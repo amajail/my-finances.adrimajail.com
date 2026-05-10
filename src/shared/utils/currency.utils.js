@@ -52,25 +52,6 @@ function convertCurrency(amount, fromCurrency, toCurrency, exchangeRate) {
 }
 
 /**
- * Calculate VAT/IVA amount
- * @param {number} netAmount - Net amount (before VAT)
- * @param {number} vatPercentage - VAT percentage (e.g., 21 for 21%)
- * @returns {number} VAT amount (rounded to 2 decimals)
- */
-function calculateVAT(netAmount, vatPercentage) {
-  if (typeof netAmount !== 'number' || isNaN(netAmount)) {
-    throw new Error('Net amount must be a valid number');
-  }
-
-  if (typeof vatPercentage !== 'number' || isNaN(vatPercentage) || vatPercentage < 0) {
-    throw new Error('VAT percentage must be a non-negative number');
-  }
-
-  const vatAmount = netAmount * (vatPercentage / 100);
-  return roundCurrency(vatAmount);
-}
-
-/**
  * Calculate total amount (net + VAT)
  * @param {number} netAmount - Net amount
  * @param {number} vatAmount - VAT amount
@@ -86,26 +67,6 @@ function calculateTotal(netAmount, vatAmount = 0) {
   }
 
   return roundCurrency(netAmount + vatAmount);
-}
-
-/**
- * Calculate net amount from total and VAT percentage
- * @param {number} totalAmount - Total amount (including VAT)
- * @param {number} vatPercentage - VAT percentage
- * @returns {number} Net amount (rounded to 2 decimals)
- */
-function calculateNetFromTotal(totalAmount, vatPercentage) {
-  if (typeof totalAmount !== 'number' || isNaN(totalAmount)) {
-    throw new Error('Total amount must be a valid number');
-  }
-
-  if (typeof vatPercentage !== 'number' || isNaN(vatPercentage) || vatPercentage < 0) {
-    throw new Error('VAT percentage must be a non-negative number');
-  }
-
-  // net = total / (1 + vatRate)
-  const netAmount = totalAmount / (1 + vatPercentage / 100);
-  return roundCurrency(netAmount);
 }
 
 /**
@@ -382,9 +343,7 @@ function splitAmount(totalAmount, percentages) {
 module.exports = {
   roundCurrency,
   convertCurrency,
-  calculateVAT,
   calculateTotal,
-  calculateNetFromTotal,
   addAmounts,
   subtractAmounts,
   multiplyAmount,

@@ -6,7 +6,7 @@ const AppError = require('./AppError');
  */
 class NotFoundError extends AppError {
   /**
-   * @param {string} resourceType - Type of resource (e.g., 'Order', 'Invoice')
+   * @param {string} resourceType - Type of resource
    * @param {string|number} identifier - Resource identifier
    * @param {Object} metadata - Additional context
    */
@@ -15,13 +15,6 @@ class NotFoundError extends AppError {
     super(message, 404, true, { ...metadata, resourceType, identifier }); // 404 Not Found
     this.resourceType = resourceType;
     this.identifier = identifier;
-  }
-
-  /**
-   * Create NotFoundError for order
-   */
-  static order(orderNumber) {
-    return new NotFoundError('Order', orderNumber);
   }
 
   /**
