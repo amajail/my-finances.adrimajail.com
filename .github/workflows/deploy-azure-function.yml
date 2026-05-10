@@ -16,7 +16,7 @@ env:
   # Secrets and variables → Actions → Variables). The job will fail fast
   # if it's not configured.
   AZURE_FUNCTIONAPP_NAME: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
+  AZURE_RESOURCE_GROUP: my-finances-rg
   NODE_VERSION: '22.x'
 
 jobs:
@@ -32,22 +32,52 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Install production dependencies
-        run: npm ci --omit=dev
-
-      - name: Run tests (with full deps)
+      - name: Run tests
         run: |
           npm ci
           npm test
 
-      - name: Reduce node_modules to production-only for deployment
+      - name: Reduce node_modules to production-only
         run: |
           rm -rf node_modules
           npm ci --omit=dev
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Defensively (re)apply runtime + worker indexing flag
+        run: |
+          az functionapp config set \
+            --name "$AZURE_FUNCTIONAPP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --linux-fx-version "Node|22"
+
+          az functionapp config appsettings set \
+            --name "$AZURE_FUNCTIONAPP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --settings \
+              "FUNCTIONS_WORKER_RUNTIME=node" \
+              "WEBSITE_NODE_DEFAULT_VERSION=~22" \
+              "AzureWebJobsFeatureFlags=EnableWorkerIndexing"
+
+      - name: Create deployment zip
+        run: |
+          zip -rq deploy.zip . \
+            --exclude "*.git*" \
+            --exclude "dashboard/*" \
+            --exclude "tests/*" \
+            --exclude "scripts/*" \
+            --exclude ".env*" \
+            --exclude "local.settings.json" \
+            --exclude "logs/*" \
+            --exclude "NEXT_STEPS.md" \
+            --exclude "PROJECT_STATUS.md"
+          echo "Zip size: $(du -sh deploy.zip | cut -f1)"
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
+          package: deploy.zip
