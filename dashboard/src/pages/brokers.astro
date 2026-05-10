@@ -44,6 +44,8 @@ import Layout from '../layouts/Layout.astro';
 <script>
   import { api } from '../lib/api.js';
 
+  const TYPE_LABELS = { broker: 'Broker', cash_holder: 'Cash holder' };
+
   async function loadBrokers() {
     try {
       const { brokers } = await api('/brokers');
@@ -56,7 +58,7 @@ import Layout from '../layouts/Layout.astro';
                 ${b.displayName}
               </td>
               <td class="px-4 py-2">
-                <span class="badge ${b.type === 'cash_holder' ? 'badge-pending' : 'badge-success'}">${b.type}</span>
+                <span class="badge ${b.type === 'cash_holder' ? 'badge-pending' : 'badge-success'}">${TYPE_LABELS[b.type] || b.type}</span>
               </td>
               <td class="px-4 py-2 text-[var(--color-muted)] text-xs">${b.notes || ''}</td>
               <td class="px-4 py-2 text-right text-xs text-[var(--color-muted)]">—</td>

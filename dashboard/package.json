@@ -8,8 +8,9 @@
   },
   "dependencies": {
     "@amajail/ui": "github:amajail/amajail-ui#master",
-    "astro": "^5.7.13",
     "@tailwindcss/vite": "^4.1.4",
-    "tailwindcss": "^4.1.4"
+    "astro": "^6.3.1",
+    "tailwindcss": "^4.1.4",
+    "vite": "^7.3.2"
   }
 }
