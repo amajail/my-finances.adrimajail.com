@@ -111,3 +111,7 @@ local.settings.json
 # Seed data (contains real portfolio holdings — never commit)
 scripts/positions.json
 scripts/*.local.json
+
+# Reference reports — contain real broker/holdings data
+portfolio-report.html
+plan-rebalanceo-brokers.html
