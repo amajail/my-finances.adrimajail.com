@@ -15,7 +15,7 @@ env:
   # Substitute these after provisioning. Or move to repo variables / secrets.
   AZURE_FUNCTIONAPP_NAME: my-finances-func
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
-  NODE_VERSION: '20.x'
+  NODE_VERSION: '24.x'
 
 jobs:
   deploy:
