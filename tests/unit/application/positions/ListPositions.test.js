@@ -8,7 +8,7 @@ const Position = require('../../../../src/domain/entities/Position');
 describe('ListPositions Use Case', () => {
   it('should list all positions when no filter', async () => {
     const position1 = new Position({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 10,
@@ -45,14 +45,14 @@ describe('ListPositions Use Case', () => {
     };
 
     const useCase = new ListPositions({ positionRepository: mockRepository });
-    await useCase.execute({ broker: 'galicia' });
+    await useCase.execute({ broker: 'broker1' });
 
-    expect(mockRepository.findByBroker).toHaveBeenCalledWith('galicia');
+    expect(mockRepository.findByBroker).toHaveBeenCalledWith('broker1');
   });
 
   it('should include id in returned positions', async () => {
     const position = new Position({
-      brokerId: 'iol',
+      brokerId: 'broker2',
       assetType: 'etf',
       symbol: 'SPY',
       quantity: 5,

@@ -12,8 +12,10 @@ on:
   workflow_dispatch:
 
 env:
-  # Substitute these after provisioning. Or move to repo variables / secrets.
-  AZURE_FUNCTIONAPP_NAME: my-finances-func
+  # AZURE_FUNCTIONAPP_NAME must be set as a repo variable (Settings →
+  # Secrets and variables → Actions → Variables). The job will fail fast
+  # if it's not configured.
+  AZURE_FUNCTIONAPP_NAME: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
   NODE_VERSION: '24.x'
 

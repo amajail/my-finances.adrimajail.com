@@ -13,14 +13,14 @@ describe('CreateBroker Use Case', () => {
 
     const useCase = new CreateBroker({ brokerRepository: mockRepository });
     const result = await useCase.execute({
-      id: 'galicia',
+      id: 'broker1',
       displayName: 'Galicia',
       type: 'broker',
       accentColor: '#FF0000',
       notes: 'Main broker'
     });
 
-    expect(result.id).toBe('galicia');
+    expect(result.id).toBe('broker1');
     expect(result.displayName).toBe('Galicia');
     expect(result.type).toBe('broker');
     expect(mockRepository.save).toHaveBeenCalled();
@@ -47,7 +47,7 @@ describe('CreateBroker Use Case', () => {
 
     const useCase = new CreateBroker({ brokerRepository: mockRepository });
     await expect(useCase.execute({
-      id: 'galicia',
+      id: 'broker1',
       type: 'broker'
     }))
       .rejects
@@ -61,7 +61,7 @@ describe('CreateBroker Use Case', () => {
 
     const useCase = new CreateBroker({ brokerRepository: mockRepository });
     await expect(useCase.execute({
-      id: 'galicia',
+      id: 'broker1',
       displayName: 'Galicia'
     }))
       .rejects
@@ -75,7 +75,7 @@ describe('CreateBroker Use Case', () => {
 
     const useCase = new CreateBroker({ brokerRepository: mockRepository });
     await expect(useCase.execute({
-      id: 'galicia',
+      id: 'broker1',
       displayName: 'Galicia',
       type: 'invalid'
     }))

@@ -9,7 +9,7 @@ describe('Position Entity', () => {
   describe('constructor', () => {
     it('should create a valid position', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -19,7 +19,7 @@ describe('Position Entity', () => {
         displayName: 'Apple Inc.'
       });
 
-      expect(position.brokerId.value).toBe('galicia');
+      expect(position.brokerId.value).toBe('broker1');
       expect(position.assetType).toBe('stock');
       expect(position.symbol.value).toBe('AAPL');
       expect(position.quantity.value).toBe(100);
@@ -31,7 +31,7 @@ describe('Position Entity', () => {
 
     it('should handle null currentPrice', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -45,7 +45,7 @@ describe('Position Entity', () => {
 
     it('should reject invalid assetType', () => {
       expect(() => new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'invalid',
         symbol: 'AAPL',
         quantity: 100,
@@ -56,7 +56,7 @@ describe('Position Entity', () => {
 
     it('should reject negative averageCost', () => {
       expect(() => new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -67,7 +67,7 @@ describe('Position Entity', () => {
 
     it('should reject invalid status', () => {
       expect(() => new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -81,7 +81,7 @@ describe('Position Entity', () => {
   describe('id', () => {
     it('should return position identifier in assetType__symbol format', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -96,7 +96,7 @@ describe('Position Entity', () => {
   describe('isOpen / isClosed', () => {
     it('should report open status correctly', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -111,7 +111,7 @@ describe('Position Entity', () => {
 
     it('should report closed status correctly', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 0,
@@ -128,7 +128,7 @@ describe('Position Entity', () => {
   describe('costBasis', () => {
     it('should calculate cost basis', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -141,9 +141,9 @@ describe('Position Entity', () => {
 
     it('should handle decimal quantities', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'bond',
-        symbol: 'AL35D',
+        symbol: 'BOND01',
         quantity: 10.5,
         averageCost: 100,
         currency: 'ARS'
@@ -156,7 +156,7 @@ describe('Position Entity', () => {
   describe('marketValue', () => {
     it('should calculate market value with price', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -170,7 +170,7 @@ describe('Position Entity', () => {
 
     it('should return null if currentPrice is not set', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -186,7 +186,7 @@ describe('Position Entity', () => {
   describe('unrealizedPnl', () => {
     it('should calculate unrealized PnL', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -200,7 +200,7 @@ describe('Position Entity', () => {
 
     it('should return null if currentPrice is not set', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -213,7 +213,7 @@ describe('Position Entity', () => {
 
     it('should handle negative PnL', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -229,7 +229,7 @@ describe('Position Entity', () => {
   describe('unrealizedPnlPercent', () => {
     it('should calculate unrealized PnL percent', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -244,7 +244,7 @@ describe('Position Entity', () => {
 
     it('should return null if currentPrice is not set', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -257,7 +257,7 @@ describe('Position Entity', () => {
 
     it('should return null if costBasis is zero', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -271,7 +271,7 @@ describe('Position Entity', () => {
 
     it('should handle negative PnL percent', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -288,7 +288,7 @@ describe('Position Entity', () => {
   describe('withCurrentPrice', () => {
     it('should create new position with updated price', () => {
       const original = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -306,7 +306,7 @@ describe('Position Entity', () => {
 
     it('should update timestamp', () => {
       const original = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -322,7 +322,7 @@ describe('Position Entity', () => {
 
     it('should preserve other fields', () => {
       const original = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -343,7 +343,7 @@ describe('Position Entity', () => {
   describe('close', () => {
     it('should create closed position', () => {
       const open = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -361,7 +361,7 @@ describe('Position Entity', () => {
 
     it('should update timestamp', () => {
       const original = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -379,7 +379,7 @@ describe('Position Entity', () => {
   describe('toJSON', () => {
     it('should return plain object', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -390,7 +390,7 @@ describe('Position Entity', () => {
 
       const json = position.toJSON();
 
-      expect(json.brokerId).toBe('galicia');
+      expect(json.brokerId).toBe('broker1');
       expect(json.assetType).toBe('stock');
       expect(json.symbol).toBe('AAPL');
       expect(json.quantity).toBe(100);
@@ -402,7 +402,7 @@ describe('Position Entity', () => {
   describe('fromJSON', () => {
     it('should round-trip with toJSON', () => {
       const original = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -421,7 +421,7 @@ describe('Position Entity', () => {
   describe('equals', () => {
     it('should return true for positions with same broker/asset/symbol', () => {
       const pos1 = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -430,7 +430,7 @@ describe('Position Entity', () => {
       });
 
       const pos2 = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 200,
@@ -443,7 +443,7 @@ describe('Position Entity', () => {
 
     it('should return false for different positions', () => {
       const pos1 = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -452,7 +452,7 @@ describe('Position Entity', () => {
       });
 
       const pos2 = new Position({
-        brokerId: 'iol',
+        brokerId: 'broker2',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,
@@ -467,7 +467,7 @@ describe('Position Entity', () => {
   describe('immutability', () => {
     it('should be frozen', () => {
       const position = new Position({
-        brokerId: 'galicia',
+        brokerId: 'broker1',
         assetType: 'stock',
         symbol: 'AAPL',
         quantity: 100,

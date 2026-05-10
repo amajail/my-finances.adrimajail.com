@@ -9,7 +9,7 @@ const { ValidationError, NotFoundError } = require('../../../../src/shared/error
 describe('UpdatePosition Use Case', () => {
   it('should update a position', async () => {
     const position = new Position({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 10,
@@ -25,7 +25,7 @@ describe('UpdatePosition Use Case', () => {
 
     const useCase = new UpdatePosition({ positionRepository: mockRepository });
     const result = await useCase.execute({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       rowKey: 'stock__AAPL',
       currentPrice: 165
     });
@@ -43,7 +43,7 @@ describe('UpdatePosition Use Case', () => {
     const useCase = new UpdatePosition({ positionRepository: mockRepository });
 
     await expect(useCase.execute({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       rowKey: 'stock__AAPL',
       currentPrice: 165
     }))
@@ -76,7 +76,7 @@ describe('UpdatePosition Use Case', () => {
     const useCase = new UpdatePosition({ positionRepository: mockRepository });
 
     await expect(useCase.execute({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       currentPrice: 165
     }))
       .rejects
@@ -85,7 +85,7 @@ describe('UpdatePosition Use Case', () => {
 
   it('should update multiple fields', async () => {
     const position = new Position({
-      brokerId: 'iol',
+      brokerId: 'broker2',
       assetType: 'stock',
       symbol: 'TSLA',
       quantity: 5,
@@ -101,7 +101,7 @@ describe('UpdatePosition Use Case', () => {
 
     const useCase = new UpdatePosition({ positionRepository: mockRepository });
     await useCase.execute({
-      brokerId: 'iol',
+      brokerId: 'broker2',
       rowKey: 'stock__TSLA',
       quantity: 10,
       currentPrice: 250,

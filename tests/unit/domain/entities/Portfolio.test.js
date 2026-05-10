@@ -10,7 +10,7 @@ const { ValidationError, DomainError } = require('../../../../src/shared/errors'
 describe('Portfolio Entity', () => {
   const createPosition = (overrides = {}) => {
     return new Position({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 100,
@@ -23,7 +23,7 @@ describe('Portfolio Entity', () => {
 
   const createBroker = (overrides = {}) => {
     return new Broker({
-      id: 'galicia',
+      id: 'broker1',
       displayName: 'Galicia',
       type: 'broker',
       ...overrides
@@ -93,12 +93,12 @@ describe('Portfolio Entity', () => {
 
   describe('positionsByBroker', () => {
     it('should filter positions by broker ID', () => {
-      const pos1 = createPosition({ brokerId: 'galicia' });
-      const pos2 = createPosition({ brokerId: 'iol', symbol: 'GOOGL' });
+      const pos1 = createPosition({ brokerId: 'broker1' });
+      const pos2 = createPosition({ brokerId: 'broker2', symbol: 'GOOGL' });
       const portfolio = new Portfolio([pos1, pos2]);
 
-      expect(portfolio.positionsByBroker('galicia')).toEqual([pos1]);
-      expect(portfolio.positionsByBroker('iol')).toEqual([pos2]);
+      expect(portfolio.positionsByBroker('broker1')).toEqual([pos1]);
+      expect(portfolio.positionsByBroker('broker2')).toEqual([pos2]);
     });
   });
 
@@ -189,16 +189,16 @@ describe('Portfolio Entity', () => {
 
   describe('totalByBroker', () => {
     it('should calculate totals by broker with MEP rate', () => {
-      const pos1 = createPosition({ brokerId: 'galicia', currency: 'USD', currentPrice: 150, quantity: 100 });
-      const pos2 = createPosition({ brokerId: 'iol', symbol: 'GGBR', currency: 'ARS', currentPrice: 1000, quantity: 50 });
+      const pos1 = createPosition({ brokerId: 'broker1', currency: 'USD', currentPrice: 150, quantity: 100 });
+      const pos2 = createPosition({ brokerId: 'broker2', symbol: 'GGBR', currency: 'ARS', currentPrice: 1000, quantity: 50 });
       const portfolio = new Portfolio([pos1, pos2]);
 
       const totals = portfolio.totalByBroker(1000);
 
-      expect(totals.galicia.native.USD).toBe(15000);
-      expect(totals.galicia.usdEquivalent).toBe(15000);
-      expect(totals.iol.native.ARS).toBe(50000);
-      expect(totals.iol.usdEquivalent).toBe(50);
+      expect(totals.broker1.native.USD).toBe(15000);
+      expect(totals.broker1.usdEquivalent).toBe(15000);
+      expect(totals.broker2.native.ARS).toBe(50000);
+      expect(totals.broker2.usdEquivalent).toBe(50);
     });
 
     it('should throw error for invalid mepRate', () => {
@@ -211,13 +211,13 @@ describe('Portfolio Entity', () => {
     });
 
     it('should exclude closed positions', () => {
-      const open = createPosition({ brokerId: 'galicia', currentPrice: 150, quantity: 100, status: 'open' });
-      const closed = createPosition({ symbol: 'GOOGL', brokerId: 'galicia', currentPrice: 200, quantity: 50, status: 'closed' });
+      const open = createPosition({ brokerId: 'broker1', currentPrice: 150, quantity: 100, status: 'open' });
+      const closed = createPosition({ symbol: 'GOOGL', brokerId: 'broker1', currentPrice: 200, quantity: 50, status: 'closed' });
       const portfolio = new Portfolio([open, closed]);
 
       const totals = portfolio.totalByBroker(1000);
 
-      expect(totals.galicia.native.USD).toBe(15000);
+      expect(totals.broker1.native.USD).toBe(15000);
     });
   });
 

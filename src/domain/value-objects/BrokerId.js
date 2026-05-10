@@ -2,7 +2,7 @@
  * BrokerId Value Object
  *
  * Represents a broker identifier/slug.
- * Examples: galicia, iol, ibkr, bullmarket, cash
+ * Examples: broker1, broker2, cash
  * Immutable value object following DDD principles.
  */
 
