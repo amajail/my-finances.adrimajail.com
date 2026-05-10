@@ -5,77 +5,58 @@
     "_optional_fields": "displayName, exchange, maturityDate, status, notes",
     "_assetType_values": "stock | etf | cedear | bond | bopreal | lecap | on | deposit | cash",
     "_currency_values": "USD | ARS",
-    "_brokerId_values": "galicia | iol | ibkr | bullmarket | cash",
+    "_brokerId_values": "match the broker ids you defined in scripts/seed-brokers.js",
     "_note_no_currentPrice": "Skip currentPrice; the price refresh will populate it",
     "_note_cash_rows": "For cash positions: assetType=cash, symbol=USD or ARS, quantity=amount, averageCost=1"
   },
   {
-    "brokerId": "ibkr",
+    "brokerId": "broker1",
     "assetType": "stock",
-    "symbol": "VOO",
-    "displayName": "Vanguard S&P 500 ETF",
-    "quantity": 24,
-    "averageCost": 412.50,
+    "symbol": "EXAMPLE",
+    "displayName": "Example Stock",
+    "quantity": 10,
+    "averageCost": 100,
     "currency": "USD",
-    "exchange": "NYSEARCA"
+    "exchange": "NYSE"
   },
   {
-    "brokerId": "galicia",
+    "brokerId": "broker1",
     "assetType": "bond",
-    "symbol": "GD41D",
-    "displayName": "Bono Global 2041 USD",
-    "quantity": 5000,
-    "averageCost": 0.42,
+    "symbol": "EX-BOND-USD",
+    "displayName": "Example USD-denominated bond",
+    "quantity": 1000,
+    "averageCost": 0.5,
     "currency": "USD",
-    "maturityDate": "2041-07-09"
+    "maturityDate": "2030-01-01"
   },
   {
-    "brokerId": "galicia",
+    "brokerId": "broker2",
     "assetType": "lecap",
-    "symbol": "S29Y6",
-    "displayName": "LECAP 29-may-2026",
-    "quantity": 1000000,
+    "symbol": "EX-LECAP",
+    "displayName": "Example LECAP",
+    "quantity": 100000,
     "averageCost": 0.95,
     "currency": "ARS",
-    "maturityDate": "2026-05-29"
+    "maturityDate": "2026-12-31"
   },
   {
-    "brokerId": "galicia",
+    "brokerId": "broker2",
     "assetType": "deposit",
-    "symbol": "PF-USD-15K-2026-05-11",
-    "displayName": "Plazo Fijo USD 15K vto 11-may-2026",
-    "quantity": 15000,
+    "symbol": "EX-DEP-USD-2026-01",
+    "displayName": "Example USD time deposit",
+    "quantity": 1000,
     "averageCost": 1,
     "currency": "USD",
-    "maturityDate": "2026-05-11"
-  },
-  {
-    "brokerId": "iol",
-    "assetType": "bopreal",
-    "symbol": "BPOC7",
-    "displayName": "BOPREAL Serie 1C",
-    "quantity": 1500,
-    "averageCost": 0.88,
-    "currency": "USD"
-  },
-  {
-    "brokerId": "bullmarket",
-    "assetType": "cedear",
-    "symbol": "AAPL",
-    "displayName": "Apple Inc. (CEDEAR)",
-    "quantity": 50,
-    "averageCost": 4500,
-    "currency": "ARS",
-    "exchange": "BCBA"
+    "maturityDate": "2026-01-01"
   },
   {
     "brokerId": "cash",
     "assetType": "cash",
     "symbol": "USD",
-    "displayName": "Dólar billete físico",
-    "quantity": 100000,
+    "displayName": "USD cash",
+    "quantity": 1000,
     "averageCost": 1,
     "currency": "USD",
-    "notes": "Off-system reserve"
+    "notes": "Example cash holding"
   }
 ]

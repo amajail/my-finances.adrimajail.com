@@ -2,7 +2,7 @@
  * Symbol Value Object
  *
  * Represents an asset's ticker symbol, bond code, or currency code.
- * Examples: AAPL, BRK.B, AL35D, S29Y6 (LECAP), USD, ARS
+ * Examples: AAPL, BRK.B, sovereign-bond codes, LECAP codes, USD, ARS
  * Immutable value object following DDD principles.
  */
 
@@ -93,7 +93,7 @@ class Symbol {
     }
 
     // Match pattern: alphanumeric, dots, hyphens, underscores
-    // Allows tickers like AAPL, BRK.B, currency codes like USD, bonds like AL35D, LECAPs like S29Y6
+    // Allows tickers like AAPL or BRK.B, currency codes like USD/ARS, and short alphanumeric bond/LECAP codes
     if (!/^[A-Z0-9._-]+$/i.test(valueStr)) {
       errors.push('Symbol can only contain alphanumeric characters, dots, hyphens, and underscores');
       return { valid: false, errors };

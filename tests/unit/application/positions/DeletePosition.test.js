@@ -13,12 +13,12 @@ describe('DeletePosition Use Case', () => {
 
     const useCase = new DeletePosition({ positionRepository: mockRepository });
     const result = await useCase.execute({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       rowKey: 'stock__AAPL'
     });
 
     expect(result.deleted).toBe(true);
-    expect(mockRepository.delete).toHaveBeenCalledWith('galicia', 'stock__AAPL');
+    expect(mockRepository.delete).toHaveBeenCalledWith('broker1', 'stock__AAPL');
   });
 
   it('should throw NotFoundError when position does not exist', async () => {
@@ -29,7 +29,7 @@ describe('DeletePosition Use Case', () => {
     const useCase = new DeletePosition({ positionRepository: mockRepository });
 
     await expect(useCase.execute({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       rowKey: 'stock__AAPL'
     }))
       .rejects
@@ -58,7 +58,7 @@ describe('DeletePosition Use Case', () => {
     const useCase = new DeletePosition({ positionRepository: mockRepository });
 
     await expect(useCase.execute({
-      brokerId: 'galicia'
+      brokerId: 'broker1'
     }))
       .rejects
       .toThrow(ValidationError);

@@ -12,12 +12,12 @@
 
 const BASE = process.env.API_BASE || 'http://localhost:7071/api';
 
+// Example brokers — replace these with your own before running this script
+// against a real environment. Add or remove rows as needed.
 const BROKERS = [
-  { id: 'galicia',    displayName: 'Banco Galicia',       type: 'broker',      accentColor: '#f0a500' },
-  { id: 'iol',        displayName: 'InvertirOnline',      type: 'broker',      accentColor: '#4f8ef7' },
-  { id: 'ibkr',       displayName: 'Interactive Brokers', type: 'broker',      accentColor: '#a78bfa' },
-  { id: 'bullmarket', displayName: 'BullMarket Brokers',  type: 'broker',      accentColor: '#00d68f' },
-  { id: 'cash',       displayName: 'Cash físico',         type: 'cash_holder', accentColor: '#94a3b8' },
+  { id: 'broker1', displayName: 'Example Broker 1', type: 'broker',      accentColor: '#f0a500' },
+  { id: 'broker2', displayName: 'Example Broker 2', type: 'broker',      accentColor: '#4f8ef7' },
+  { id: 'cash',     displayName: 'Cash holdings',    type: 'cash_holder', accentColor: '#94a3b8' },
 ];
 
 const SETTINGS = [

@@ -9,7 +9,7 @@ const { ValidationError, NotFoundError } = require('../../../../src/shared/error
 describe('AddPosition Use Case', () => {
   it('should add a position when broker exists', async () => {
     const broker = new Broker({
-      id: 'galicia',
+      id: 'broker1',
       displayName: 'Galicia',
       type: 'broker'
     });
@@ -28,7 +28,7 @@ describe('AddPosition Use Case', () => {
     });
 
     const result = await useCase.execute({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 10,
@@ -82,7 +82,7 @@ describe('AddPosition Use Case', () => {
     });
 
     await expect(useCase.execute({
-      brokerId: 'galicia'
+      brokerId: 'broker1'
       // missing assetType, symbol, etc.
     }))
       .rejects
@@ -91,7 +91,7 @@ describe('AddPosition Use Case', () => {
 
   it('should include optional fields when provided', async () => {
     const broker = new Broker({
-      id: 'iol',
+      id: 'broker2',
       displayName: 'IOL',
       type: 'broker'
     });
@@ -110,7 +110,7 @@ describe('AddPosition Use Case', () => {
     });
 
     await useCase.execute({
-      brokerId: 'iol',
+      brokerId: 'broker2',
       assetType: 'bond',
       symbol: 'AE38',
       quantity: 100,

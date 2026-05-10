@@ -1,11 +1,13 @@
 # my-finances
 
-Personal portfolio tracker. Stocks, bonds, and cash across 4 brokers + cash físico.
+Self-hosted portfolio tracker for stocks, bonds, deposits, and cash across
+multiple brokers.
 
 - **Backend**: Azure Functions v4 (Node.js)
 - **Storage**: Azure Table Storage
-- **Dashboard**: Astro + @amajail/ui (separate `dashboard/` folder, added in Phase 5)
+- **Dashboard**: Astro (separate `dashboard/` folder)
 - **Price refresh**: Daily timer-triggered function pulling from Yahoo Finance
+  (stocks/ETFs) and Rava (Argentine fixed income)
 
 ## Develop
 

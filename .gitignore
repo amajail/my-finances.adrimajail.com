@@ -10,8 +10,9 @@
 !dashboard/.env.production
 !.env.test
 
-# Project status (may contain sensitive configuration examples)
+# Project status / resume notes (may contain secrets, infra names, in-flight context)
 PROJECT_STATUS.md
+NEXT_STEPS.md
 
 # Node.js
 node_modules/

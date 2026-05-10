@@ -34,7 +34,7 @@ describe('RefreshPrices Use Case', () => {
 
   it('should fetch and update prices for all unique symbols', async () => {
     const position1 = new Position({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 10,
@@ -44,7 +44,7 @@ describe('RefreshPrices Use Case', () => {
     });
 
     const position2 = new Position({
-      brokerId: 'iol',
+      brokerId: 'broker2',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 5,
@@ -93,7 +93,7 @@ describe('RefreshPrices Use Case', () => {
 
   it('should record failed quotes without updating positions', async () => {
     const position = new Position({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'BADSTOCK',
       quantity: 10,
@@ -143,7 +143,7 @@ describe('RefreshPrices Use Case', () => {
 
   it('should process multiple symbols sequentially', async () => {
     const position1 = new Position({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 10,
@@ -152,7 +152,7 @@ describe('RefreshPrices Use Case', () => {
     });
 
     const position2 = new Position({
-      brokerId: 'iol',
+      brokerId: 'broker2',
       assetType: 'stock',
       symbol: 'MSFT',
       quantity: 5,

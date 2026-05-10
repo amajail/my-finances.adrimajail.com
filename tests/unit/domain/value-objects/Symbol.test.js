@@ -14,11 +14,11 @@ describe('Symbol Value Object', () => {
       const symbol2 = new Symbol('BRK.B');
       expect(symbol2.value).toBe('BRK.B');
 
-      const symbol3 = new Symbol('AL35D');
-      expect(symbol3.value).toBe('AL35D');
+      const symbol3 = new Symbol('BOND01');
+      expect(symbol3.value).toBe('BOND01');
 
-      const symbol4 = new Symbol('S29Y6');
-      expect(symbol4.value).toBe('S29Y6');
+      const symbol4 = new Symbol('BOND02');
+      expect(symbol4.value).toBe('BOND02');
 
       const symbol5 = new Symbol('USD');
       expect(symbol5.value).toBe('USD');
@@ -51,8 +51,8 @@ describe('Symbol Value Object', () => {
       const symbol1 = new Symbol('BRK.B');
       expect(symbol1.value).toBe('BRK.B');
 
-      const symbol2 = new Symbol('AL35D');
-      expect(symbol2.value).toBe('AL35D');
+      const symbol2 = new Symbol('BOND01');
+      expect(symbol2.value).toBe('BOND01');
 
       const symbol3 = new Symbol('TEST-1');
       expect(symbol3.value).toBe('TEST-1');
@@ -138,7 +138,7 @@ describe('Symbol Value Object', () => {
     it('should return true for valid symbols', () => {
       expect(Symbol.isValid('AAPL')).toBe(true);
       expect(Symbol.isValid('BRK.B')).toBe(true);
-      expect(Symbol.isValid('AL35D')).toBe(true);
+      expect(Symbol.isValid('BOND01')).toBe(true);
     });
 
     it('should return false for invalid symbols', () => {

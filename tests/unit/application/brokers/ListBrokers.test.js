@@ -8,7 +8,7 @@ const Broker = require('../../../../src/domain/entities/Broker');
 describe('ListBrokers Use Case', () => {
   it('should list all brokers', async () => {
     const broker1 = new Broker({
-      id: 'galicia',
+      id: 'broker1',
       displayName: 'Galicia',
       type: 'broker'
     });
@@ -26,7 +26,7 @@ describe('ListBrokers Use Case', () => {
     const result = await useCase.execute({});
 
     expect(result).toHaveLength(2);
-    expect(result[0].id).toBe('galicia');
+    expect(result[0].id).toBe('broker1');
     expect(result[1].id).toBe('cash');
     expect(mockRepository.findAll).toHaveBeenCalled();
   });
@@ -44,7 +44,7 @@ describe('ListBrokers Use Case', () => {
 
   it('should return brokers as plain objects', async () => {
     const broker = new Broker({
-      id: 'iol',
+      id: 'broker2',
       displayName: 'IOL',
       type: 'broker',
       accentColor: '#FF0000',
@@ -59,7 +59,7 @@ describe('ListBrokers Use Case', () => {
     const result = await useCase.execute({});
 
     expect(result[0]).toEqual(expect.objectContaining({
-      id: 'iol',
+      id: 'broker2',
       displayName: 'IOL',
       type: 'broker',
       accentColor: '#FF0000',

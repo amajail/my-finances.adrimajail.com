@@ -9,13 +9,13 @@ const Position = require('../../../../src/domain/entities/Position');
 describe('GetPortfolioSummary Use Case', () => {
   it('should generate portfolio summary', async () => {
     const broker = new Broker({
-      id: 'galicia',
+      id: 'broker1',
       displayName: 'Galicia',
       type: 'broker'
     });
 
     const position = new Position({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 10,
@@ -57,13 +57,13 @@ describe('GetPortfolioSummary Use Case', () => {
 
   it('should use default MEP rate when setting fails', async () => {
     const broker = new Broker({
-      id: 'iol',
+      id: 'broker2',
       displayName: 'IOL',
       type: 'broker'
     });
 
     const position = new Position({
-      brokerId: 'iol',
+      brokerId: 'broker2',
       assetType: 'stock',
       symbol: 'MSFT',
       quantity: 5,
@@ -102,7 +102,7 @@ describe('GetPortfolioSummary Use Case', () => {
 
   it('should include lastPriceRefreshAt when available', async () => {
     const broker = new Broker({
-      id: 'galicia',
+      id: 'broker1',
       displayName: 'Galicia',
       type: 'broker'
     });
@@ -141,7 +141,7 @@ describe('GetPortfolioSummary Use Case', () => {
 
   it('should set lastPriceRefreshAt to null when no quotes exist', async () => {
     const broker = new Broker({
-      id: 'iol',
+      id: 'broker2',
       displayName: 'IOL',
       type: 'broker'
     });

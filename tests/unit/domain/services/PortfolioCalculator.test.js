@@ -10,7 +10,7 @@ const { DomainError } = require('../../../../src/shared/errors');
 describe('PortfolioCalculator Service', () => {
   const createPosition = (overrides = {}) => {
     return new Position({
-      brokerId: 'galicia',
+      brokerId: 'broker1',
       assetType: 'stock',
       symbol: 'AAPL',
       quantity: 100,

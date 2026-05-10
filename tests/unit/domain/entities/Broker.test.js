@@ -10,14 +10,14 @@ describe('Broker Entity', () => {
   describe('constructor', () => {
     it('should create a valid broker', () => {
       const broker = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker',
         accentColor: '#FF0000',
         notes: 'Test broker'
       });
 
-      expect(broker.idValue).toBe('galicia');
+      expect(broker.idValue).toBe('broker1');
       expect(broker.displayName).toBe('Galicia');
       expect(broker.type).toBe('broker');
       expect(broker.accentColor).toBe('#FF0000');
@@ -39,8 +39,8 @@ describe('Broker Entity', () => {
 
     it('should set default timestamps', () => {
       const broker = new Broker({
-        id: 'iol',
-        displayName: 'IOL',
+        id: 'broker2',
+        displayName: 'BROKER2',
         type: 'broker'
       });
 
@@ -53,8 +53,8 @@ describe('Broker Entity', () => {
       const updatedAt = new Date('2023-01-02');
 
       const broker = new Broker({
-        id: 'iol',
-        displayName: 'IOL',
+        id: 'broker2',
+        displayName: 'BROKER2',
         type: 'broker',
         createdAt,
         updatedAt
@@ -66,14 +66,14 @@ describe('Broker Entity', () => {
 
     it('should reject missing displayName', () => {
       expect(() => new Broker({
-        id: 'galicia',
+        id: 'broker1',
         type: 'broker'
       })).toThrow(ValidationError);
     });
 
     it('should reject empty displayName', () => {
       expect(() => new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: '  ',
         type: 'broker'
       })).toThrow(ValidationError);
@@ -81,7 +81,7 @@ describe('Broker Entity', () => {
 
     it('should reject invalid type', () => {
       expect(() => new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'invalid'
       })).toThrow(ValidationError);
@@ -89,37 +89,37 @@ describe('Broker Entity', () => {
 
     it('should normalize broker ID to lowercase', () => {
       const broker = new Broker({
-        id: 'GALICIA',
+        id: 'BROKER1',
         displayName: 'Galicia',
         type: 'broker'
       });
-      expect(broker.idValue).toBe('galicia');
+      expect(broker.idValue).toBe('broker1');
     });
   });
 
   describe('id getter', () => {
     it('should return BrokerId value object', () => {
       const broker = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker'
       });
 
       expect(broker.id instanceof BrokerId).toBe(true);
-      expect(broker.id.value).toBe('galicia');
+      expect(broker.id.value).toBe('broker1');
     });
   });
 
   describe('idValue getter', () => {
     it('should return broker ID as string', () => {
       const broker = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker'
       });
 
       expect(typeof broker.idValue).toBe('string');
-      expect(broker.idValue).toBe('galicia');
+      expect(broker.idValue).toBe('broker1');
     });
   });
 
@@ -136,7 +136,7 @@ describe('Broker Entity', () => {
 
     it('should return false for brokers', () => {
       const broker = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker'
       });
@@ -148,7 +148,7 @@ describe('Broker Entity', () => {
   describe('isBroker', () => {
     it('should return true for brokers', () => {
       const broker = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker'
       });
@@ -170,7 +170,7 @@ describe('Broker Entity', () => {
   describe('toJSON', () => {
     it('should return plain object', () => {
       const broker = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker',
         accentColor: '#FF0000',
@@ -179,7 +179,7 @@ describe('Broker Entity', () => {
 
       const json = broker.toJSON();
 
-      expect(json.id).toBe('galicia');
+      expect(json.id).toBe('broker1');
       expect(json.displayName).toBe('Galicia');
       expect(json.type).toBe('broker');
       expect(json.accentColor).toBe('#FF0000');
@@ -192,7 +192,7 @@ describe('Broker Entity', () => {
   describe('fromJSON', () => {
     it('should create broker from plain object', () => {
       const data = {
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker',
         accentColor: '#FF0000',
@@ -202,13 +202,13 @@ describe('Broker Entity', () => {
 
       const broker = Broker.fromJSON(data);
 
-      expect(broker.idValue).toBe('galicia');
+      expect(broker.idValue).toBe('broker1');
       expect(broker.displayName).toBe('Galicia');
     });
 
     it('should round-trip with toJSON', () => {
       const original = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker',
         accentColor: '#FF0000',
@@ -225,13 +225,13 @@ describe('Broker Entity', () => {
   describe('equals', () => {
     it('should return true for brokers with same ID', () => {
       const broker1 = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker'
       });
 
       const broker2 = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia Modified',
         type: 'cash_holder'
       });
@@ -241,14 +241,14 @@ describe('Broker Entity', () => {
 
     it('should return false for brokers with different IDs', () => {
       const broker1 = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker'
       });
 
       const broker2 = new Broker({
-        id: 'iol',
-        displayName: 'IOL',
+        id: 'broker2',
+        displayName: 'BROKER2',
         type: 'broker'
       });
 
@@ -257,12 +257,12 @@ describe('Broker Entity', () => {
 
     it('should return false when comparing with non-Broker', () => {
       const broker = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker'
       });
 
-      expect(broker.equals('galicia')).toBe(false);
+      expect(broker.equals('broker1')).toBe(false);
       expect(broker.equals(null)).toBe(false);
     });
   });
@@ -270,7 +270,7 @@ describe('Broker Entity', () => {
   describe('immutability', () => {
     it('should be frozen', () => {
       const broker = new Broker({
-        id: 'galicia',
+        id: 'broker1',
         displayName: 'Galicia',
         type: 'broker'
       });
