@@ -292,25 +292,6 @@ function normalizeCurrencyCode(currencyCode) {
 }
 
 /**
- * Convert ISO currency code to AFIP currency code
- * @param {string} isoCurrencyCode - ISO currency code (ARS, USD, EUR)
- * @returns {string} AFIP currency code
- */
-function toAfipCurrencyCode(isoCurrencyCode) {
-  if (typeof isoCurrencyCode !== 'string') {
-    return isoCurrencyCode;
-  }
-
-  const mapping = {
-    'ARS': 'PES',
-    'USD': 'DOL'
-  };
-
-  const upperCode = isoCurrencyCode.toUpperCase();
-  return mapping[upperCode] || upperCode;
-}
-
-/**
  * Format amount as currency with symbol
  * @param {number} amount - Amount to format
  * @param {string} currencyCode - Currency code
@@ -413,7 +394,6 @@ module.exports = {
   parseCurrencyAmount,
   validateCurrencyCode,
   normalizeCurrencyCode,
-  toAfipCurrencyCode,
   formatCurrencyAmount,
   calculatePercentage,
   splitAmount

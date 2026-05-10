@@ -25,13 +25,6 @@ class NotFoundError extends AppError {
   }
 
   /**
-   * Create NotFoundError for invoice
-   */
-  static invoice(cae) {
-    return new NotFoundError('Invoice', cae);
-  }
-
-  /**
    * Create NotFoundError with custom resource type
    */
   static resource(resourceType, identifier) {
