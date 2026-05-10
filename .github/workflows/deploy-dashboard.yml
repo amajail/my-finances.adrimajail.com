@@ -1,0 +1,33 @@
+name: Deploy Dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/deploy-dashboard.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build and deploy to Azure Static Web Apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Build and deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: dashboard
+          output_location: dist
+        env:
+          PUBLIC_API_BASE_URL: ${{ secrets.PUBLIC_API_URL }}
+          PUBLIC_FUNCTION_KEY: ${{ secrets.PUBLIC_FUNCTION_KEY }}
