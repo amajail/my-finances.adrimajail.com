@@ -1,0 +1,191 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Portfolio · my-finances" active="home">
+  <header class="mb-8">
+    <span class="eyebrow">Consolidated Portfolio</span>
+    <span class="accent-line"></span>
+    <div class="flex items-end justify-between flex-wrap gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight" id="grand-total">—</h1>
+        <p class="text-sm text-[var(--color-muted)]">
+          Last refresh: <span id="last-refresh">—</span>
+        </p>
+      </div>
+      <button id="refresh-btn" class="row-action-btn">Refresh prices</button>
+    </div>
+  </header>
+
+  <section id="stat-row" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8"></section>
+
+  <section id="brokers-section" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10"></section>
+
+  <section id="positions-by-broker" class="space-y-6 mb-10"></section>
+
+  <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div id="top-performers"></div>
+    <div id="bottom-performers"></div>
+  </section>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+
+  const fmtUsd = n => n == null ? '—' : `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+  const fmtPct = n => n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+  const pnlClass = n => n == null ? 'pos-neutral' : n >= 0 ? 'pos-positive' : 'pos-negative';
+
+  function renderStatCell(label, value, sub = '') {
+    return `
+      <div class="stat-cell">
+        <div class="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-1">${label}</div>
+        <div class="text-lg font-bold num-mono">${value}</div>
+        ${sub ? `<div class="text-xs text-[var(--color-muted)] mt-0.5">${sub}</div>` : ''}
+      </div>
+    `;
+  }
+
+  async function load() {
+    try {
+      const summary = await api('/portfolio/summary');
+
+      // Grand total
+      document.getElementById('grand-total').textContent = fmtUsd(summary.grandTotalUsd);
+      document.getElementById('last-refresh').textContent = summary.lastPriceRefreshAt
+        ? new Date(summary.lastPriceRefreshAt).toLocaleString()
+        : 'Never';
+
+      // Stat row
+      const ars = summary.totalByCurrency?.ARS || 0;
+      const usd = summary.totalByCurrency?.USD || 0;
+      const pnlUsd = summary.unrealizedPnlByCurrency?.USD || 0;
+      const pnlArs = summary.unrealizedPnlByCurrency?.ARS || 0;
+      document.getElementById('stat-row').innerHTML = [
+        renderStatCell('Total USD positions', fmtUsd(usd)),
+        renderStatCell('Total ARS positions', `$${Math.round(ars).toLocaleString('es-AR')}`, 'in ARS'),
+        renderStatCell('Unrealized P&L (USD)', `<span class="${pnlClass(pnlUsd)}">${fmtUsd(pnlUsd)}</span>`),
+        renderStatCell('Unrealized P&L (ARS)', `<span class="${pnlClass(pnlArs)}">$${Math.round(pnlArs).toLocaleString('es-AR')}</span>`),
+      ].join('');
+
+      // Broker cards
+      const brokers = await api('/brokers');
+      const brokerById = Object.fromEntries(brokers.brokers.map(b => [b.id, b]));
+      const brokerEntries = Object.entries(summary.totalByBroker || {});
+      document.getElementById('brokers-section').innerHTML = brokerEntries.map(([brokerId, totals]) => {
+        const broker = brokerById[brokerId] || { displayName: brokerId, accentColor: 'var(--color-accent)' };
+        const accent = broker.accentColor || 'var(--color-accent)';
+        return `
+          <div class="card" style="border-top: 3px solid ${accent}">
+            <div class="p-4">
+              <div class="text-xs uppercase tracking-wider text-[var(--color-muted)]">${broker.type || 'broker'}</div>
+              <div class="text-lg font-bold mb-2">${broker.displayName}</div>
+              <div class="text-2xl font-bold num-mono">${fmtUsd(totals.usdEquivalent)}</div>
+              <div class="text-xs text-[var(--color-muted)] mt-1">
+                ${(totals.native?.USD ? `USD ${fmtUsd(totals.native.USD)}` : '')}
+                ${(totals.native?.ARS ? ` · ARS $${Math.round(totals.native.ARS).toLocaleString('es-AR')}` : '')}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('') || '<div class="text-sm text-[var(--color-muted)]">No brokers yet — add one in the Brokers page.</div>';
+
+      // Per-broker positions tables
+      const positionsRes = await api('/positions?status=open');
+      const byBroker = {};
+      for (const p of positionsRes.positions) {
+        (byBroker[p.brokerId] ||= []).push(p);
+      }
+
+      document.getElementById('positions-by-broker').innerHTML = Object.entries(byBroker).map(([brokerId, positions]) => {
+        const broker = brokerById[brokerId] || { displayName: brokerId };
+        return `
+          <div class="card">
+            <div class="card-strip" style="background: ${broker.accentColor || 'var(--color-accent)'}"></div>
+            <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-center justify-between">
+              <h3 class="font-semibold">${broker.displayName}</h3>
+              <span class="text-xs text-[var(--color-muted)]">${positions.length} position${positions.length === 1 ? '' : 's'}</span>
+            </div>
+            <table class="w-full text-sm">
+              <thead class="bg-[var(--color-surface-2)]">
+                <tr class="text-xs uppercase text-[var(--color-muted)]">
+                  <th class="text-left px-4 py-2">Symbol</th>
+                  <th class="text-right px-4 py-2">Qty</th>
+                  <th class="text-right px-4 py-2">PPC</th>
+                  <th class="text-right px-4 py-2">Last</th>
+                  <th class="text-right px-4 py-2">Value</th>
+                  <th class="text-right px-4 py-2">P&L</th>
+                  <th class="text-right px-4 py-2">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${positions.map(p => {
+                  const cb = p.quantity * p.averageCost;
+                  const mv = p.currentPrice != null ? p.quantity * p.currentPrice : null;
+                  const pnl = mv != null ? mv - cb : null;
+                  const pct = (cb > 0 && pnl != null) ? (pnl / cb) * 100 : null;
+                  return `
+                    <tr class="border-t border-[var(--color-border)]">
+                      <td class="px-4 py-2"><span class="font-semibold">${p.symbol}</span> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
+                      <td class="px-4 py-2 text-right num-mono">${p.quantity}</td>
+                      <td class="px-4 py-2 text-right num-mono">${p.averageCost.toFixed(2)} ${p.currency}</td>
+                      <td class="px-4 py-2 text-right num-mono">${p.currentPrice != null ? p.currentPrice.toFixed(2) : '—'}</td>
+                      <td class="px-4 py-2 text-right num-mono">${mv != null ? mv.toFixed(0) + ' ' + p.currency : '—'}</td>
+                      <td class="px-4 py-2 text-right num-mono ${pnlClass(pnl)}">${pnl != null ? pnl.toFixed(0) : '—'}</td>
+                      <td class="px-4 py-2 text-right num-mono ${pnlClass(pct)}">${fmtPct(pct)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }).join('') || '<div class="text-sm text-[var(--color-muted)]">No open positions yet.</div>';
+
+      // Top / bottom performers
+      const renderPerf = (title, list, variant) => `
+        <div class="card p-4">
+          <div class="eyebrow mb-2">${title}</div>
+          ${list && list.length
+            ? '<ul class="space-y-2">' + list.map(p => `
+                <li class="flex items-center justify-between text-sm">
+                  <span><strong>${p.symbol}</strong> <span class="text-xs text-[var(--color-muted)]">${p.brokerId}</span></span>
+                  <span class="badge badge-${variant} num-mono">${fmtPct(p.pnlPercent)}</span>
+                </li>
+              `).join('') + '</ul>'
+            : '<div class="text-sm text-[var(--color-muted)]">Not enough data yet.</div>'}
+        </div>
+      `;
+
+      const toPerfShape = list => (list || []).map(p => {
+        const cb = p.quantity * p.averageCost;
+        const mv = p.currentPrice != null ? p.quantity * p.currentPrice : null;
+        const pnl = mv != null ? mv - cb : null;
+        const pct = (cb > 0 && pnl != null) ? (pnl / cb) * 100 : null;
+        return { symbol: p.symbol, brokerId: p.brokerId, pnlPercent: pct };
+      });
+
+      document.getElementById('top-performers').innerHTML    = renderPerf('Top performers',    toPerfShape(summary.topPerformers),    'success');
+      document.getElementById('bottom-performers').innerHTML = renderPerf('Bottom performers', toPerfShape(summary.bottomPerformers), 'failed');
+
+    } catch (err) {
+      document.querySelector('main').insertAdjacentHTML('afterbegin',
+        `<div class="card p-4 mb-4 border-l-4 border-l-red-500"><strong>Failed to load:</strong> ${err.message}</div>`);
+    }
+  }
+
+  document.getElementById('refresh-btn').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    e.target.textContent = 'Refreshing…';
+    try {
+      const result = await api('/prices/refresh', { method: 'POST' });
+      e.target.textContent = `Refreshed: ${result.succeeded}/${result.totalSymbols}`;
+      setTimeout(() => location.reload(), 800);
+    } catch (err) {
+      e.target.textContent = 'Refresh failed';
+      console.error(err);
+    }
+  });
+
+  load();
+</script>

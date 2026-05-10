@@ -1,0 +1,255 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Positions · my-finances" active="positions">
+  <header class="mb-6">
+    <span class="eyebrow">Positions</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold">Manage positions</h1>
+  </header>
+
+  <div class="card p-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="block text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1">Broker</label>
+        <select id="broker-filter" class="w-full border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm"></select>
+      </div>
+      <div>
+        <label class="block text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1">Status</label>
+        <select id="status-filter" class="w-full border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm">
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
+          <option value="">All</option>
+        </select>
+      </div>
+    </div>
+    <button id="apply-filters-btn" class="row-action-btn">Apply filters</button>
+  </div>
+
+  <div class="card mb-6 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Symbol</th>
+          <th class="text-right px-4 py-2">Qty</th>
+          <th class="text-right px-4 py-2">PPC</th>
+          <th class="text-right px-4 py-2">Last price</th>
+          <th class="text-right px-4 py-2">Currency</th>
+          <th class="text-left px-4 py-2">Maturity</th>
+          <th class="text-left px-4 py-2">Status</th>
+          <th class="text-right px-4 py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="positions-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="font-semibold mb-4">Add position</h2>
+    <form id="add-position-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1">Broker</label>
+        <select name="brokerId" required class="w-full border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" id="broker-select"></select>
+      </div>
+      <div>
+        <label class="block text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1">Asset type</label>
+        <select name="assetType" required class="w-full border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm">
+          <option value="">Select type</option>
+          <option value="stock">Stock</option>
+          <option value="etf">ETF</option>
+          <option value="cedear">CEDEAR</option>
+          <option value="bond">Bond</option>
+          <option value="bopreal">Bopreal</option>
+          <option value="lecap">Lecap</option>
+          <option value="on">ON</option>
+          <option value="deposit">Deposit</option>
+          <option value="cash">Cash</option>
+        </select>
+      </div>
+      <input name="symbol" placeholder="Symbol (e.g., AAPL)" required class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <input name="displayName" placeholder="Display name (optional)" class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <input name="quantity" placeholder="Quantity" type="number" step="0.01" required class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <input name="averageCost" placeholder="Average cost" type="number" step="0.01" required class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <div>
+        <label class="block text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1">Currency</label>
+        <select name="currency" required class="w-full border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm">
+          <option value="USD">USD</option>
+          <option value="ARS">ARS</option>
+        </select>
+      </div>
+      <input name="currentPrice" placeholder="Current price (optional)" type="number" step="0.01" class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <input name="exchange" placeholder="Exchange (optional)" class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <input name="maturityDate" placeholder="Maturity date (optional)" type="date" class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <input name="notes" placeholder="Notes (optional)" class="md:col-span-2 border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <button type="submit" class="md:col-span-2 row-action-btn !bg-[var(--color-accent)] !text-white !border-transparent">Add position</button>
+    </form>
+    <div id="add-position-msg" class="mt-2 text-sm"></div>
+  </div>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+
+  let allPositions = [];
+  let brokers = [];
+  let currentBrokerFilter = 'all';
+  let currentStatusFilter = 'open';
+
+  async function loadBrokers() {
+    try {
+      const res = await api('/brokers');
+      brokers = res.brokers || [];
+
+      const brokerSelect = document.getElementById('broker-select');
+      brokerSelect.innerHTML = brokers.map(b => `<option value="${b.id}">${b.displayName}</option>`).join('');
+      if (brokers.length > 0) {
+        brokerSelect.value = brokers[0].id;
+      }
+
+      const brokerFilter = document.getElementById('broker-filter');
+      brokerFilter.innerHTML = '<option value="all">All brokers</option>' + brokers.map(b => `<option value="${b.id}">${b.displayName}</option>`).join('');
+      brokerFilter.value = 'all';
+    } catch (err) {
+      console.error('Failed to load brokers:', err);
+    }
+  }
+
+  async function loadPositions() {
+    try {
+      const params = new URLSearchParams();
+      if (currentStatusFilter) params.append('status', currentStatusFilter);
+      const res = await api(`/positions?${params}`);
+      allPositions = res.positions || [];
+      renderPositions();
+    } catch (err) {
+      document.getElementById('positions-tbody').innerHTML =
+        `<tr><td colspan="8" class="px-4 py-4 text-sm pos-negative">Failed to load: ${err.message}</td></tr>`;
+    }
+  }
+
+  function renderPositions() {
+    let filtered = allPositions;
+    if (currentBrokerFilter !== 'all') {
+      filtered = filtered.filter(p => p.brokerId === currentBrokerFilter);
+    }
+
+    const tbody = document.getElementById('positions-tbody');
+    tbody.innerHTML = filtered.length
+      ? filtered.map(p => {
+          const brokerName = brokers.find(b => b.id === p.brokerId)?.displayName || p.brokerId;
+          return `
+            <tr class="border-t border-[var(--color-border)]">
+              <td class="px-4 py-2"><strong>${p.symbol}</strong> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
+              <td class="px-4 py-2 text-right num-mono">${p.quantity}</td>
+              <td class="px-4 py-2 text-right num-mono">${p.averageCost.toFixed(2)}</td>
+              <td class="px-4 py-2 text-right num-mono price-cell" data-broker="${p.brokerId}" data-rowkey="${p.id}">${p.currentPrice != null ? p.currentPrice.toFixed(2) : '—'}</td>
+              <td class="px-4 py-2 text-right">${p.currency}</td>
+              <td class="px-4 py-2 text-sm text-[var(--color-muted)]">${p.maturityDate ? p.maturityDate.substring(0, 10) : '—'}</td>
+              <td class="px-4 py-2">
+                <span class="badge ${p.status === 'closed' ? 'badge-failed' : 'badge-success'}">${p.status}</span>
+              </td>
+              <td class="px-4 py-2 text-right space-x-1">
+                <button class="row-action-btn edit-btn" data-broker="${p.brokerId}" data-rowkey="${p.id}" data-symbol="${p.symbol}">Edit</button>
+                <button class="row-action-btn danger delete-btn" data-broker="${p.brokerId}" data-rowkey="${p.id}">Del</button>
+                ${p.status === 'open' ? `<button class="row-action-btn close-btn" data-broker="${p.brokerId}" data-rowkey="${p.id}">Close</button>` : ''}
+              </td>
+            </tr>
+          `;
+        }).join('')
+      : '<tr><td colspan="8" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No positions.</td></tr>';
+
+    attachEventListeners();
+  }
+
+  function attachEventListeners() {
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const broker = e.target.dataset.broker;
+        const rowkey = e.target.dataset.rowkey;
+        if (confirm('Delete this position?')) {
+          try {
+            await api(`/positions/${broker}/${rowkey}`, { method: 'DELETE' });
+            loadPositions();
+          } catch (err) {
+            alert(`Failed: ${err.message}`);
+          }
+        }
+      });
+    });
+
+    document.querySelectorAll('.close-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const broker = e.target.dataset.broker;
+        const rowkey = e.target.dataset.rowkey;
+        try {
+          await api(`/positions/${broker}/${rowkey}`, {
+            method: 'PUT',
+            body: { status: 'closed', realizedPnl: 0 }
+          });
+          loadPositions();
+        } catch (err) {
+          alert(`Failed: ${err.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const broker = e.target.dataset.broker;
+        const rowkey = e.target.dataset.rowkey;
+        const symbol = e.target.dataset.symbol;
+        const newPrice = prompt(`Update current price for ${symbol}:`, '');
+        if (newPrice !== null && newPrice !== '') {
+          try {
+            await api(`/positions/${broker}/${rowkey}`, {
+              method: 'PUT',
+              body: { currentPrice: parseFloat(newPrice) }
+            });
+            loadPositions();
+          } catch (err) {
+            alert(`Failed: ${err.message}`);
+          }
+        }
+      });
+    });
+  }
+
+  document.getElementById('apply-filters-btn').addEventListener('click', () => {
+    currentBrokerFilter = document.getElementById('broker-filter').value;
+    currentStatusFilter = document.getElementById('status-filter').value;
+    renderPositions();
+  });
+
+  document.getElementById('add-position-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = Object.fromEntries(new FormData(form));
+    data.quantity = parseFloat(data.quantity);
+    data.averageCost = parseFloat(data.averageCost);
+    if (data.currentPrice) data.currentPrice = parseFloat(data.currentPrice);
+    else delete data.currentPrice;
+    if (!data.displayName) delete data.displayName;
+    if (!data.exchange) delete data.exchange;
+    if (!data.maturityDate) delete data.maturityDate;
+    if (!data.notes) delete data.notes;
+
+    const msg = document.getElementById('add-position-msg');
+    msg.className = 'mt-2 text-sm';
+    msg.textContent = 'Saving…';
+
+    try {
+      await api('/positions', { method: 'POST', body: data });
+      msg.className = 'mt-2 text-sm pos-positive';
+      msg.textContent = 'Position added.';
+      form.reset();
+      loadPositions();
+    } catch (err) {
+      msg.className = 'mt-2 text-sm pos-negative';
+      msg.textContent = err.message;
+    }
+  });
+
+  loadBrokers();
+  loadPositions();
+</script>

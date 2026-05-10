@@ -1,0 +1,30 @@
+@import "@amajail/ui/fonts";
+@import "tailwindcss";
+@import "@amajail/ui/styles";
+
+@layer components {
+  .pos-positive { color: #15803d; }
+  .pos-negative { color: #b91c1c; }
+  .pos-neutral { color: var(--color-muted); }
+
+  .num-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .row-action-btn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .row-action-btn:hover {
+    background-color: var(--color-surface-2);
+  }
+  .row-action-btn.danger {
+    color: #b91c1c;
+    border-color: #fecaca;
+  }
+}

@@ -1,0 +1,94 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Brokers · my-finances" active="brokers">
+  <header class="mb-6">
+    <span class="eyebrow">Brokers</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold">Manage brokers</h1>
+  </header>
+
+  <div class="card mb-6">
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">ID</th>
+          <th class="text-left px-4 py-2">Name</th>
+          <th class="text-left px-4 py-2">Type</th>
+          <th class="text-left px-4 py-2">Notes</th>
+          <th class="text-right px-4 py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="brokers-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="font-semibold mb-3">Add broker</h2>
+    <form id="add-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <input name="id" placeholder="id (e.g., galicia)" required class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <input name="displayName" placeholder="Display name" required class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <select name="type" required class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm">
+        <option value="broker">Broker</option>
+        <option value="cash_holder">Cash holder</option>
+      </select>
+      <input name="accentColor" placeholder="#hex (optional)" class="border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <input name="notes" placeholder="Notes (optional)" class="md:col-span-2 border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm" />
+      <button type="submit" class="md:col-span-2 row-action-btn !bg-[var(--color-accent)] !text-white !border-transparent">Add broker</button>
+    </form>
+    <div id="form-msg" class="mt-2 text-sm"></div>
+  </div>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+
+  async function loadBrokers() {
+    try {
+      const { brokers } = await api('/brokers');
+      document.getElementById('brokers-tbody').innerHTML = brokers.length
+        ? brokers.map(b => `
+            <tr class="border-t border-[var(--color-border)]">
+              <td class="px-4 py-2 num-mono">${b.id}</td>
+              <td class="px-4 py-2">
+                ${b.accentColor ? `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${b.accentColor};margin-right:6px;vertical-align:middle"></span>` : ''}
+                ${b.displayName}
+              </td>
+              <td class="px-4 py-2">
+                <span class="badge ${b.type === 'cash_holder' ? 'badge-pending' : 'badge-success'}">${b.type}</span>
+              </td>
+              <td class="px-4 py-2 text-[var(--color-muted)] text-xs">${b.notes || ''}</td>
+              <td class="px-4 py-2 text-right text-xs text-[var(--color-muted)]">—</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="5" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No brokers yet.</td></tr>';
+    } catch (err) {
+      document.getElementById('brokers-tbody').innerHTML =
+        `<tr><td colspan="5" class="px-4 py-4 text-sm pos-negative">Failed: ${err.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById('add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = Object.fromEntries(new FormData(form));
+    if (!data.accentColor) delete data.accentColor;
+    if (!data.notes) delete data.notes;
+    const msg = document.getElementById('form-msg');
+    msg.className = 'mt-2 text-sm';
+    msg.textContent = 'Saving…';
+    try {
+      await api('/brokers', { method: 'POST', body: data });
+      msg.className = 'mt-2 text-sm pos-positive';
+      msg.textContent = 'Saved.';
+      form.reset();
+      loadBrokers();
+    } catch (err) {
+      msg.className = 'mt-2 text-sm pos-negative';
+      msg.textContent = err.message;
+    }
+  });
+
+  loadBrokers();
+</script>

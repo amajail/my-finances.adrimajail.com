@@ -1,0 +1,15 @@
+{
+  "name": "my-finances-dashboard",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@amajail/ui": "github:amajail/amajail-ui#master",
+    "astro": "^5.7.13",
+    "@tailwindcss/vite": "^4.1.4",
+    "tailwindcss": "^4.1.4"
+  }
+}
