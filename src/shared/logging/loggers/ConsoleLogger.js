@@ -15,7 +15,7 @@ class ConsoleLogger extends Logger {
    * @param {string} options.level - Log level (error, warn, info, http, debug)
    * @param {boolean} options.colorize - Enable colored output (default: true)
    * @param {boolean} options.includeTimestamp - Include timestamp in output (default: true)
-   * @param {boolean} options.writeToFile - Also write logs to files (default: true)
+   * @param {boolean} options.writeToFile - Also write logs to files (default: false — read-only FS safe)
    * @param {string} options.logDirectory - Directory for log files (default: './logs')
    * @param {boolean} options.silent - Silent mode for testing (default: false)
    */
@@ -26,7 +26,7 @@ class ConsoleLogger extends Logger {
       level = 'info',
       colorize = true,
       includeTimestamp = true,
-      writeToFile = true,
+      writeToFile = false,
       logDirectory = './logs',
       silent = false
     } = options;
