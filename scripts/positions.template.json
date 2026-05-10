@@ -1,0 +1,81 @@
+[
+  {
+    "_comment": "TEMPLATE — copy this file to scripts/positions.json (gitignored) and fill with real holdings. Delete _comment fields when done.",
+    "_required_fields": "brokerId, assetType, symbol, quantity, averageCost, currency",
+    "_optional_fields": "displayName, exchange, maturityDate, status, notes",
+    "_assetType_values": "stock | etf | cedear | bond | bopreal | lecap | on | deposit | cash",
+    "_currency_values": "USD | ARS",
+    "_brokerId_values": "galicia | iol | ibkr | bullmarket | cash",
+    "_note_no_currentPrice": "Skip currentPrice; the price refresh will populate it",
+    "_note_cash_rows": "For cash positions: assetType=cash, symbol=USD or ARS, quantity=amount, averageCost=1"
+  },
+  {
+    "brokerId": "ibkr",
+    "assetType": "stock",
+    "symbol": "VOO",
+    "displayName": "Vanguard S&P 500 ETF",
+    "quantity": 24,
+    "averageCost": 412.50,
+    "currency": "USD",
+    "exchange": "NYSEARCA"
+  },
+  {
+    "brokerId": "galicia",
+    "assetType": "bond",
+    "symbol": "GD41D",
+    "displayName": "Bono Global 2041 USD",
+    "quantity": 5000,
+    "averageCost": 0.42,
+    "currency": "USD",
+    "maturityDate": "2041-07-09"
+  },
+  {
+    "brokerId": "galicia",
+    "assetType": "lecap",
+    "symbol": "S29Y6",
+    "displayName": "LECAP 29-may-2026",
+    "quantity": 1000000,
+    "averageCost": 0.95,
+    "currency": "ARS",
+    "maturityDate": "2026-05-29"
+  },
+  {
+    "brokerId": "galicia",
+    "assetType": "deposit",
+    "symbol": "PF-USD-15K-2026-05-11",
+    "displayName": "Plazo Fijo USD 15K vto 11-may-2026",
+    "quantity": 15000,
+    "averageCost": 1,
+    "currency": "USD",
+    "maturityDate": "2026-05-11"
+  },
+  {
+    "brokerId": "iol",
+    "assetType": "bopreal",
+    "symbol": "BPOC7",
+    "displayName": "BOPREAL Serie 1C",
+    "quantity": 1500,
+    "averageCost": 0.88,
+    "currency": "USD"
+  },
+  {
+    "brokerId": "bullmarket",
+    "assetType": "cedear",
+    "symbol": "AAPL",
+    "displayName": "Apple Inc. (CEDEAR)",
+    "quantity": 50,
+    "averageCost": 4500,
+    "currency": "ARS",
+    "exchange": "BCBA"
+  },
+  {
+    "brokerId": "cash",
+    "assetType": "cash",
+    "symbol": "USD",
+    "displayName": "Dólar billete físico",
+    "quantity": 100000,
+    "averageCost": 1,
+    "currency": "USD",
+    "notes": "Off-system reserve"
+  }
+]
