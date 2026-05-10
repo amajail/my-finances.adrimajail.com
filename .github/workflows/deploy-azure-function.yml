@@ -17,7 +17,7 @@ env:
   # if it's not configured.
   AZURE_FUNCTIONAPP_NAME: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
-  NODE_VERSION: '24.x'
+  NODE_VERSION: '22.x'
 
 jobs:
   deploy:

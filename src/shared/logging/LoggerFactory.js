@@ -68,7 +68,7 @@ class LoggerFactory {
       level: level || (isTest ? 'error' : (isDev ? 'debug' : 'info')),
       colorize: !isTest,
       includeTimestamp: !isTest,
-      writeToFile: !isTest,
+      writeToFile: false,
       silent: isTest
     };
 
