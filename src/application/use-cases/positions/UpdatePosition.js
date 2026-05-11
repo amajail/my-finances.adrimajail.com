@@ -62,7 +62,7 @@ class UpdatePosition extends UseCase {
 
     // Apply patches, excluding internal metadata
     const allowedFields = [
-      'displayName', 'quantity', 'averageCost', 'currentPrice', 'currentPriceUpdatedAt',
+      'displayName', 'quantity', 'averageCost', 'currency', 'currentPrice', 'currentPriceUpdatedAt',
       'exchange', 'maturityDate', 'status', 'realizedPnl', 'notes'
     ];
 
