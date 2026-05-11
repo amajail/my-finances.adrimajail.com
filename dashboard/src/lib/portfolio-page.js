@@ -2,6 +2,100 @@ import { api } from './api.js';
 import { fmtUsd, fmtArs, fmtPct, pnlClass, brokerTypeLabel } from './format.js';
 import { effectivePrice, marketValue, costBasis } from './pricing.js';
 
+// Per-broker positions table state: rows + active sort + active asset filter.
+// Each broker's table re-renders from its own state when the user sorts or
+// changes the asset filter, so the two interactions compose cleanly.
+const brokerState = new Map();
+
+const SORT_ACCESSORS = {
+  symbol:      r => r.p.symbol,
+  quantity:    r => r.p.quantity,
+  averageCost: r => r.p.averageCost,
+  price:       r => r.price,
+  value:       r => r.mv,
+  pnl:         r => r.pnl,
+  pct:         r => r.pct,
+};
+
+function buildBrokerRows(positions) {
+  return positions.map(p => {
+    const cb = costBasis(p);
+    const price = effectivePrice(p);
+    const mv = marketValue(p);
+    const pnl = mv != null ? mv - cb : null;
+    const pct = (cb > 0 && pnl != null) ? (pnl / cb) * 100 : null;
+    return { p, price, mv, pnl, pct };
+  });
+}
+
+function sortRows(rows, sortKey, sortDir) {
+  if (!sortKey) return rows;
+  const get = SORT_ACCESSORS[sortKey];
+  if (!get) return rows;
+  const sign = sortDir === 'desc' ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const av = get(a), bv = get(b);
+    // Nulls always sort last regardless of direction.
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'string') return av.localeCompare(bv) * sign;
+    return (av - bv) * sign;
+  });
+}
+
+function brokerRowHtml({ p, price, mv, pnl, pct }) {
+  return `
+    <tr class="border-t border-[var(--color-border)]" data-asset-type="${p.assetType}">
+      <td class="px-4 py-2"><span class="font-semibold">${p.symbol}</span> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
+      <td class="px-4 py-2 text-right num-mono">${p.quantity}</td>
+      <td class="px-4 py-2 text-right num-mono">${p.averageCost.toFixed(2)} ${p.currency}</td>
+      <td class="px-4 py-2 text-right num-mono">${price != null ? price.toFixed(2) : '—'}</td>
+      <td class="px-4 py-2 text-right num-mono">${mv != null ? mv.toFixed(0) + ' ' + p.currency : '—'}</td>
+      <td class="px-4 py-2 text-right num-mono ${pnlClass(pnl)}">${pnl != null ? pnl.toFixed(0) : '—'}</td>
+      <td class="px-4 py-2 text-right num-mono ${pnlClass(pct)}">${fmtPct(pct)}</td>
+    </tr>
+  `;
+}
+
+function renderBrokerRows(brokerId) {
+  const state = brokerState.get(brokerId);
+  if (!state) return;
+  const table = document.querySelector(`[data-broker-table="${brokerId}"]`);
+  if (!table) return;
+  const filtered = state.activeAsset === 'all'
+    ? state.rows
+    : state.rows.filter(r => r.p.assetType === state.activeAsset);
+  const sorted = sortRows(filtered, state.sortKey, state.sortDir);
+  const tbody = table.querySelector('tbody');
+  tbody.innerHTML = sorted.length
+    ? sorted.map(brokerRowHtml).join('')
+    : '<tr><td colspan="7" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No matching positions.</td></tr>';
+  table.querySelectorAll('th[data-sort-key] .sort-indicator').forEach(span => {
+    const key = span.parentElement.dataset.sortKey;
+    span.textContent = key === state.sortKey ? (state.sortDir === 'asc' ? '▲' : '▼') : '';
+  });
+}
+
+function attachSortHandlers(brokerId) {
+  const table = document.querySelector(`[data-broker-table="${brokerId}"]`);
+  if (!table) return;
+  table.querySelectorAll('th[data-sort-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const state = brokerState.get(brokerId);
+      if (!state) return;
+      const key = th.dataset.sortKey;
+      if (state.sortKey === key) {
+        state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sortKey = key;
+        state.sortDir = 'asc';
+      }
+      renderBrokerRows(brokerId);
+    });
+  });
+}
+
 function renderStatCell(label, value, sub = '') {
   return `
     <div class="stat-cell">
@@ -94,7 +188,10 @@ async function load() {
       (byBroker[p.brokerId] ||= []).push(p);
     }
 
-    document.getElementById('positions-by-broker').innerHTML = Object.entries(byBroker).map(([brokerId, brokerPositions]) => {
+    const positionBrokerEntries = Object.entries(byBroker);
+    brokerState.clear();
+
+    document.getElementById('positions-by-broker').innerHTML = positionBrokerEntries.map(([brokerId, brokerPositions]) => {
       const broker = brokerById[brokerId] || { displayName: brokerId };
       const assetTypes = [...new Set(brokerPositions.map(p => p.assetType))].sort();
       const filterPills = assetTypes.length > 1
@@ -116,39 +213,31 @@ async function load() {
           <table class="w-full text-sm" data-broker-table="${brokerId}">
             <thead class="bg-[var(--color-surface-2)]">
               <tr class="text-xs uppercase text-[var(--color-muted)]">
-                <th class="text-left px-4 py-2">Symbol</th>
-                <th class="text-right px-4 py-2">Qty</th>
-                <th class="text-right px-4 py-2">PPC</th>
-                <th class="text-right px-4 py-2">Last</th>
-                <th class="text-right px-4 py-2">Value</th>
-                <th class="text-right px-4 py-2">P&L</th>
-                <th class="text-right px-4 py-2">%</th>
+                <th class="text-left px-4 py-2 sort-th" data-sort-key="symbol">Symbol<span class="sort-indicator"></span></th>
+                <th class="text-right px-4 py-2 sort-th" data-sort-key="quantity">Qty<span class="sort-indicator"></span></th>
+                <th class="text-right px-4 py-2 sort-th" data-sort-key="averageCost">PPC<span class="sort-indicator"></span></th>
+                <th class="text-right px-4 py-2 sort-th" data-sort-key="price">Last<span class="sort-indicator"></span></th>
+                <th class="text-right px-4 py-2 sort-th" data-sort-key="value">Value<span class="sort-indicator"></span></th>
+                <th class="text-right px-4 py-2 sort-th" data-sort-key="pnl">P&L<span class="sort-indicator"></span></th>
+                <th class="text-right px-4 py-2 sort-th" data-sort-key="pct">%<span class="sort-indicator"></span></th>
               </tr>
             </thead>
-            <tbody>
-              ${brokerPositions.map(p => {
-                const cb = costBasis(p);
-                const mv = marketValue(p);
-                const pnl = mv != null ? mv - cb : null;
-                const pct = (cb > 0 && pnl != null) ? (pnl / cb) * 100 : null;
-                const price = effectivePrice(p);
-                return `
-                  <tr class="border-t border-[var(--color-border)]" data-asset-type="${p.assetType}">
-                    <td class="px-4 py-2"><span class="font-semibold">${p.symbol}</span> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
-                    <td class="px-4 py-2 text-right num-mono">${p.quantity}</td>
-                    <td class="px-4 py-2 text-right num-mono">${p.averageCost.toFixed(2)} ${p.currency}</td>
-                    <td class="px-4 py-2 text-right num-mono">${price != null ? price.toFixed(2) : '—'}</td>
-                    <td class="px-4 py-2 text-right num-mono">${mv != null ? mv.toFixed(0) + ' ' + p.currency : '—'}</td>
-                    <td class="px-4 py-2 text-right num-mono ${pnlClass(pnl)}">${pnl != null ? pnl.toFixed(0) : '—'}</td>
-                    <td class="px-4 py-2 text-right num-mono ${pnlClass(pct)}">${fmtPct(pct)}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
+            <tbody></tbody>
           </table>
         </div>
       `;
     }).join('') || '<div class="text-sm text-[var(--color-muted)]">No open positions yet.</div>';
+
+    for (const [brokerId, brokerPositions] of positionBrokerEntries) {
+      brokerState.set(brokerId, {
+        rows: buildBrokerRows(brokerPositions),
+        sortKey: null,
+        sortDir: 'asc',
+        activeAsset: 'all',
+      });
+      renderBrokerRows(brokerId);
+      attachSortHandlers(brokerId);
+    }
 
     attachAssetFilters();
 
@@ -187,8 +276,6 @@ async function load() {
 function attachAssetFilters() {
   document.querySelectorAll('[data-broker-filter]').forEach(group => {
     const brokerId = group.dataset.brokerFilter;
-    const table = document.querySelector(`[data-broker-table="${brokerId}"]`);
-    if (!table) return;
     group.querySelectorAll('.asset-filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const asset = btn.dataset.asset;
@@ -196,9 +283,10 @@ function attachAssetFilters() {
           b.classList.remove('!bg-[var(--color-accent)]', '!text-white', '!border-transparent');
         });
         btn.classList.add('!bg-[var(--color-accent)]', '!text-white', '!border-transparent');
-        table.querySelectorAll('tbody tr').forEach(row => {
-          row.style.display = (asset === 'all' || row.dataset.assetType === asset) ? '' : 'none';
-        });
+        const state = brokerState.get(brokerId);
+        if (!state) return;
+        state.activeAsset = asset;
+        renderBrokerRows(brokerId);
       });
     });
   });

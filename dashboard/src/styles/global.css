@@ -27,4 +27,18 @@
     color: #b91c1c;
     border-color: #fecaca;
   }
+
+  .sort-th {
+    cursor: pointer;
+    user-select: none;
+  }
+  .sort-th:hover {
+    color: var(--color-text-primary);
+  }
+  .sort-indicator {
+    display: inline-block;
+    width: 0.85em;
+    margin-left: 0.25em;
+    opacity: 0.7;
+  }
 }
