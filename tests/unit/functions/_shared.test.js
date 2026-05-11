@@ -14,18 +14,17 @@ const {
 
 describe('_shared.js response helpers', () => {
   describe('corsHeaders', () => {
-    it('should return default CORS headers', () => {
+    it('should not emit CORS headers (handled by Azure platform CORS)', () => {
       const headers = corsHeaders();
-      expect(headers['Access-Control-Allow-Origin']).toBeDefined();
-      expect(headers['Access-Control-Allow-Methods']).toContain('GET');
-      expect(headers['Access-Control-Allow-Methods']).toContain('POST');
+      expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
+      expect(headers['Access-Control-Allow-Methods']).toBeUndefined();
+      expect(headers['Access-Control-Allow-Headers']).toBeUndefined();
     });
 
     it('should merge extra headers', () => {
       const extra = { 'Cache-Control': 'max-age=30' };
       const headers = corsHeaders(extra);
       expect(headers['Cache-Control']).toBe('max-age=30');
-      expect(headers['Access-Control-Allow-Origin']).toBeDefined();
     });
   });
 
@@ -34,7 +33,6 @@ describe('_shared.js response helpers', () => {
       const response = ok({ data: 'test' });
       expect(response.status).toBe(200);
       expect(response.jsonBody).toEqual({ data: 'test' });
-      expect(response.headers['Access-Control-Allow-Origin']).toBeDefined();
     });
 
     it('should include extra headers', () => {
@@ -48,7 +46,6 @@ describe('_shared.js response helpers', () => {
       const response = created({ id: '123' });
       expect(response.status).toBe(201);
       expect(response.jsonBody).toEqual({ id: '123' });
-      expect(response.headers['Access-Control-Allow-Origin']).toBeDefined();
     });
   });
 
@@ -56,7 +53,6 @@ describe('_shared.js response helpers', () => {
     it('should return 204 with no body', () => {
       const response = noContent();
       expect(response.status).toBe(204);
-      expect(response.headers['Access-Control-Allow-Origin']).toBeDefined();
     });
   });
 
@@ -65,7 +61,6 @@ describe('_shared.js response helpers', () => {
       const response = fail(400, 'Bad request');
       expect(response.status).toBe(400);
       expect(response.jsonBody.error).toBe('Bad request');
-      expect(response.headers['Access-Control-Allow-Origin']).toBeDefined();
     });
 
     it('should include extra fields like details', () => {

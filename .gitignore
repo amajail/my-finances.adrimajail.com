@@ -113,6 +113,9 @@ local.settings.json
 scripts/positions.json
 scripts/*.local.json
 
+# Ad-hoc broker-update scripts (contain real PPCs / quantities)
+scripts/update-*.js
+
 # Reference reports — contain real broker/holdings data
 portfolio-report.html
 plan-rebalanceo-brokers.html
