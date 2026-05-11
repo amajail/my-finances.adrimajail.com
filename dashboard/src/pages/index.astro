@@ -44,6 +44,12 @@ import Layout from '../layouts/Layout.astro';
   // refresher hasn't populated currentPrice, fall back to averageCost so the
   // value isn't silently treated as zero.
   const HOLDS_AT_PAR = new Set(['cash', 'deposit']);
+  // Bonds, BOPREAL, LECAP and ON are quoted per 100 nominales (% of par);
+  // both averageCost and currentPrice are stored in that convention.
+  const QUOTED_PER_HUNDRED = new Set(['bond', 'bopreal', 'lecap', 'on']);
+  function priceFaceValue(assetType) {
+    return QUOTED_PER_HUNDRED.has(assetType) ? 100 : 1;
+  }
   function effectivePrice(p) {
     if (p.currentPrice != null) return p.currentPrice;
     if (HOLDS_AT_PAR.has(p.assetType)) return p.averageCost;
@@ -51,7 +57,10 @@ import Layout from '../layouts/Layout.astro';
   }
   function marketValue(p) {
     const price = effectivePrice(p);
-    return price != null ? p.quantity * price : null;
+    return price != null ? p.quantity * (price / priceFaceValue(p.assetType)) : null;
+  }
+  function costBasis(p) {
+    return p.quantity * (p.averageCost / priceFaceValue(p.assetType));
   }
 
   function renderStatCell(label, value, sub = '') {
@@ -179,7 +188,7 @@ import Layout from '../layouts/Layout.astro';
               </thead>
               <tbody>
                 ${brokerPositions.map(p => {
-                  const cb = p.quantity * p.averageCost;
+                  const cb = costBasis(p);
                   const mv = marketValue(p);
                   const pnl = mv != null ? mv - cb : null;
                   const pct = (cb > 0 && pnl != null) ? (pnl / cb) * 100 : null;
@@ -220,8 +229,8 @@ import Layout from '../layouts/Layout.astro';
       `;
 
       const toPerfShape = list => (list || []).map(p => {
-        const cb = p.quantity * p.averageCost;
-        const mv = p.currentPrice != null ? p.quantity * p.currentPrice : null;
+        const cb = costBasis(p);
+        const mv = marketValue(p);
         const pnl = mv != null ? mv - cb : null;
         const pct = (cb > 0 && pnl != null) ? (pnl / cb) * 100 : null;
         return { symbol: p.symbol, brokerId: p.brokerId, pnlPercent: pct };

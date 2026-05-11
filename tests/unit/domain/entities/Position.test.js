@@ -142,14 +142,43 @@ describe('Position Entity', () => {
     it('should handle decimal quantities', () => {
       const position = new Position({
         brokerId: 'broker1',
-        assetType: 'bond',
-        symbol: 'BOND01',
+        assetType: 'stock',
+        symbol: 'AAPL',
         quantity: 10.5,
+        averageCost: 100,
+        currency: 'USD'
+      });
+
+      expect(position.costBasis()).toBe(1050);
+    });
+
+    it('should divide by 100 for bonds (per-100-nominales convention)', () => {
+      // 100 nominales at PPC 150 (per 100) → 100 * 1.50 = 150
+      const position = new Position({
+        brokerId: 'broker1',
+        assetType: 'bond',
+        symbol: 'BNDA',
+        quantity: 100,
+        averageCost: 150,
+        currency: 'ARS'
+      });
+
+      expect(position.costBasis()).toBe(150);
+    });
+
+    it('should apply per-100 convention for bopreal, lecap, and on as well', () => {
+      const make = (assetType) => new Position({
+        brokerId: 'broker1',
+        assetType,
+        symbol: 'X',
+        quantity: 1000,
         averageCost: 100,
         currency: 'ARS'
       });
 
-      expect(position.costBasis()).toBe(1050);
+      expect(make('bopreal').costBasis()).toBe(1000);
+      expect(make('lecap').costBasis()).toBe(1000);
+      expect(make('on').costBasis()).toBe(1000);
     });
   });
 
@@ -180,6 +209,32 @@ describe('Position Entity', () => {
       });
 
       expect(position.marketValue()).toBeNull();
+    });
+
+    it('should divide by 100 for bonds (per-100-nominales convention)', () => {
+      // 100 nominales at price 150 (per 100) → 100 * 1.50 = 150
+      const bond = new Position({
+        brokerId: 'broker1',
+        assetType: 'bond',
+        symbol: 'BNDA',
+        quantity: 100,
+        averageCost: 140,
+        currency: 'ARS',
+        currentPrice: 150
+      });
+      expect(bond.marketValue()).toBe(150);
+
+      // 1_000_000 nominales at price 100 (per 100, par) → 1_000_000 * 1.00 = 1_000_000
+      const lecap = new Position({
+        brokerId: 'broker1',
+        assetType: 'lecap',
+        symbol: 'LCAP',
+        quantity: 1000000,
+        averageCost: 100,
+        currency: 'ARS',
+        currentPrice: 100
+      });
+      expect(lecap.marketValue()).toBe(1000000);
     });
   });
 
@@ -223,6 +278,22 @@ describe('Position Entity', () => {
       });
 
       expect(position.unrealizedPnl()).toBe(-2500);
+    });
+
+    it('should compute PnL on per-100-nominales basis for bonds', () => {
+      // 100 nominales, PPC 140 (per 100), current 150 (per 100)
+      // → (100 * 150/100) - (100 * 140/100) = 150 - 140 = 10
+      const position = new Position({
+        brokerId: 'broker1',
+        assetType: 'bond',
+        symbol: 'BNDA',
+        quantity: 100,
+        averageCost: 140,
+        currency: 'ARS',
+        currentPrice: 150
+      });
+
+      expect(position.unrealizedPnl()).toBe(10);
     });
   });
 

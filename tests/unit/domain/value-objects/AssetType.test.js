@@ -93,4 +93,27 @@ describe('AssetType Value Object', () => {
       expect(AssetType.requiresPriceQuote(null)).toBe(false);
     });
   });
+
+  describe('AssetType.priceFaceValue', () => {
+    it('should return 100 for instruments quoted per 100 nominales', () => {
+      expect(AssetType.priceFaceValue('bond')).toBe(100);
+      expect(AssetType.priceFaceValue('bopreal')).toBe(100);
+      expect(AssetType.priceFaceValue('lecap')).toBe(100);
+      expect(AssetType.priceFaceValue('on')).toBe(100);
+    });
+
+    it('should return 1 for instruments quoted per unit', () => {
+      expect(AssetType.priceFaceValue('stock')).toBe(1);
+      expect(AssetType.priceFaceValue('etf')).toBe(1);
+      expect(AssetType.priceFaceValue('cedear')).toBe(1);
+      expect(AssetType.priceFaceValue('deposit')).toBe(1);
+      expect(AssetType.priceFaceValue('cash')).toBe(1);
+    });
+
+    it('should return 1 for unknown asset types (safe default)', () => {
+      expect(AssetType.priceFaceValue('invalid')).toBe(1);
+      expect(AssetType.priceFaceValue(null)).toBe(1);
+      expect(AssetType.priceFaceValue(undefined)).toBe(1);
+    });
+  });
 });

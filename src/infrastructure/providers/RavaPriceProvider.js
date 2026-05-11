@@ -6,7 +6,9 @@
  * (bonds, bopreal, lecap, ON) that Yahoo Finance does not cover.
  *
  * Bond prices on Rava are quoted per VN 100 (face value 100) — same convention
- * as Yahoo's Argentine bond quotes, so callers don't need to special-case.
+ * as Yahoo's Argentine bond quotes. The per-100 → per-unit conversion is
+ * handled centrally in Position.marketValue() via AssetType.priceFaceValue(),
+ * so this provider stores prices verbatim in the broker's quoted convention.
  */
 
 const IPriceProvider = require('../../application/interfaces/IPriceProvider');
