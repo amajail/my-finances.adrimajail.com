@@ -80,6 +80,23 @@ class AssetType {
     ];
     return priceQuoteAssets.includes(type);
   }
+
+  /**
+   * Face value the price is quoted against.
+   * Bonds, BOPREAL, LECAP and ON are quoted per 100 nominales (% of par),
+   * so position value = quantity * (price / 100). Other types quote per unit.
+   * @param {string} type - Asset type
+   * @returns {number} 100 for per-par-quoted instruments, 1 otherwise
+   */
+  static priceFaceValue(type) {
+    const quotedPerHundred = [
+      AssetType.BOND,
+      AssetType.BOPREAL,
+      AssetType.LECAP,
+      AssetType.ON
+    ];
+    return quotedPerHundred.includes(type) ? 100 : 1;
+  }
 }
 
 module.exports = AssetType;

@@ -243,6 +243,18 @@ describe('Portfolio Entity', () => {
       expect(totals.stock.USD).toBe(15000);
       expect(totals.etf).toBeUndefined();
     });
+
+    it('should aggregate bonds on per-100-nominales basis alongside stocks', () => {
+      const stock = createPosition({ symbol: 'AAPL', assetType: 'stock', currency: 'USD', currentPrice: 200, quantity: 10 });
+      // 100 nominales at 150 (per 100) → 150 ARS
+      const bond = createPosition({ symbol: 'BNDA', assetType: 'bond', currency: 'ARS', currentPrice: 150, quantity: 100 });
+      const portfolio = new Portfolio([stock, bond]);
+
+      const totals = portfolio.totalByAssetType();
+
+      expect(totals.stock.USD).toBe(2000);
+      expect(totals.bond.ARS).toBe(150);
+    });
   });
 
   describe('topPerformers', () => {

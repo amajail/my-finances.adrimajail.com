@@ -257,23 +257,26 @@ class Position {
   }
 
   /**
-   * Calculate cost basis (quantity * averageCost)
+   * Calculate cost basis. For per-par-quoted instruments (bonds, BOPREAL, LECAP, ON)
+   * both averageCost and currentPrice are stored per 100 nominales, so divide.
    * @returns {number}
    */
   costBasis() {
-    return this._quantity.value * this._averageCost;
+    const faceValue = AssetType.priceFaceValue(this._assetType);
+    return this._quantity.value * (this._averageCost / faceValue);
   }
 
   /**
-   * Calculate market value (quantity * currentPrice)
-   * Returns null if currentPrice is not set
+   * Calculate market value. See costBasis() for the per-100 convention.
+   * Returns null if currentPrice is not set.
    * @returns {number|null}
    */
   marketValue() {
     if (this._currentPrice === null) {
       return null;
     }
-    return this._quantity.value * this._currentPrice;
+    const faceValue = AssetType.priceFaceValue(this._assetType);
+    return this._quantity.value * (this._currentPrice / faceValue);
   }
 
   /**
