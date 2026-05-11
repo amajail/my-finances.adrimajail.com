@@ -13,7 +13,7 @@ const AzureSettingsRepository = require('../../infrastructure/repositories/Azure
 const AzurePriceRepository = require('../../infrastructure/repositories/AzurePriceRepository');
 
 // Infrastructure providers
-const { YahooFinancePriceProvider, RavaPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
+const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
 
 // Use cases
 const {
@@ -104,15 +104,27 @@ class Container {
   }
 
   /**
-   * Get RavaPriceProvider instance
-   * @returns {RavaPriceProvider}
+   * Get CohenPriceProvider instance
+   * @returns {CohenPriceProvider}
    */
-  getRavaProvider() {
-    if (!this._singletons.has('ravaProvider')) {
-      const provider = new RavaPriceProvider();
-      this._singletons.set('ravaProvider', provider);
+  getCohenProvider() {
+    if (!this._singletons.has('cohenProvider')) {
+      const provider = new CohenPriceProvider();
+      this._singletons.set('cohenProvider', provider);
     }
-    return this._singletons.get('ravaProvider');
+    return this._singletons.get('cohenProvider');
+  }
+
+  /**
+   * Get IOLPriceProvider instance
+   * @returns {IOLPriceProvider}
+   */
+  getIOLProvider() {
+    if (!this._singletons.has('iolProvider')) {
+      const provider = new IOLPriceProvider();
+      this._singletons.set('iolProvider', provider);
+    }
+    return this._singletons.get('iolProvider');
   }
 
   /**
@@ -123,7 +135,8 @@ class Container {
     if (!this._singletons.has('priceProviderRouter')) {
       const router = new PriceProviderRouter({
         yahoo: this.getYahooProvider(),
-        rava: this.getRavaProvider()
+        cohen: this.getCohenProvider(),
+        iol: this.getIOLProvider()
       });
       this._singletons.set('priceProviderRouter', router);
     }

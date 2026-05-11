@@ -6,48 +6,62 @@ const PriceProviderRouter = require('../../../../src/infrastructure/providers/Pr
 
 describe('PriceProviderRouter', () => {
   const yahoo = { name: 'yahoo' };
-  const rava = { name: 'rava' };
+  const cohen = { name: 'cohen' };
+  const iol = { name: 'iol' };
 
-  describe('with both providers registered', () => {
-    const router = new PriceProviderRouter({ yahoo, rava });
+  describe('with all three providers registered', () => {
+    const router = new PriceProviderRouter({ yahoo, cohen, iol });
 
-    it('routes ARS-denominated bonds to Rava', () => {
-      expect(router.pickFor({ assetType: 'bond', currency: 'ARS' })).toBe(rava);
+    it('chains ARS bonds: iol → cohen → yahoo', () => {
+      expect(router.chainFor({ assetType: 'bond', currency: 'ARS' })).toEqual([iol, cohen, yahoo]);
     });
 
-    it('routes ARS bopreal/lecap/on to Rava', () => {
-      expect(router.pickFor({ assetType: 'bopreal', currency: 'ARS' })).toBe(rava);
-      expect(router.pickFor({ assetType: 'lecap', currency: 'ARS' })).toBe(rava);
-      expect(router.pickFor({ assetType: 'on', currency: 'ARS' })).toBe(rava);
+    it('chains ARS bopreal/lecap/on the same way', () => {
+      expect(router.chainFor({ assetType: 'bopreal', currency: 'ARS' })).toEqual([iol, cohen, yahoo]);
+      expect(router.chainFor({ assetType: 'lecap', currency: 'ARS' })).toEqual([iol, cohen, yahoo]);
+      expect(router.chainFor({ assetType: 'on', currency: 'ARS' })).toEqual([iol, cohen, yahoo]);
     });
 
-    it('routes USD-denominated bonds to Yahoo (default)', () => {
-      expect(router.pickFor({ assetType: 'bond', currency: 'USD' })).toBe(yahoo);
+    it('chains USD bonds: iol → yahoo (Cohen skipped — ARS-only)', () => {
+      expect(router.chainFor({ assetType: 'bond', currency: 'USD' })).toEqual([iol, yahoo]);
+      expect(router.chainFor({ assetType: 'bopreal', currency: 'USD' })).toEqual([iol, yahoo]);
     });
 
-    it('routes stocks/etfs/cedears to Yahoo regardless of currency', () => {
-      expect(router.pickFor({ assetType: 'stock', currency: 'ARS' })).toBe(yahoo);
-      expect(router.pickFor({ assetType: 'etf', currency: 'USD' })).toBe(yahoo);
-      expect(router.pickFor({ assetType: 'cedear', currency: 'ARS' })).toBe(yahoo);
+    it('routes stocks/etfs/cedears directly to Yahoo only', () => {
+      expect(router.chainFor({ assetType: 'stock', currency: 'ARS' })).toEqual([yahoo]);
+      expect(router.chainFor({ assetType: 'etf', currency: 'USD' })).toEqual([yahoo]);
+      expect(router.chainFor({ assetType: 'cedear', currency: 'ARS' })).toEqual([yahoo]);
     });
 
-    it('returns the default for null position', () => {
-      expect(router.pickFor(null)).toBe(yahoo);
+    it('returns [default] for null position', () => {
+      expect(router.chainFor(null)).toEqual([yahoo]);
     });
   });
 
-  describe('without Rava registered', () => {
-    const router = new PriceProviderRouter({ yahoo });
+  describe('without IOL registered', () => {
+    const router = new PriceProviderRouter({ yahoo, cohen });
 
-    it('falls back to Yahoo for ARS bonds when Rava unavailable', () => {
-      expect(router.pickFor({ assetType: 'bond', currency: 'ARS' })).toBe(yahoo);
+    it('ARS bond chain degrades to [cohen, yahoo]', () => {
+      expect(router.chainFor({ assetType: 'bond', currency: 'ARS' })).toEqual([cohen, yahoo]);
+    });
+
+    it('USD bond chain degrades to [yahoo] only', () => {
+      expect(router.chainFor({ assetType: 'bond', currency: 'USD' })).toEqual([yahoo]);
+    });
+  });
+
+  describe('without Cohen registered', () => {
+    const router = new PriceProviderRouter({ yahoo, iol });
+
+    it('ARS bond chain is [iol, yahoo]', () => {
+      expect(router.chainFor({ assetType: 'bond', currency: 'ARS' })).toEqual([iol, yahoo]);
     });
   });
 
   describe('without any providers', () => {
-    it('returns undefined as default when no providers registered', () => {
+    it('returns an empty chain when no providers are registered', () => {
       const router = new PriceProviderRouter({});
-      expect(router.pickFor({ assetType: 'bond', currency: 'ARS' })).toBeUndefined();
+      expect(router.chainFor({ assetType: 'bond', currency: 'ARS' })).toEqual([]);
     });
   });
 });

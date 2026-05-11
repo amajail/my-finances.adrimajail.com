@@ -6,12 +6,14 @@
 
 const SymbolMapper = require('./SymbolMapper');
 const YahooFinancePriceProvider = require('./YahooFinancePriceProvider');
-const RavaPriceProvider = require('./RavaPriceProvider');
+const CohenPriceProvider = require('./CohenPriceProvider');
+const IOLPriceProvider = require('./IOLPriceProvider');
 const PriceProviderRouter = require('./PriceProviderRouter');
 
 module.exports = {
   SymbolMapper,
   YahooFinancePriceProvider,
-  RavaPriceProvider,
+  CohenPriceProvider,
+  IOLPriceProvider,
   PriceProviderRouter
 };
