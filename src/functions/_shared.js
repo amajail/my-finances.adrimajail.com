@@ -3,7 +3,6 @@
  * Response helpers and error mapping
  */
 
-const { api: apiConfig } = require('../shared/config/api.config');
 const {
   AppError,
   ValidationError,
@@ -12,18 +11,11 @@ const {
   InfrastructureError,
 } = require('../shared/errors');
 
-/**
- * Generate CORS headers
- * @param {Object} extra - Additional headers to merge
- * @returns {Object} Headers object with CORS settings
- */
+// CORS headers are injected by the Azure Function App platform CORS config
+// (Function App → API → CORS). Returning them from code as well produces
+// duplicated `Access-Control-Allow-Origin` headers which browsers reject.
 function corsHeaders(extra = {}) {
-  return {
-    'Access-Control-Allow-Origin': apiConfig.corsOrigins,
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-functions-key, x-api-key',
-    ...extra,
-  };
+  return { ...extra };
 }
 
 /**
