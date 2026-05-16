@@ -54,13 +54,17 @@ jobs:
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --linux-fx-version "Node|22"
 
+          # TZ=America/New_York anchors the refreshPricesTimer cron
+          # (0 30 16 * * 1-5) to NYSE close + 30 min, DST-aware year-round.
+          # See src/functions/refreshPricesTimer.js.
           az functionapp config appsettings set \
             --name "$AZURE_FUNCTIONAPP_NAME" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --settings \
               "FUNCTIONS_WORKER_RUNTIME=node" \
               "WEBSITE_NODE_DEFAULT_VERSION=~22" \
-              "AzureWebJobsFeatureFlags=EnableWorkerIndexing"
+              "AzureWebJobsFeatureFlags=EnableWorkerIndexing" \
+              "TZ=America/New_York"
 
       - name: Create deployment zip
         run: |

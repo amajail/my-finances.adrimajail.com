@@ -38,7 +38,7 @@ Slugs: `galicia`, `iol`, `ibkr`, `bullmarket`, `cash` (off-system USD reserve).
 - `GET|PUT|DELETE /api/positions/{broker}/{rowKey}` — fetch/update/delete one
   - `rowKey` = `${assetType}__${symbol}` (e.g., `cedear__GOOGL`, `bond__GD35`)
   - PUT accepts partial body (patch semantics) — preferred for "update PPC for one holding"
-- `POST /api/prices/refresh` — refresh all current prices
+- `POST /api/prices/refresh` — refresh all current prices. **Operator-only** since the dashboard's manual refresh button was removed; the production refresh path is the daily timer (`src/functions/refreshPricesTimer.js`, 16:30 ET weekdays). Endpoint requires the Function App key (`authLevel: 'function'`).
 - `GET /api/brokers`, `POST /api/brokers` — broker CRUD
 
 ## Seeding scripts
@@ -70,3 +70,8 @@ This repo is (or may become) public. Real portfolio data must stay local.
 **Affirmatively OK to commit:** `scripts/positions.template.json` (placeholder schema), code that operates on positions without hard-coding real ones, and tests that use clearly-fake data.
 
 **Before any `git add` / commit:** if the change touches `scripts/`, fixtures, docs, or comments, scan the diff for real symbols + quantities + PPCs together. If in doubt, ask the user before staging.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
