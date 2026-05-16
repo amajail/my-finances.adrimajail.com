@@ -292,22 +292,6 @@ function attachAssetFilters() {
   });
 }
 
-function attachRefreshButton() {
-  document.getElementById('refresh-btn').addEventListener('click', async (e) => {
-    e.target.disabled = true;
-    e.target.textContent = 'Refreshing…';
-    try {
-      const result = await api('/prices/refresh', { method: 'POST' });
-      e.target.textContent = `Refreshed: ${result.succeeded}/${result.totalSymbols}`;
-      setTimeout(() => location.reload(), 800);
-    } catch (err) {
-      e.target.textContent = 'Refresh failed';
-      console.error(err);
-    }
-  });
-}
-
 export function initPortfolioPage() {
-  attachRefreshButton();
   load();
 }
