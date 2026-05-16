@@ -1,15 +1,17 @@
 <!--
 Sync Impact Report
-- Version change: (initial) → 1.0.0
+- Version change: 1.0.0 → 1.1.0
 - Ratification: 2026-05-16
-- Principles introduced: I. Privacy First (NON-NEGOTIABLE), II. Clean Architecture / DDD, III. Idempotent Data Operations, IV. Pragmatic Testing, V. Convention-Driven Workflow
+- Last Amended: 2026-05-16
+- Principles introduced (1.0.0): I. Privacy First (NON-NEGOTIABLE), II. Clean Architecture / DDD, III. Idempotent Data Operations, IV. Pragmatic Testing, V. Convention-Driven Workflow
+- 1.1.0 amendment: Principle I gains a "Runtime egress to authorized third-party AI services" sub-clause carving out Anthropic API calls for the weekly rebalance analysis (feature 002-weekly-rebalance-analysis). Source-control prohibition unchanged. Driven by spec FR-028.
 - Added sections: Tech Stack & Constraints, Development Workflow, Governance
 - Templates reviewed:
   - ✅ .specify/templates/plan-template.md — Constitution Check section is generic; no edit required (principles are surfaced by reference).
   - ✅ .specify/templates/spec-template.md — no constitution-specific slots; no edit required.
   - ✅ .specify/templates/tasks-template.md — no constitution-specific slots; no edit required.
 - Runtime guidance reviewed:
-  - ✅ CLAUDE.md — already encodes Privacy First and branch naming; this constitution makes them formal. No edits forced.
+  - ✅ CLAUDE.md — Privacy First section is consistent with the amendment (source-control wording unchanged).
 - Deferred TODOs: none.
 -->
 
@@ -22,7 +24,14 @@ The repository is, or may become, public. Real personal-finance data MUST NEVER 
 
 Affirmatively OK to commit: `scripts/positions.template.json`, code that operates on positions without hard-coding real ones, and tests using clearly-fake data. Before any `git add`, scan the diff for real symbols + quantities + PPCs together; if in doubt, ask the user before staging.
 
-*Rationale: One leaked commit cannot be un-published. The cost of a missed sanitization step is permanent.*
+**Runtime egress to authorized third-party AI services.** Real holdings data MAY flow to a named third-party AI service at runtime for analysis purposes, provided ALL of the following hold:
+
+- The service is explicitly named in this constitution. Currently authorized: **Anthropic** (via `@anthropic-ai/sdk`), governed by Anthropic's published data-retention policy (https://www.anthropic.com/legal/privacy). Adding a new AI service requires an amendment to this clause naming the service and its policy.
+- Credentials reach the runtime via environment configuration only (e.g. `ANTHROPIC_API_KEY` in Function App Application Settings, or local `local.settings.json`). Credentials MUST NEVER be checked into source control.
+- The integration includes a sanitization layer that prevents the prompt body or the response body from being captured in any operational log sink (Application Insights or equivalent). Only run metadata — date, model, token counts, USD cost, status, duration, sanitized error type — may be logged.
+- The carve-out applies only to the runtime egress path. The source-control prohibition stated in the paragraphs above remains in force unchanged: real holdings MUST NEVER be staged, committed, or pushed, regardless of whether they have flowed through a third-party AI service at runtime.
+
+*Rationale: One leaked commit cannot be un-published. The cost of a missed sanitization step is permanent. The third-party-AI carve-out is deliberate: a strategic-reasoning layer benefits from frontier-model quality that cannot be matched on-device today, so the privacy boundary moves from "data never leaves my machine" to "data only leaves to a named provider under a documented policy, and never to operational logs". This is an audited carve-out, not a relaxation of the source-control prohibition.*
 
 ### II. Clean Architecture / DDD
 Business logic lives in `src/application/use-cases/`. Domain entities and value objects live in `src/domain/`. Repository **interfaces** live in `src/application/interfaces/`; **implementations** (e.g. `AzureTableDatabase.js`) live in `src/database/`. HTTP and timer entry points in `src/functions/` MUST stay thin: parse input → invoke use-case → format response. No business rules in function handlers.
@@ -83,4 +92,4 @@ This constitution supersedes ad-hoc conventions in `CLAUDE.md` where they confli
 
 Compliance is verified at `/speckit-plan` time (Constitution Check section) and at PR review. Any deviation MUST be justified in the plan's Complexity Tracking section, not hidden in code.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-16
+**Version**: 1.1.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-16

@@ -33,6 +33,7 @@ A Friday-evening Azure Function timer that asks Claude (via the Anthropic SDK, w
 - **Privacy**: prompt body and response body MUST NOT enter Application Insights or any operational log sink.
 - **Idempotency**: re-run for the same date overwrites narrative and replaces orders (no per-order state to preserve, per Clarification Q1).
 - **Token caching**: leverage Anthropic prompt caching on the static-metaprompt block to amortize cost across retries within 5 minutes.
+- **No concurrent runs (FR-003)**: Azure Functions v4 timer triggers serialize invocations by default — only one instance of `weeklyAnalysisTimer` executes at a time across the Function App scale-out. This satisfies FR-003 without any code-level locking. If a portal-initiated "Test/Run" coincides with the timer firing, the platform queues the second invocation behind the first. Implementation does not need to add explicit lease/lock logic; tasks.md does not include such a task.
 
 **Scale/Scope**: Single user; ~52 runs per year; ~1 narrative + ~5 orders per run = ~260 order rows per year. Storage cost trivial.
 

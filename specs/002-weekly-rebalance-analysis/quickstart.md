@@ -30,28 +30,16 @@ cd ..
 
 ## Seed prerequisites
 
-The use-case reads `portfolioSettings` for `analysis.model`, `analysis.promptVersion`, `analysis.maxInputTokens`, `analysis.maxOutputTokens`. Add seed values:
+The use-case reads `portfolioSettings` for `analysis.model`, `analysis.promptVersion`, `analysis.maxInputTokens`, `analysis.maxOutputTokens`. Run the seed script once (idempotent — existing keys are left untouched):
 
 ```bash
-# From repo root, with Azurite + function host running:
-curl -X PUT http://localhost:7071/api/settings/analysis.model \
-  -H 'Content-Type: application/json' \
-  -d '{"value": "claude-opus-4-7"}'
-
-curl -X PUT http://localhost:7071/api/settings/analysis.promptVersion \
-  -H 'Content-Type: application/json' \
-  -d '{"value": "weekly-rebalance-v1"}'
-
-curl -X PUT http://localhost:7071/api/settings/analysis.maxInputTokens \
-  -H 'Content-Type: application/json' \
-  -d '{"value": "80000"}'
-
-curl -X PUT http://localhost:7071/api/settings/analysis.maxOutputTokens \
-  -H 'Content-Type: application/json' \
-  -d '{"value": "8000"}'
+# From repo root, with Azurite running:
+node scripts/seed-analysis-settings.js
 ```
 
-(If `PUT /api/settings/{key}` doesn't yet exist as written, use the existing pattern from `src/functions/settings.js` — the seed shape is whatever that endpoint accepts.)
+The script writes the four defaults directly to the `portfolioSettings` table via `@azure/data-tables`, mirroring `scripts/seed-brokers.js`. It reads `AZURE_STORAGE_CONNECTION_STRING` from env (`local.settings.json` provides this in dev).
+
+For prod, run the same script against the production storage account (set `AZURE_STORAGE_CONNECTION_STRING` to the prod value), or modify the four rows directly via Azure Storage Explorer / the portal.
 
 ## Run the timer locally
 
