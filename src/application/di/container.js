@@ -16,6 +16,7 @@ const AzureAnalysisRepository = require('../../infrastructure/repositories/Azure
 // Infrastructure providers
 const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
 const ArgentinaDatosRiesgoPaisProvider = require('../../infrastructure/providers/ArgentinaDatosRiesgoPaisProvider');
+const ArgentinaDatosMepProvider = require('../../infrastructure/providers/ArgentinaDatosMepProvider');
 
 // Infrastructure LLM
 const AnthropicLLMClient = require('../../infrastructure/llm/AnthropicLLMClient');
@@ -173,6 +174,19 @@ class Container {
     return this._singletons.get('riesgoPaisProvider');
   }
 
+  /**
+   * Get ArgentinaDatosMepProvider instance — replaces the legacy `mep_rate`
+   * portfolioSettings row. Fetches the dólar bolsa quote dynamically.
+   * @returns {IMepProvider}
+   */
+  getMepProvider() {
+    if (!this._singletons.has('mepProvider')) {
+      const provider = new ArgentinaDatosMepProvider();
+      this._singletons.set('mepProvider', provider);
+    }
+    return this._singletons.get('mepProvider');
+  }
+
   // ==================== LLM ====================
 
   /**
@@ -262,8 +276,8 @@ class Container {
     return new GetPortfolioSummary({
       brokerRepository: this.getBrokerRepository(),
       positionRepository: this.getPositionRepository(),
-      settingsRepository: this.getSettingsRepository(),
-      priceRepository: this.getPriceRepository()
+      priceRepository: this.getPriceRepository(),
+      mepProvider: this.getMepProvider()
     });
   }
 

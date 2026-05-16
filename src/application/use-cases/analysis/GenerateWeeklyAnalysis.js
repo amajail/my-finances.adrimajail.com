@@ -175,6 +175,8 @@ class GenerateWeeklyAnalysis extends UseCase {
           });
         }
         // Unknown failure mode — persist failed, then re-throw for surface visibility.
+        const errType = err && err.name ? err.name : 'Error';
+        const errMsg = err && err.message ? err.message : String(err);
         await this._persistFailed({
           targetDate,
           startedAt,
@@ -182,7 +184,7 @@ class GenerateWeeklyAnalysis extends UseCase {
           promptVersion,
           portfolioSnapshot,
           riesgoReading,
-          errorMessage: `unexpected error: ${err && err.name ? err.name : 'Error'}`,
+          errorMessage: `unexpected error: ${errType}: ${errMsg}`,
         });
         throw err;
       }

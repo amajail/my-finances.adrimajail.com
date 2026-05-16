@@ -28,22 +28,22 @@ function fakeResponse({ ok = true, status = 200, json = null, throwOnJson = fals
 }
 
 describe('ArgentinaDatosRiesgoPaisProvider', () => {
-  it('returns the first entry parsed into { basisPoints, asOf }', async () => {
+  it('returns the /ultimo single-object response parsed into { basisPoints, asOf }', async () => {
     const fetcher = jest.fn().mockResolvedValue(fakeResponse({ json: fixture }));
     const provider = new ArgentinaDatosRiesgoPaisProvider({ fetcher });
 
     const result = await provider.getLatest();
 
-    expect(result).toEqual({ basisPoints: 524, asOf: '2026-05-15' });
+    expect(result).toEqual({ basisPoints: 525, asOf: '2026-05-14' });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it('throws RiesgoPaisFetchError on empty array', async () => {
-    const fetcher = jest.fn().mockResolvedValue(fakeResponse({ json: [] }));
+  it('throws RiesgoPaisFetchError when response is an array (regression guard for the bare /riesgo-pais endpoint)', async () => {
+    const fetcher = jest.fn().mockResolvedValue(fakeResponse({ json: [{ valor: 525, fecha: '2026-05-14' }] }));
     const provider = new ArgentinaDatosRiesgoPaisProvider({ fetcher });
 
     await expect(provider.getLatest()).rejects.toBeInstanceOf(RiesgoPaisFetchError);
-    await expect(provider.getLatest()).rejects.toThrow(/did not contain any readings/);
+    await expect(provider.getLatest()).rejects.toThrow(/was not a single object/);
   });
 
   it('throws RiesgoPaisFetchError on non-2xx response', async () => {
@@ -54,15 +54,15 @@ describe('ArgentinaDatosRiesgoPaisProvider', () => {
     await expect(provider.getLatest()).rejects.toThrow(/non-2xx response: 503/);
   });
 
-  it('throws RiesgoPaisFetchError when first entry is missing `valor`', async () => {
-    const fetcher = jest.fn().mockResolvedValue(fakeResponse({ json: [{ fecha: '2026-05-15' }] }));
+  it('throws RiesgoPaisFetchError when response is missing `valor`', async () => {
+    const fetcher = jest.fn().mockResolvedValue(fakeResponse({ json: { fecha: '2026-05-14' } }));
     const provider = new ArgentinaDatosRiesgoPaisProvider({ fetcher });
 
     await expect(provider.getLatest()).rejects.toThrow(/has no valid `valor`/);
   });
 
-  it('throws RiesgoPaisFetchError when first entry has malformed `fecha`', async () => {
-    const fetcher = jest.fn().mockResolvedValue(fakeResponse({ json: [{ fecha: '15-05-2026', valor: 500 }] }));
+  it('throws RiesgoPaisFetchError when response has malformed `fecha`', async () => {
+    const fetcher = jest.fn().mockResolvedValue(fakeResponse({ json: { fecha: '14-05-2026', valor: 525 } }));
     const provider = new ArgentinaDatosRiesgoPaisProvider({ fetcher });
 
     await expect(provider.getLatest()).rejects.toThrow(/has no valid `fecha`/);

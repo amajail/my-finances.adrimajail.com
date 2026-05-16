@@ -13,7 +13,12 @@
 
 const IRiesgoPaisProvider = require('../../application/interfaces/IRiesgoPaisProvider');
 
-const DEFAULT_BASE_URL = 'https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais';
+// IMPORTANT: use the `/ultimo` endpoint, NOT the bare `/riesgo-pais` endpoint.
+// The bare endpoint returns the FULL history in chronological-ASC order, so
+// `[0]` is the oldest reading (1999-era values like 937 bp) — exactly the
+// opposite of what a "current riesgo país" reader expects. `/ultimo` returns
+// a single object with the most recent reading.
+const DEFAULT_BASE_URL = 'https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo';
 const DEFAULT_TIMEOUT_MS = 10000;
 
 class RiesgoPaisFetchError extends Error {
@@ -76,19 +81,19 @@ class ArgentinaDatosRiesgoPaisProvider extends IRiesgoPaisProvider {
       throw new RiesgoPaisFetchError(`response was not valid JSON: ${err.message}`, err);
     }
 
-    if (!Array.isArray(body) || body.length === 0) {
-      throw new RiesgoPaisFetchError('response did not contain any readings');
+    // `/ultimo` returns a single object `{ valor: number, fecha: "YYYY-MM-DD" }`.
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw new RiesgoPaisFetchError('response was not a single object');
     }
 
-    const first = body[0];
-    const valor = first && typeof first.valor !== 'undefined' ? Number(first.valor) : NaN;
-    const fecha = first && typeof first.fecha === 'string' ? first.fecha : null;
+    const valor = typeof body.valor !== 'undefined' ? Number(body.valor) : NaN;
+    const fecha = typeof body.fecha === 'string' ? body.fecha : null;
 
     if (!Number.isFinite(valor) || valor < 0) {
-      throw new RiesgoPaisFetchError('first entry has no valid `valor`');
+      throw new RiesgoPaisFetchError('response has no valid `valor`');
     }
     if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-      throw new RiesgoPaisFetchError('first entry has no valid `fecha`');
+      throw new RiesgoPaisFetchError('response has no valid `fecha`');
     }
 
     return {
