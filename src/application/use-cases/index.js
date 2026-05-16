@@ -21,6 +21,9 @@ const { GetSetting, UpdateSetting } = require('./settings');
 // Price use cases
 const { RefreshPrices } = require('./prices');
 
+// Analysis use cases
+const GenerateWeeklyAnalysis = require('./analysis/GenerateWeeklyAnalysis');
+
 module.exports = {
   UseCase,
   ListBrokers,
@@ -32,5 +35,6 @@ module.exports = {
   GetPortfolioSummary,
   GetSetting,
   UpdateSetting,
-  RefreshPrices
+  RefreshPrices,
+  GenerateWeeklyAnalysis
 };

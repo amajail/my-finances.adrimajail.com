@@ -1,0 +1,133 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Analysis detail · my-finances" active="analysis">
+  <header class="mb-6">
+    <span class="eyebrow"><a href="/analysis" class="hover:underline">Analysis</a> · detail</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold" id="hdr-title">Loading…</h1>
+    <p class="text-sm text-[var(--color-muted)] mt-1" id="hdr-meta"></p>
+  </header>
+
+  <section id="failed-banner" class="card mb-6 hidden" style="border-left:4px solid #c00">
+    <div class="p-4">
+      <h2 class="font-semibold mb-1 pos-negative">Run failed</h2>
+      <p class="text-sm" id="failed-reason"></p>
+    </div>
+  </section>
+
+  <section id="orders-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-baseline justify-between">
+      <h2 class="font-semibold">Suggested orders</h2>
+      <span class="text-xs text-[var(--color-muted)]" id="orders-count">—</span>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Broker</th>
+          <th class="text-left px-4 py-2">Symbol</th>
+          <th class="text-left px-4 py-2">Side</th>
+          <th class="text-right px-4 py-2">Qty</th>
+          <th class="text-left px-4 py-2">Conviction</th>
+          <th class="text-left px-4 py-2">Rationale</th>
+        </tr>
+      </thead>
+      <tbody id="orders-tbody"></tbody>
+    </table>
+  </section>
+
+  <section id="narrative-section" class="card mb-6 hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Narrative</h2>
+    </div>
+    <article id="narrative-body" class="prose prose-sm max-w-none p-6"></article>
+  </section>
+
+  <p id="error-banner" class="card p-4 pos-negative text-sm hidden"></p>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+  import { marked } from 'marked';
+  import DOMPurify from 'dompurify';
+
+  function escapeHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function show(el) { el.classList.remove('hidden'); }
+
+  function getDateFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const date = params.get('date') || '';
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
+  }
+
+  async function load() {
+    const date = getDateFromUrl();
+    if (!date) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = 'Missing or malformed `date` query parameter (expected YYYY-MM-DD).';
+      show(banner);
+      return;
+    }
+    document.getElementById('hdr-title').textContent = `Weekly analysis — ${date}`;
+
+    let detail;
+    try {
+      detail = await api(`/analysis/weekly/${encodeURIComponent(date)}`);
+    } catch (err) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = err.status === 404
+        ? `No analysis exists for ${date}.`
+        : `Failed to load: ${err.message}`;
+      show(banner);
+      return;
+    }
+
+    const meta = [];
+    if (detail.modelUsed) meta.push(`model: ${detail.modelUsed}`);
+    if (detail.promptVersion) meta.push(`prompt: ${detail.promptVersion}`);
+    if (typeof detail.costUsd === 'number') meta.push(`cost: USD ${detail.costUsd.toFixed(4)}`);
+    if (detail.tokensIn) meta.push(`tokens in: ${detail.tokensIn}`);
+    if (detail.tokensOut) meta.push(`tokens out: ${detail.tokensOut}`);
+    if (detail.riesgoPaisBp != null) meta.push(`riesgo país: ${detail.riesgoPaisBp} bp (${detail.riesgoPaisAsOf || '—'})`);
+    document.getElementById('hdr-meta').textContent = meta.join(' · ');
+
+    if (detail.status === 'failed') {
+      document.getElementById('failed-reason').textContent = detail.errorMessage || 'No reason recorded.';
+      show(document.getElementById('failed-banner'));
+      return;
+    }
+
+    if (Array.isArray(detail.orders) && detail.orders.length > 0) {
+      show(document.getElementById('orders-section'));
+      document.getElementById('orders-count').textContent = `${detail.orders.length} suggested`;
+      document.getElementById('orders-tbody').innerHTML = detail.orders.map((o) => `
+        <tr class="border-t border-[var(--color-border)]">
+          <td class="px-4 py-2">${escapeHtml(o.broker)}</td>
+          <td class="px-4 py-2 num-mono">${escapeHtml(o.symbol)}</td>
+          <td class="px-4 py-2"><span class="badge ${o.side === 'buy' ? 'badge-success' : 'badge-pending'}">${escapeHtml(o.side)}</span></td>
+          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(o.quantity))}</td>
+          <td class="px-4 py-2">${escapeHtml(o.conviction)}</td>
+          <td class="px-4 py-2 text-[var(--color-text-primary)]">${escapeHtml(o.rationale)}</td>
+        </tr>
+      `).join('');
+    }
+
+    if (detail.markdownBody) {
+      const raw = marked.parse(detail.markdownBody, { gfm: true, breaks: false });
+      const safe = DOMPurify.sanitize(raw);
+      document.getElementById('narrative-body').innerHTML = safe;
+      show(document.getElementById('narrative-section'));
+    }
+  }
+
+  load();
+</script>

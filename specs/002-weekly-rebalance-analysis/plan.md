@@ -109,8 +109,7 @@ dashboard/
 └── src/
     └── pages/
         ├── analysis.astro                             (NEW — list page)
-        └── analysis/
-            └── [date].astro                           (NEW — detail page)
+        └── analysis-detail.astro                      (NEW — detail page; reads ?date=YYYY-MM-DD from query string. Query-param instead of path-param because the dashboard is statically built — dynamic routes would require getStaticPaths() with a known finite set of dates, which is impossible.)
 
 tests/
 ├── unit/

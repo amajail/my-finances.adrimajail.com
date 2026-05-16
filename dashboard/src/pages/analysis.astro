@@ -1,0 +1,90 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Weekly Analysis · my-finances" active="analysis">
+  <header class="mb-6">
+    <span class="eyebrow">Analysis</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold">Weekly rebalance analyses</h1>
+    <p class="text-sm text-[var(--color-muted)] mt-1">
+      Auto-generated every Friday at 17:00 ET. Read-only.
+    </p>
+  </header>
+
+  <div class="card overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Date</th>
+          <th class="text-left px-4 py-2">Status</th>
+          <th class="text-left px-4 py-2">Summary / reason</th>
+          <th class="text-right px-4 py-2">Riesgo país</th>
+          <th class="text-right px-4 py-2">Cost (USD)</th>
+          <th class="text-left px-4 py-2">Model</th>
+        </tr>
+      </thead>
+      <tbody id="analysis-tbody">
+        <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+
+  function escapeHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatCost(n) {
+    if (typeof n !== 'number') return '—';
+    return n.toFixed(2);
+  }
+
+  function renderRow(item) {
+    const dateLink = `<a href="/analysis-detail?date=${encodeURIComponent(item.date)}" class="text-[var(--color-accent)] underline-offset-2 hover:underline">${escapeHtml(item.date)}</a>`;
+    const statusBadge = item.status === 'completed'
+      ? `<span class="badge badge-success">completed</span>`
+      : `<span class="badge badge-pending" style="background:#fee;color:#900">failed</span>`;
+    const summaryText = item.status === 'completed'
+      ? (item.summary || '')
+      : (item.errorMessage || '');
+    const rp = item.status === 'completed' && item.riesgoPaisBp != null
+      ? `${item.riesgoPaisBp} bp` + (item.riesgoPaisAsOf ? `<div class="text-xs text-[var(--color-muted)]">${escapeHtml(item.riesgoPaisAsOf)}</div>` : '')
+      : '—';
+    const cost = item.status === 'completed' ? formatCost(item.costUsd) : '—';
+    return `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2 num-mono">${dateLink}</td>
+        <td class="px-4 py-2">${statusBadge}</td>
+        <td class="px-4 py-2 text-[var(--color-text-primary)]">${escapeHtml(summaryText)}</td>
+        <td class="px-4 py-2 text-right num-mono">${rp}</td>
+        <td class="px-4 py-2 text-right num-mono">${cost}</td>
+        <td class="px-4 py-2 text-xs text-[var(--color-muted)]">${escapeHtml(item.modelUsed || '')}</td>
+      </tr>
+    `;
+  }
+
+  async function loadList() {
+    const tbody = document.getElementById('analysis-tbody');
+    try {
+      const { items } = await api('/analysis/weekly?limit=52');
+      if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No analyses yet. The next Friday at 17:00 ET will create the first one.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(renderRow).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-4 text-sm pos-negative">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  loadList();
+</script>

@@ -21,10 +21,10 @@
 
 **Purpose**: Prerequisites that must land before any code is written.
 
-- [ ] T001 Amend `.specify/memory/constitution.md` — add Principle I (Privacy First) carve-out clause acknowledging the Anthropic API as an authorized off-repo data path under its published data-retention policy. Bump version to 1.1.0 with Sync Impact Report. Required by FR-028 and the Constitution Check tension in `plan.md` Complexity Tracking.
-- [ ] T002 [P] Add `@anthropic-ai/sdk` runtime dependency to root `package.json`. Pin to a known-good minor version (latest stable at install time). Run `npm install`. Commit the lockfile change.
-- [ ] T003 [P] Add `marked` and `dompurify` runtime dependencies to `dashboard/package.json`. Run `npm install` inside `dashboard/`. Commit the lockfile.
-- [ ] T004 [P] Update `local.settings.json.example` to document the `ANTHROPIC_API_KEY` slot under `Values`. Add a comment noting that real keys MUST live in `local.settings.json` (gitignored) for dev and in Function App Application Settings for prod.
+- [X] T001 Amend `.specify/memory/constitution.md` — add Principle I (Privacy First) carve-out clause acknowledging the Anthropic API as an authorized off-repo data path under its published data-retention policy. Bump version to 1.1.0 with Sync Impact Report. Required by FR-028 and the Constitution Check tension in `plan.md` Complexity Tracking.
+- [X] T002 [P] Add `@anthropic-ai/sdk` runtime dependency to root `package.json`. Pin to a known-good minor version (latest stable at install time). Run `npm install`. Commit the lockfile change.
+- [X] T003 [P] Add `marked` and `dompurify` runtime dependencies to `dashboard/package.json`. Run `npm install` inside `dashboard/`. Commit the lockfile.
+- [X] T004 [P] Update `local.settings.json.example` to document the `ANTHROPIC_API_KEY` slot under `Values`. Add a comment noting that real keys MUST live in `local.settings.json` (gitignored) for dev and in Function App Application Settings for prod.
 
 ---
 
@@ -36,33 +36,33 @@
 
 ### Interfaces
 
-- [ ] T005 [P] Create interface `IAnalysisRepository` at `src/application/interfaces/IAnalysisRepository.js`. Declare methods: `getLatest(limit)`, `getByDate(date)`, `upsert(weeklyAnalysis, suggestedOrders)`. Methods are unimplemented; this is an abstract contract.
-- [ ] T006 [P] Create interface `ILLMClient` at `src/application/interfaces/ILLMClient.js`. Declare method: `submitAnalysis({ systemPrompt, userMessage, toolSchema, model, maxInputTokens, maxOutputTokens })` returning `{ summary, markdownBody, orders[], usage: { inputTokens, outputTokens, costUsd } }`.
-- [ ] T007 [P] Create interface `IRiesgoPaisProvider` at `src/application/interfaces/IRiesgoPaisProvider.js`. Declare method: `getLatest()` returning `{ basisPoints, asOf }`.
-- [ ] T008 Update `src/application/interfaces/index.js` to export the three new interfaces.
+- [X] T005 [P] Create interface `IAnalysisRepository` at `src/application/interfaces/IAnalysisRepository.js`. Declare methods: `getLatest(limit)`, `getByDate(date)`, `upsert(weeklyAnalysis, suggestedOrders)`. Methods are unimplemented; this is an abstract contract.
+- [X] T006 [P] Create interface `ILLMClient` at `src/application/interfaces/ILLMClient.js`. Declare method: `submitAnalysis({ systemPrompt, userMessage, toolSchema, model, maxInputTokens, maxOutputTokens })` returning `{ summary, markdownBody, orders[], usage: { inputTokens, outputTokens, costUsd } }`.
+- [X] T007 [P] Create interface `IRiesgoPaisProvider` at `src/application/interfaces/IRiesgoPaisProvider.js`. Declare method: `getLatest()` returning `{ basisPoints, asOf }`.
+- [X] T008 Update `src/application/interfaces/index.js` to export the three new interfaces.
 
 ### Domain entities
 
-- [ ] T009 [P] Create `WeeklyAnalysis` entity at `src/domain/entities/WeeklyAnalysis.js`. Fields and validation per `data-model.md` (date, status, summary, markdownBody, riesgoPaisBp, riesgoPaisAsOf, portfolioSnapshot, tokensIn, tokensOut, costUsd, durationMs, errorMessage, generatedAt, modelUsed, promptVersion). Constructor validates: `status ∈ {completed, failed}`, `errorMessage` set iff `failed`, numeric fields ≥ 0, `markdownBody.length ≥ 200` when `completed`. Static `id(date)` returns `{ partitionKey: "weekly", rowKey: date }`.
-- [ ] T010 [P] Create `SuggestedOrder` entity at `src/domain/entities/SuggestedOrder.js`. Fields per `data-model.md` (analysisDate, index, broker, symbol, side, quantity, rationale, conviction). Constructor validates: `side ∈ {buy, sell}` (rejects `hold` explicitly), `broker ∈ {galicia, iol, ibkr, bullmarket, cash}`, `quantity > 0`, `rationale.length ≥ 20`, `conviction ∈ {low, medium, high}`. Static `id(analysisDate, index)` returns `{ partitionKey: analysisDate, rowKey: String(index).padStart(2, "0") }`.
-- [ ] T011 Update `src/domain/entities/index.js` to export `WeeklyAnalysis` and `SuggestedOrder`.
-- [ ] T012 [P] Unit tests for `WeeklyAnalysis` validation at `tests/unit/domain/entities/WeeklyAnalysis.test.js`. Cover: happy path completed, happy path failed, missing errorMessage on failed (throws), short markdownBody (throws), negative tokensIn (throws), invalid status enum (throws), id() shape.
-- [ ] T013 [P] Unit tests for `SuggestedOrder` validation at `tests/unit/domain/entities/SuggestedOrder.test.js`. Cover: happy path buy, happy path sell, rejecting `side: "hold"` (throws), unknown broker (throws), zero/negative quantity (throws), short rationale (throws), id() shape with zero-padding.
+- [X] T009 [P] Create `WeeklyAnalysis` entity at `src/domain/entities/WeeklyAnalysis.js`. Fields and validation per `data-model.md` (date, status, summary, markdownBody, riesgoPaisBp, riesgoPaisAsOf, portfolioSnapshot, tokensIn, tokensOut, costUsd, durationMs, errorMessage, generatedAt, modelUsed, promptVersion). Constructor validates: `status ∈ {completed, failed}`, `errorMessage` set iff `failed`, numeric fields ≥ 0, `markdownBody.length ≥ 200` when `completed`. Static `id(date)` returns `{ partitionKey: "weekly", rowKey: date }`.
+- [X] T010 [P] Create `SuggestedOrder` entity at `src/domain/entities/SuggestedOrder.js`. Fields per `data-model.md` (analysisDate, index, broker, symbol, side, quantity, rationale, conviction). Constructor validates: `side ∈ {buy, sell}` (rejects `hold` explicitly), `broker ∈ {galicia, iol, ibkr, bullmarket, cash}`, `quantity > 0`, `rationale.length ≥ 20`, `conviction ∈ {low, medium, high}`. Static `id(analysisDate, index)` returns `{ partitionKey: analysisDate, rowKey: String(index).padStart(2, "0") }`.
+- [X] T011 Update `src/domain/entities/index.js` to export `WeeklyAnalysis` and `SuggestedOrder`.
+- [X] T012 [P] Unit tests for `WeeklyAnalysis` validation at `tests/unit/domain/entities/WeeklyAnalysis.test.js`. Cover: happy path completed, happy path failed, missing errorMessage on failed (throws), short markdownBody (throws), negative tokensIn (throws), invalid status enum (throws), id() shape.
+- [X] T013 [P] Unit tests for `SuggestedOrder` validation at `tests/unit/domain/entities/SuggestedOrder.test.js`. Cover: happy path buy, happy path sell, rejecting `side: "hold"` (throws), unknown broker (throws), zero/negative quantity (throws), short rationale (throws), id() shape with zero-padding.
 
 ### Repository
 
-- [ ] T014 Implement `AzureAnalysisRepository` at `src/infrastructure/repositories/AzureAnalysisRepository.js`. Implements `IAnalysisRepository`. Methods:
+- [X] T014 Implement `AzureAnalysisRepository` at `src/infrastructure/repositories/AzureAnalysisRepository.js`. Implements `IAnalysisRepository`. Methods:
   - `getLatest(limit=20)` → query `portfolioAnalysis` PK=`weekly`, sort rowKey desc, take `limit`. Hydrates each row to `WeeklyAnalysis` (deserializing the JSON-string `portfolioSnapshot` field).
   - `getByDate(date)` → fetch one `portfolioAnalysis` row + batch query `portfolioOrders` PK=date. Returns `{ analysis: WeeklyAnalysis, orders: SuggestedOrder[] }` or `null`.
   - `upsert(weeklyAnalysis, suggestedOrders)` → transactional batch: delete prior `portfolioOrders` rows for that date (if any), then upsert the `portfolioAnalysis` row, then batch-write the new `portfolioOrders` rows.
   - On first call, ensure both tables exist (`createTable` swallowing the "already exists" error — pattern matches existing repositories).
-- [ ] T015 Register `analysisRepository` factory in `src/application/di/container.js`. Follow the singleton pattern used by `getPositionRepository()` etc.
+- [X] T015 Register `analysisRepository` factory in `src/application/di/container.js`. Follow the singleton pattern used by `getPositionRepository()` etc.
 
 ### LLM infrastructure
 
-- [ ] T016 [P] Implement `LLMLogSanitizer` at `src/infrastructure/llm/LLMLogSanitizer.js`. Exposes one method `sanitizeError(err)` that extracts only `{ status, errorType, requestId, message }` from an Anthropic SDK error, explicitly DROPPING any echoed prompt/response content. Returns a plain object safe to log.
-- [ ] T017 [P] Unit test for `LLMLogSanitizer` at `tests/unit/infrastructure/llm/LLMLogSanitizer.test.js`. Cover: a synthetic error object containing a `request.messages[0].content` payload (must be scrubbed); a vanilla `Error` instance; an SDK-style error with `status`, `error.type`, `request_id`.
-- [ ] T018 Implement `AnthropicLLMClient` at `src/infrastructure/llm/AnthropicLLMClient.js`. Implements `ILLMClient`. Construct the official `Anthropic` client with `apiKey: process.env.ANTHROPIC_API_KEY`. In `submitAnalysis`:
+- [X] T016 [P] Implement `LLMLogSanitizer` at `src/infrastructure/llm/LLMLogSanitizer.js`. Exposes one method `sanitizeError(err)` that extracts only `{ status, errorType, requestId, message }` from an Anthropic SDK error, explicitly DROPPING any echoed prompt/response content. Returns a plain object safe to log.
+- [X] T017 [P] Unit test for `LLMLogSanitizer` at `tests/unit/infrastructure/llm/LLMLogSanitizer.test.js`. Cover: a synthetic error object containing a `request.messages[0].content` payload (must be scrubbed); a vanilla `Error` instance; an SDK-style error with `status`, `error.type`, `request_id`.
+- [X] T018 Implement `AnthropicLLMClient` at `src/infrastructure/llm/AnthropicLLMClient.js`. Implements `ILLMClient`. Construct the official `Anthropic` client with `apiKey: process.env.ANTHROPIC_API_KEY`. In `submitAnalysis`:
   - Set `tools: [{ name: "submit_analysis", input_schema: <loaded from contracts/submit-analysis-tool.json> }]`.
   - Set `tool_choice: { type: "tool", name: "submit_analysis" }`.
   - Add `cache_control: { type: "ephemeral" }` to the static prefix of the system message (per research R1).
@@ -70,24 +70,24 @@
   - On SDK exception, wrap with `LLMLogSanitizer.sanitizeError` before re-throwing.
   - Extract `tool_use.input` from the response, validate against the same JSON schema (defense-in-depth), compute `costUsd` from `usage` and per-model rates (rates as a constant map keyed by model id).
   - Return `{ summary, markdownBody, orders, usage: { inputTokens, outputTokens, costUsd } }`. NEVER return the raw response.
-- [ ] T019 Register `llmClient` factory in `src/application/di/container.js`. Singleton.
+- [X] T019 Register `llmClient` factory in `src/application/di/container.js`. Singleton.
 
 ### Riesgo-país provider
 
-- [ ] T020 [P] Implement `ArgentinaDatosRiesgoPaisProvider` at `src/infrastructure/providers/ArgentinaDatosRiesgoPaisProvider.js`. Implements `IRiesgoPaisProvider`. Use `fetch` + `AbortController` with a 10-second timeout (match the existing price-provider pattern). Endpoint: `https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais`. Read first array element. Return `{ basisPoints: number, asOf: string }`. On timeout, non-2xx, or empty array, throw a typed `RiesgoPaisFetchError(reason)`.
-- [ ] T021 [P] Integration test for the provider at `tests/integration/ArgentinaDatosRiesgoPaisProvider.test.js`. Use a recorded JSON fixture in `tests/fixtures/argentinadatos-riesgo-pais.json`. Inject a fake fetcher returning the fixture; assert returned `{ basisPoints, asOf }`. Add a second test that asserts `RiesgoPaisFetchError` is thrown on empty array.
-- [ ] T022 Register `riesgoPaisProvider` factory in `src/application/di/container.js`. Singleton.
+- [X] T020 [P] Implement `ArgentinaDatosRiesgoPaisProvider` at `src/infrastructure/providers/ArgentinaDatosRiesgoPaisProvider.js`. Implements `IRiesgoPaisProvider`. Use `fetch` + `AbortController` with a 10-second timeout (match the existing price-provider pattern). Endpoint: `https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais`. Read first array element. Return `{ basisPoints: number, asOf: string }`. On timeout, non-2xx, or empty array, throw a typed `RiesgoPaisFetchError(reason)`.
+- [X] T021 [P] Integration test for the provider at `tests/integration/ArgentinaDatosRiesgoPaisProvider.test.js`. Use a recorded JSON fixture in `tests/fixtures/argentinadatos-riesgo-pais.json`. Inject a fake fetcher returning the fixture; assert returned `{ basisPoints, asOf }`. Add a second test that asserts `RiesgoPaisFetchError` is thrown on empty array.
+- [X] T022 Register `riesgoPaisProvider` factory in `src/application/di/container.js`. Singleton.
 
 ### Prompt template + settings
 
-- [ ] T023 Author the versioned prompt template at `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`. Sections per spec FR-010 and `metaprompt-rebalance-plan.md` §9 domain context:
+- [X] T023 Author the versioned prompt template at `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`. Sections per spec FR-010 and `metaprompt-rebalance-plan.md` §9 domain context:
   - **Role** — Portfolio strategist for an Argentina-USD mixed portfolio.
   - **Inputs** — Slots: `{{portfolioSummary}}`, `{{previousAnalysis}}` (markdown + orders + previous portfolio snapshot, or `"none — first run"`), `{{riesgoPais}}` (basisPoints + asOf, or `"unavailable"`), `{{generatedAt}}`.
   - **Strategic framework** (inline as content per Clarification Q3): bucket structure (US/ARG/OffSystem), riesgo-país 600 bp trigger, deploy-priority rankings with caps, standing position-level directives (BRK.B ADD, MU TRIM, DELL TRIM, APG TRIM, FISV HOLD, GOOGL@BullMarket CLOSE), target allocation framework.
   - **Conventions** — bonds per 100 nominales, MEP valuation for ARS, Galicia preference for sovereigns, GD30/AL30 MEP-liquid no-close, commission + IVA on ARS trades, broker minimums.
   - **Required output** — must call `submit_analysis` tool; narrative sections (Executive Summary, Market Context, Portfolio Assessment, Week-over-week Comparison, Suggested Actions).
   - **Guardrails** — no >25% rotation unless conviction high, no selling cash, flag illiquid bonds, rationale must cite drift/directive/trigger/context, week-over-week section MUST compare current portfolio to prior snapshot when prior exists.
-- [ ] T024 Add a one-off bootstrap script at `scripts/seed-analysis-settings.js` that writes the four analysis settings directly to the `portfolioSettings` Azure Table via `@azure/data-tables` (mirroring the pattern of `scripts/seed-brokers.js`). Idempotent insert-only: existing keys are left untouched. Defaults: `analysis.model` = `claude-opus-4-7`, `analysis.promptVersion` = `weekly-rebalance-v1`, `analysis.maxInputTokens` = `80000`, `analysis.maxOutputTokens` = `8000`. The script reads `AZURE_STORAGE_CONNECTION_STRING` from env (same convention as the other seed scripts). Add a one-line "run this once" note to `quickstart.md`. Direct-table write avoids the `authLevel: 'function'` key handshake required by `PUT /api/settings/{key}`.
+- [X] T024 Add a one-off bootstrap script at `scripts/seed-analysis-settings.js` that writes the four analysis settings directly to the `portfolioSettings` Azure Table via `@azure/data-tables` (mirroring the pattern of `scripts/seed-brokers.js`). Idempotent insert-only: existing keys are left untouched. Defaults: `analysis.model` = `claude-opus-4-7`, `analysis.promptVersion` = `weekly-rebalance-v1`, `analysis.maxInputTokens` = `80000`, `analysis.maxOutputTokens` = `8000`. The script reads `AZURE_STORAGE_CONNECTION_STRING` from env (same convention as the other seed scripts). Add a one-line "run this once" note to `quickstart.md`. Direct-table write avoids the `authLevel: 'function'` key handshake required by `PUT /api/settings/{key}`.
 
 **Checkpoint**: Foundation ready — all three user stories can now proceed.
 
@@ -101,7 +101,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T025 [US1] Implement `GenerateWeeklyAnalysis` use-case (happy path) at `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`. Constructor takes `{ analysisRepository, llmClient, riesgoPaisProvider, getPortfolioSummary, settingsRepository, promptLoader, clock }`. `execute(targetDate)` flow:
+- [X] T025 [US1] Implement `GenerateWeeklyAnalysis` use-case (happy path) at `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`. Constructor takes `{ analysisRepository, llmClient, riesgoPaisProvider, getPortfolioSummary, settingsRepository, promptLoader, clock }`. `execute(targetDate)` flow:
   1. Read `analysis.model`, `analysis.promptVersion`, `analysis.maxInputTokens`, `analysis.maxOutputTokens` from settings.
   2. Load the active prompt template file from `src/application/use-cases/analysis/prompts/{promptVersion}.md`.
   3. Call `getPortfolioSummary.execute()` for the current portfolio + MEP + prices.
@@ -113,23 +113,23 @@
   9. Persist via `analysisRepository.upsert(...)`.
   10. Log run metadata (date, model, tokens, cost, orderCount, duration) — NEVER the prompt/response body.
   11. Return the persisted `WeeklyAnalysis`.
-- [ ] T026 [US1] Register `getGenerateWeeklyAnalysis` factory in `src/application/di/container.js` and export from `src/application/use-cases/index.js`.
-- [ ] T027 [P] [US1] Implement timer function at `src/functions/weeklyAnalysisTimer.js`. NCRONTAB `0 0 17 * * 5` (Friday 17:00 ET via the existing `TZ=America/New_York` app setting). Function body: resolve `targetDate` from now (in the ET timezone), invoke `container.getGenerateWeeklyAnalysis().execute(targetDate)`. Thin — no business logic in the handler (Constitution II).
-- [ ] T028 [P] [US1] Implement read endpoint `GET /api/analysis/weekly` at `src/functions/getWeeklyAnalysisList.js`. Parses `?limit=` (default 20, max 200), calls `analysisRepository.getLatest(limit)`, returns the list shape from `contracts/api.md`. `authLevel: 'anonymous'`.
-- [ ] T029 [P] [US1] Implement read endpoint `GET /api/analysis/weekly/{date}` at `src/functions/getWeeklyAnalysis.js`. Validates the `date` path param matches `YYYY-MM-DD` (400 if not). Calls `analysisRepository.getByDate(date)`. Returns the detail shape from `contracts/api.md`. 404 if no row. `authLevel: 'anonymous'`.
-- [ ] T030 [US1] Register the three new functions in `src/functions/index.js` if that file aggregates registrations (mirror the existing pattern; otherwise the v4 functions self-register via `app.timer(...)` / `app.http(...)`).
-- [ ] T031 [P] [US1] Implement dashboard list page at `dashboard/src/pages/analysis.astro`. Mirror layout style of `dashboard/src/pages/positions.astro`. On load (client-side `fetch`), call `GET /api/analysis/weekly?limit=20`. Render a table: date (link to detail), status badge, one-line summary, orderCount, modelUsed, costUsd. Read-only.
-- [ ] T032 [P] [US1] Implement dashboard detail page at `dashboard/src/pages/analysis/[date].astro`. Reads `date` from Astro's URL params. On load, calls `GET /api/analysis/weekly/{date}`. Renders: header (date, status, riesgo país reading + asOf), narrative body via `marked` → `DOMPurify` → set innerHTML, orders table (read-only columns: broker, symbol, side, quantity, conviction, rationale). 404 path shows a friendly "no analysis for this date" message.
+- [X] T026 [US1] Register `getGenerateWeeklyAnalysis` factory in `src/application/di/container.js` and export from `src/application/use-cases/index.js`.
+- [X] T027 [P] [US1] Implement timer function at `src/functions/weeklyAnalysisTimer.js`. NCRONTAB `0 0 17 * * 5` (Friday 17:00 ET via the existing `TZ=America/New_York` app setting). Function body: resolve `targetDate` from now (in the ET timezone), invoke `container.getGenerateWeeklyAnalysis().execute(targetDate)`. Thin — no business logic in the handler (Constitution II).
+- [X] T028 [P] [US1] Implement read endpoint `GET /api/analysis/weekly` at `src/functions/getWeeklyAnalysisList.js`. Parses `?limit=` (default 20, max 200), calls `analysisRepository.getLatest(limit)`, returns the list shape from `contracts/api.md`. `authLevel: 'anonymous'`.
+- [X] T029 [P] [US1] Implement read endpoint `GET /api/analysis/weekly/{date}` at `src/functions/getWeeklyAnalysis.js`. Validates the `date` path param matches `YYYY-MM-DD` (400 if not). Calls `analysisRepository.getByDate(date)`. Returns the detail shape from `contracts/api.md`. 404 if no row. `authLevel: 'anonymous'`.
+- [X] T030 [US1] Register the three new functions in `src/functions/index.js` if that file aggregates registrations (mirror the existing pattern; otherwise the v4 functions self-register via `app.timer(...)` / `app.http(...)`).
+- [X] T031 [P] [US1] Implement dashboard list page at `dashboard/src/pages/analysis.astro`. Mirror layout style of `dashboard/src/pages/positions.astro`. On load (client-side `fetch`), call `GET /api/analysis/weekly?limit=20`. Render a table: date (link to detail), status badge, one-line summary, orderCount, modelUsed, costUsd. Read-only.
+- [X] T032 [P] [US1] Implement dashboard detail page at `dashboard/src/pages/analysis-detail.astro`. Reads `date` from `?date=YYYY-MM-DD` query string (query-param instead of dynamic `[date]` route because the dashboard is statically built — dynamic routes need a build-time-known set of paths). On load, calls `GET /api/analysis/weekly/{date}`. Renders: header (date, status, riesgo país reading + asOf), narrative body via `marked` → `DOMPurify` → set innerHTML, orders table (read-only columns: broker, symbol, side, quantity, conviction, rationale). 404 path shows a friendly "no analysis for this date" message. The list page (T031) links via `/analysis-detail?date=…`.
 
 ### Tests for User Story 1
 
-- [ ] T033 [P] [US1] Unit test for `GenerateWeeklyAnalysis` (happy path) at `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js`. Inject mocks for all collaborators. Cover:
+- [X] T033 [P] [US1] Unit test for `GenerateWeeklyAnalysis` (happy path) at `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js`. Inject mocks for all collaborators. Cover:
   - First-ever run (no prior analysis): prompt is rendered with `previousAnalysis: null`, completed row is persisted, snapshot is populated from portfolio summary.
   - Riesgo país fetch returns a value: it is included in the prompt and persisted on the analysis row.
   - Settings drive the model name and prompt version (vary them in two test cases).
   - Assert that `analysisRepository.upsert` was called once with the right shape; assert the entity passed had `status: "completed"`.
   - Assert that NO log call contains the prompt body or the raw response.
-- [ ] T034 [P] [US1] HTTP smoke test for `GET /api/analysis/weekly/{date}` at `tests/integration/functions/getWeeklyAnalysis.test.js`. Seed Azurite with one fake `portfolioAnalysis` row + 2 fake `portfolioOrders` rows. Hit the endpoint; assert 200 + shape matches the contract. Add: invalid date → 400; missing date → 404.
+- [X] T034 [P] [US1] HTTP smoke test for `GET /api/analysis/weekly/{date}` at `tests/integration/functions/getWeeklyAnalysis.test.js`. Seed Azurite with one fake `portfolioAnalysis` row + 2 fake `portfolioOrders` rows. Hit the endpoint; assert 200 + shape matches the contract. Add: invalid date → 400; missing date → 404.
 
 **Checkpoint**: US1 fully functional. The MVP slice ships here. Validate end-to-end via `quickstart.md` before moving on.
 

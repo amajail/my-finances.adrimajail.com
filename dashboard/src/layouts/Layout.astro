@@ -3,7 +3,7 @@ import '../styles/global.css';
 
 interface Props {
   title?: string;
-  active?: 'home' | 'brokers' | 'positions' | 'settings';
+  active?: 'home' | 'brokers' | 'positions' | 'analysis' | 'settings';
 }
 
 const { title = 'Portfolio · my-finances', active = 'home' } = Astro.props;
@@ -12,6 +12,7 @@ const navItems = [
   { id: 'home',      label: 'Portfolio',  href: '/' },
   { id: 'brokers',   label: 'Brokers',    href: '/brokers' },
   { id: 'positions', label: 'Positions',  href: '/positions' },
+  { id: 'analysis',  label: 'Analysis',   href: '/analysis' },
   { id: 'settings',  label: 'Settings',   href: '/settings' },
 ];
 ---

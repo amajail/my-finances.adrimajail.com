@@ -10,11 +10,17 @@ const IPositionRepository = require('./IPositionRepository');
 const ISettingsRepository = require('./ISettingsRepository');
 const IPriceRepository = require('./IPriceRepository');
 const IPriceProvider = require('./IPriceProvider');
+const IAnalysisRepository = require('./IAnalysisRepository');
+const ILLMClient = require('./ILLMClient');
+const IRiesgoPaisProvider = require('./IRiesgoPaisProvider');
 
 module.exports = {
   IBrokerRepository,
   IPositionRepository,
   ISettingsRepository,
   IPriceRepository,
-  IPriceProvider
+  IPriceProvider,
+  IAnalysisRepository,
+  ILLMClient,
+  IRiesgoPaisProvider
 };
