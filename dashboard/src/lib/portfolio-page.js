@@ -136,6 +136,17 @@ async function load() {
       ? new Date(summary.lastPriceRefreshAt).toLocaleString()
       : 'Never';
 
+    // MEP rate (fetched live from api.argentinadatos.com on every summary call).
+    const mepEl = document.getElementById('mep-rate');
+    if (mepEl) {
+      if (typeof summary.mepRate === 'number' && summary.mepRate > 1) {
+        mepEl.textContent = `${summary.mepRate.toFixed(2)} ARS/USD`
+          + (summary.mepRateAsOf ? ` (as of ${summary.mepRateAsOf})` : '');
+      } else {
+        mepEl.textContent = 'unavailable';
+      }
+    }
+
     // Stat row
     const pnlUsd = summary.unrealizedPnlByCurrency?.USD || 0;
     const pnlArs = summary.unrealizedPnlByCurrency?.ARS || 0;
