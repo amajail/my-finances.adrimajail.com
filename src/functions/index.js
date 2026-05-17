@@ -13,3 +13,4 @@ require('./refreshPricesTimer');
 require('./weeklyAnalysisTimer');
 require('./getWeeklyAnalysisList');
 require('./getWeeklyAnalysis');
+require('./framework');

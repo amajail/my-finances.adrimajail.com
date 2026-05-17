@@ -12,6 +12,7 @@ const AzurePositionRepository = require('../../infrastructure/repositories/Azure
 const AzureSettingsRepository = require('../../infrastructure/repositories/AzureSettingsRepository');
 const AzurePriceRepository = require('../../infrastructure/repositories/AzurePriceRepository');
 const AzureAnalysisRepository = require('../../infrastructure/repositories/AzureAnalysisRepository');
+const AzureFrameworkRepository = require('../../infrastructure/repositories/AzureFrameworkRepository');
 
 // Infrastructure providers
 const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
@@ -33,7 +34,9 @@ const {
   GetSetting,
   UpdateSetting,
   RefreshPrices,
-  GenerateWeeklyAnalysis
+  GenerateWeeklyAnalysis,
+  GetActiveFramework,
+  SaveFramework
 } = require('../use-cases');
 
 /**
@@ -106,6 +109,18 @@ class Container {
       this._singletons.set('analysisRepository', repository);
     }
     return this._singletons.get('analysisRepository');
+  }
+
+  /**
+   * Get FrameworkRepository instance (feature 004).
+   * @returns {IFrameworkRepository}
+   */
+  getFrameworkRepository() {
+    if (!this._singletons.has('frameworkRepository')) {
+      const repository = new AzureFrameworkRepository();
+      this._singletons.set('frameworkRepository', repository);
+    }
+    return this._singletons.get('frameworkRepository');
   }
 
   // ==================== Providers ====================
@@ -330,6 +345,28 @@ class Container {
       riesgoPaisProvider: this.getRiesgoPaisProvider(),
       getPortfolioSummary: this.getGetPortfolioSummary(),
       settingsRepository: this.getSettingsRepository()
+    });
+  }
+
+  // ==================== Framework Use Cases (feature 004) ====================
+
+  /**
+   * Get GetActiveFramework use case (feature 004).
+   * @returns {GetActiveFramework}
+   */
+  getGetActiveFramework() {
+    return new GetActiveFramework({
+      frameworkRepository: this.getFrameworkRepository()
+    });
+  }
+
+  /**
+   * Get SaveFramework use case (feature 004).
+   * @returns {SaveFramework}
+   */
+  getSaveFramework() {
+    return new SaveFramework({
+      frameworkRepository: this.getFrameworkRepository()
     });
   }
 
