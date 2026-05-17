@@ -13,6 +13,23 @@ multiple brokers.
   IOL, and Cohen (Argentine fixed income). No manual UI trigger — the HTTP
   endpoint `POST /api/prices/refresh` is retained as an operator escape
   hatch, protected by the Function App key.
+- **Weekly rebalance analysis**: Friday 17:00 ET timer fires
+  `GenerateWeeklyAnalysis`, which asks Claude (Anthropic SDK, default
+  `claude-opus-4-7`, configurable via `portfolioSettings`) for a written
+  strategic analysis + structured buy/sell orders. Inputs: current portfolio,
+  prior week's analysis (narrative + portfolio snapshot), Argentina riesgo
+  país (via `api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo`),
+  and the owner's strategic framework (stored as `analysis.strategicFrameworkV1`
+  in `portfolioSettings` — NOT in the repo). Output persists to two new
+  tables (`portfolioAnalysis`, `portfolioOrders`) and renders on the dashboard
+  at `/analysis` (list) + `/analysis-detail?date=YYYY-MM-DD` (detail).
+  Requires `ANTHROPIC_API_KEY` in Function App settings. Full design lives
+  under `specs/002-weekly-rebalance-analysis/`; local-dev recipe in that
+  feature's `quickstart.md`. The prompt template at
+  `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md` is
+  generic; the owner's framework content (bucket→symbol mappings, target
+  allocations, deploy priorities, standing directives) is injected at
+  runtime from settings to keep personal data out of git.
 
 ## Develop
 

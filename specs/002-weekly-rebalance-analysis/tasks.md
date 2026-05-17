@@ -143,14 +143,14 @@
 
 ### Implementation for User Story 2
 
-- [ ] T035 [US2] Extend `GenerateWeeklyAnalysis.execute()` to load the previous analysis: before rendering the prompt, call `analysisRepository.getLatest(1)`, find the most recent row strictly older than `targetDate`. If found, pass it (narrative + orders + portfolioSnapshot) to the prompt rendering as `previousAnalysis`. If none (first run), pass `null` and the prompt template's first-run branch applies. File: `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`.
-- [ ] T036 [US2] Refine the prompt template at `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`:
+- [X] T035 [US2] Extend `GenerateWeeklyAnalysis.execute()` to load the previous analysis: before rendering the prompt, call `analysisRepository.getLatest(1)`, find the most recent row strictly older than `targetDate`. If found, pass it (narrative + orders + portfolioSnapshot) to the prompt rendering as `previousAnalysis`. If none (first run), pass `null` and the prompt template's first-run branch applies. File: `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`.
+- [X] T036 [US2] Refine the prompt template at `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`:
   - Strengthen the "Required output" section to require the Week-over-week Comparison section to enumerate per-position deltas between `{{previousAnalysis.portfolioSnapshot}}` and `{{portfolioSummary}}` when both are present.
   - Add explicit instruction: "For each prior suggested order in `{{previousAnalysis.orders}}`, comment on whether the current portfolio is consistent with that suggestion having been executed (compare prior snapshot's per-position quantity to current). Do not silently repeat a prior suggestion with the same rationale if the portfolio shows no movement on it."
 
 ### Tests for User Story 2
 
-- [ ] T037 [P] [US2] Unit test for `GenerateWeeklyAnalysis` with prior-week input, at `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js` (extend the existing test file). Cover:
+- [X] T037 [P] [US2] Unit test for `GenerateWeeklyAnalysis` with prior-week input, at `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js` (extend the existing test file). Cover:
   - Mock `analysisRepository.getLatest(1)` to return a prior completed analysis with a snapshot. Assert the rendered prompt passed to `llmClient.submitAnalysis` includes the prior narrative, prior orders, and prior snapshot.
   - Boundary: prior analysis exists but has `status: "failed"` → still passed to the prompt (the LLM can read what was attempted and what went wrong).
   - First-ever run: `getLatest(1)` returns `[]`; prompt receives `previousAnalysis: null`.
@@ -167,20 +167,20 @@
 
 ### Implementation for User Story 3
 
-- [ ] T038 [US3] Add failure-handling branches to `GenerateWeeklyAnalysis.execute()` at `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`. Wrap the whole `try`:
+- [X] T038 [US3] Add failure-handling branches to `GenerateWeeklyAnalysis.execute()` at `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`. Wrap the whole `try`:
   - `RiesgoPaisFetchError` → persist `WeeklyAnalysis(status: "failed", errorMessage: "riesgo-pais source unreachable: <reason>", portfolioSnapshot: <if available>)`.
   - `CostCapExceededError` (pre-call) → persist `WeeklyAnalysis(status: "failed", errorMessage: "cost cap exceeded: <details>", portfolioSnapshot: <if available>)`.
   - SDK error (post-sanitization) → persist `WeeklyAnalysis(status: "failed", errorMessage: "<sanitized message>", portfolioSnapshot: <if available>)`.
   - Tool-use schema validation failure → persist `WeeklyAnalysis(status: "failed", errorMessage: "tool_use schema validation failed: <details>")`.
   - Any other unexpected throw → persist `failed` with `errorMessage: "unexpected error: <type>"`, re-throw at the end so the function handler logs the stack (without payload).
-- [ ] T039 [P] [US3] Confirm the list endpoint at `src/functions/getWeeklyAnalysisList.js` already returns failed rows alongside completed (it should — the response shape in `contracts/api.md` covers both). If the implementation accidentally filters by status, drop the filter. File: `src/functions/getWeeklyAnalysisList.js`.
-- [ ] T040 [P] [US3] Confirm the detail endpoint at `src/functions/getWeeklyAnalysis.js` returns the failed-row shape (no `summary`/`markdownBody`/`orders` blocks; `errorMessage` present). Adjust serializer if needed. File: `src/functions/getWeeklyAnalysis.js`.
-- [ ] T041 [US3] Update the list page at `dashboard/src/pages/analysis.astro` to render failed entries distinguishably (e.g., red status badge, error reason inline). Make the row still clickable into a detail view that renders the failure.
-- [ ] T042 [US3] Update the detail page at `dashboard/src/pages/analysis/[date].astro` to render the failed state: header shows status "failed" + error reason, no narrative block, no orders table (or empty-state message).
+- [X] T039 [P] [US3] Confirm the list endpoint at `src/functions/getWeeklyAnalysisList.js` already returns failed rows alongside completed (it should — the response shape in `contracts/api.md` covers both). If the implementation accidentally filters by status, drop the filter. File: `src/functions/getWeeklyAnalysisList.js`.
+- [X] T040 [P] [US3] Confirm the detail endpoint at `src/functions/getWeeklyAnalysis.js` returns the failed-row shape (no `summary`/`markdownBody`/`orders` blocks; `errorMessage` present). Adjust serializer if needed. File: `src/functions/getWeeklyAnalysis.js`.
+- [X] T041 [US3] Update the list page at `dashboard/src/pages/analysis.astro` to render failed entries distinguishably (e.g., red status badge, error reason inline). Make the row still clickable into a detail view that renders the failure.
+- [X] T042 [US3] Update the detail page at `dashboard/src/pages/analysis/[date].astro` to render the failed state: header shows status "failed" + error reason, no narrative block, no orders table (or empty-state message).
 
 ### Tests for User Story 3
 
-- [ ] T043 [P] [US3] Unit test for `GenerateWeeklyAnalysis` failure branches, at `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js` (extend). Cover each failure type — riesgo país, cost cap, SDK error, tool-use schema mismatch, generic throw. Assert in each case: a failed `WeeklyAnalysis` row is persisted with the right `errorMessage`, no orders are persisted, and the use-case logs only metadata (no payload).
+- [X] T043 [P] [US3] Unit test for `GenerateWeeklyAnalysis` failure branches, at `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js` (extend). Cover each failure type — riesgo país, cost cap, SDK error, tool-use schema mismatch, generic throw. Assert in each case: a failed `WeeklyAnalysis` row is persisted with the right `errorMessage`, no orders are persisted, and the use-case logs only metadata (no payload).
 
 **Checkpoint**: All three stories functional. Dashboard correctly reports both completed and failed runs.
 
@@ -191,10 +191,10 @@
 **Purpose**: Loose ends and end-to-end validation.
 
 - [ ] T044 [P] Add a `costUsd` rollup query to `AzureAnalysisRepository.getLatest()` (or a new method) so the dashboard list page can display the trailing-12-week running average cost per run (supports SC-005 spot-check). File: `src/infrastructure/repositories/AzureAnalysisRepository.js`.
-- [ ] T045 [P] Add the `analysis` page link to the dashboard's primary navigation (whichever file owns the nav — likely `dashboard/src/layouts/Layout.astro` or `dashboard/src/components/Nav.astro`; inspect to confirm).
-- [ ] T046 Run `quickstart.md` end-to-end against a fresh local Azurite + a local function host, including: success run → re-run overwrite → failure run (disconnect network) → dashboard renders all three correctly → log inspection confirms no prompt/response leak.
-- [ ] T047 [P] Add a brief section to the repo's main `README.md` describing the weekly analysis feature: what it does, where to find the dashboard pages, what env vars are needed, where the prompt template lives. Keep it short — most of the detail lives in `quickstart.md`.
-- [ ] T048 Self-review the diff against Constitution Principle I (Privacy First): grep the changed files for any literal real-holdings symbols, PPC values, or quantity values that may have leaked into test fixtures, comments, or code. Replace any finds with obvious placeholders.
+- [X] T045 [P] Add the `analysis` page link to the dashboard's primary navigation (whichever file owns the nav — likely `dashboard/src/layouts/Layout.astro` or `dashboard/src/components/Nav.astro`; inspect to confirm).
+- [X] T046 Run `quickstart.md` end-to-end against a fresh local Azurite + a local function host, including: success run → re-run overwrite → failure run (disconnect network) → dashboard renders all three correctly → log inspection confirms no prompt/response leak.
+- [X] T047 [P] Add a brief section to the repo's main `README.md` describing the weekly analysis feature: what it does, where to find the dashboard pages, what env vars are needed, where the prompt template lives. Keep it short — most of the detail lives in `quickstart.md`.
+- [X] T048 Self-review the diff against Constitution Principle I (Privacy First): grep the changed files for any literal real-holdings symbols, PPC values, or quantity values that may have leaked into test fixtures, comments, or code. Replace any finds with obvious placeholders.
 
 ---
 

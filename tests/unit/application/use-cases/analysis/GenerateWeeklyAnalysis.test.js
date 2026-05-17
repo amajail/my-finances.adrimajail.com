@@ -271,3 +271,120 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     warnSpy.mockRestore();
   });
 });
+
+// =========================================================================
+// Failure-branch coverage (T043)
+//
+// Verifies the five typed-error paths in GenerateWeeklyAnalysis.execute:
+//   - RiesgoPaisFetchError      → persist failed, do not call LLM
+//   - CostCapExceededError      → persist failed (no API spend)
+//   - LLMSchemaValidationError  → persist failed (cost already incurred)
+//   - LLMRequestError           → persist failed (sanitized message)
+//   - Generic Error (catch-all) → persist failed AND re-throw to surface in
+//                                 the function host log
+// =========================================================================
+
+const { RiesgoPaisFetchError } = require('../../../../../src/infrastructure/providers/ArgentinaDatosRiesgoPaisProvider');
+const {
+  CostCapExceededError,
+  LLMSchemaValidationError,
+  LLMRequestError,
+} = require('../../../../../src/infrastructure/llm/AnthropicLLMClient');
+
+describe('GenerateWeeklyAnalysis (failure branches)', () => {
+  it('RiesgoPaisFetchError: persists a failed row, never calls the LLM, preserves the snapshot', async () => {
+    const repo = mockRepositoryEmpty();
+    const llmClient = mockLlmClientReturning([]);
+    const { useCase } = buildUseCase({
+      repository: repo,
+      llmClient,
+      riesgoPaisProvider: {
+        getLatest: jest.fn().mockRejectedValue(
+          new RiesgoPaisFetchError('timeout after 10000ms')
+        ),
+      },
+    });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.status).toBe('failed');
+    expect(result.errorMessage).toMatch(/riesgo-pais source unreachable: timeout after 10000ms/);
+    expect(llmClient.submitAnalysis).not.toHaveBeenCalled();
+    expect(repo.upsert).toHaveBeenCalledTimes(1);
+    expect(repo.upsert.mock.calls[0][1]).toEqual([]);
+    // Snapshot was captured (portfolio assembled before the fetch failed)
+    expect(repo.upsert.mock.calls[0][0].portfolioSnapshot.length).toBeGreaterThan(0);
+  });
+
+  it('CostCapExceededError: persists a failed row, never calls the LLM successfully', async () => {
+    const repo = mockRepositoryEmpty();
+    const llmClient = {
+      submitAnalysis: jest.fn().mockRejectedValue(
+        new CostCapExceededError('pre-call estimate 120000 tokens exceeds maxInputTokens=80000')
+      ),
+    };
+    const { useCase } = buildUseCase({ repository: repo, llmClient });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.status).toBe('failed');
+    expect(result.errorMessage).toMatch(/cost cap exceeded: pre-call estimate 120000 tokens/);
+    expect(repo.upsert).toHaveBeenCalledTimes(1);
+    expect(repo.upsert.mock.calls[0][1]).toEqual([]);
+  });
+
+  it('LLMSchemaValidationError: persists a failed row with the schema-mismatch reason', async () => {
+    const repo = mockRepositoryEmpty();
+    const llmClient = {
+      submitAnalysis: jest.fn().mockRejectedValue(
+        new LLMSchemaValidationError('$.orders[0].side: must be one of ["buy","sell"]')
+      ),
+    };
+    const { useCase } = buildUseCase({ repository: repo, llmClient });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.status).toBe('failed');
+    expect(result.errorMessage).toMatch(/tool_use schema validation failed: .*orders\[0\]\.side/);
+    expect(repo.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('LLMRequestError: persists a failed row using the sanitized message (no payload echoed)', async () => {
+    const repo = mockRepositoryEmpty();
+    const sanitized = { status: 429, errorType: 'rate_limit_error', requestId: 'req_abc', message: 'rate limit exceeded' };
+    const requestErr = new LLMRequestError(sanitized);
+    const llmClient = {
+      submitAnalysis: jest.fn().mockRejectedValue(requestErr),
+    };
+    const { useCase } = buildUseCase({ repository: repo, llmClient });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.status).toBe('failed');
+    expect(result.errorMessage).toMatch(/LLM request failed: rate limit exceeded/);
+    // No payload echo in errorMessage (defense-in-depth check)
+    expect(result.errorMessage).not.toContain('messages');
+    expect(result.errorMessage).not.toContain('SECRET');
+    expect(repo.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('Generic unknown error: persists a failed row AND re-throws to surface in the function host log', async () => {
+    const repo = mockRepositoryEmpty();
+    const oops = new Error('some unexpected upstream blowup');
+    oops.name = 'WeirdError';
+    const llmClient = {
+      submitAnalysis: jest.fn().mockRejectedValue(oops),
+    };
+    const { useCase } = buildUseCase({ repository: repo, llmClient });
+
+    await expect(useCase.execute({ targetDate: '2026-05-15' })).rejects.toBe(oops);
+
+    // Even though we re-threw, we still persisted a failed row first.
+    expect(repo.upsert).toHaveBeenCalledTimes(1);
+    const persisted = repo.upsert.mock.calls[0][0];
+    expect(persisted.status).toBe('failed');
+    // The improved errorMessage format includes both name AND message
+    expect(persisted.errorMessage).toMatch(/unexpected error: WeirdError: some unexpected upstream blowup/);
+    expect(repo.upsert.mock.calls[0][1]).toEqual([]);
+  });
+});
