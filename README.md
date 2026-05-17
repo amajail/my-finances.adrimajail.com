@@ -30,6 +30,12 @@ multiple brokers.
   generic; the owner's framework content (bucket→symbol mappings, target
   allocations, deploy priorities, standing directives) is injected at
   runtime from settings to keep personal data out of git.
+- **Editable strategic framework**: the framework prompt is editable from
+  the dashboard at `/framework` with append-only version history (every save
+  becomes an immutable row in `portfolioFrameworkHistory`; restore creates
+  a new entry, never mutates). Each weekly analysis is linked to the exact
+  framework version that produced it. Full design in
+  `specs/004-editable-strategic-framework/`.
 
 ## Develop
 

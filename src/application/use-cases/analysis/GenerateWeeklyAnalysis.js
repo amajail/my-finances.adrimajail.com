@@ -42,14 +42,20 @@ const DEFAULTS = {
 class GenerateWeeklyAnalysis extends UseCase {
   /**
    * @param {Object} deps
-   * @param {IAnalysisRepository} deps.analysisRepository
-   * @param {ILLMClient}          deps.llmClient
-   * @param {IRiesgoPaisProvider} deps.riesgoPaisProvider
-   * @param {Object}              deps.getPortfolioSummary - GetPortfolioSummary use-case instance
-   * @param {ISettingsRepository} deps.settingsRepository
-   * @param {Function}            [deps.loadPrompt] - (version: string) => string (injectable for tests)
-   * @param {Function}            [deps.clock]      - () => Date (injectable for tests)
-   * @param {Object}              [deps.toolSchema] - override for tests
+   * @param {IAnalysisRepository}    deps.analysisRepository
+   * @param {ILLMClient}              deps.llmClient
+   * @param {IRiesgoPaisProvider}     deps.riesgoPaisProvider
+   * @param {Object}                  deps.getPortfolioSummary - GetPortfolioSummary use-case instance
+   * @param {ISettingsRepository}     deps.settingsRepository
+   * @param {IFrameworkRepository}    [deps.frameworkRepository] - Feature 004 (optional).
+   *   When provided, the framework content + historyRowKey are read in a
+   *   single call via getActive() — preserving snapshot-at-start (FR-014) and
+   *   enabling the analysis row to be linked to its source framework version
+   *   (FR-015). When absent, falls back to the legacy settingsRepository read
+   *   path and frameworkHistoryRowKey on the persisted analysis stays null.
+   * @param {Function}                [deps.loadPrompt] - (version: string) => string (injectable for tests)
+   * @param {Function}                [deps.clock]      - () => Date (injectable for tests)
+   * @param {Object}                  [deps.toolSchema] - override for tests
    */
   constructor({
     analysisRepository,
@@ -57,6 +63,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     riesgoPaisProvider,
     getPortfolioSummary,
     settingsRepository,
+    frameworkRepository = null,
     loadPrompt = null,
     clock = () => new Date(),
     toolSchema = TOOL_SCHEMA,
@@ -67,6 +74,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     this._riesgoPaisProvider = riesgoPaisProvider;
     this._getPortfolioSummary = getPortfolioSummary;
     this._settingsRepository = settingsRepository;
+    this._frameworkRepository = frameworkRepository;
     this._loadPrompt = loadPrompt || this._defaultLoadPrompt;
     this._clock = clock;
     this._toolSchema = toolSchema;
@@ -93,6 +101,9 @@ class GenerateWeeklyAnalysis extends UseCase {
     let portfolioSnapshot = [];
     let portfolioSummary = null;
     let riesgoReading = null;
+    // Feature 004: captured at the moment we read the framework, then stamped
+    // onto every WeeklyAnalysis written by this run (snapshot-at-start, FR-014).
+    let frameworkHistoryRowKey = null;
 
     try {
       // 2. Current portfolio.
@@ -123,14 +134,27 @@ class GenerateWeeklyAnalysis extends UseCase {
       // mappings, targets, deploy priorities, standing directives). Lives in
       // settings, NOT in the prompt template file, so it never enters git.
       //
-      // NOTE: AzureSettingsRepository.get(key) returns the raw value string
-      // (or null), NOT a { value } wrapper. That wrapper shape only exists
-      // at the API boundary via GetSetting.execute.
+      // Feature 004: when a frameworkRepository is wired (production path),
+      // we read content + historyRowKey in a single call so the resulting
+      // analysis row can be linked back to the exact framework version that
+      // produced it (FR-015). The legacy settings-only path stays around as
+      // a fallback so existing unit tests that don't inject the new dep
+      // still work — those analyses get frameworkHistoryRowKey: null.
       const frameworkKey = `analysis.strategicFrameworkV1`;
-      const frameworkValue = await this._readSettingRaw(frameworkKey);
-      const strategicFramework = typeof frameworkValue === 'string'
-        ? frameworkValue.trim()
-        : '';
+      let strategicFramework = '';
+      if (this._frameworkRepository) {
+        const active = await this._frameworkRepository.getActive();
+        strategicFramework = active && typeof active.content === 'string'
+          ? active.content.trim()
+          : '';
+        frameworkHistoryRowKey = active ? (active.historyRowKey || null) : null;
+      } else {
+        const frameworkValue = await this._readSettingRaw(frameworkKey);
+        strategicFramework = typeof frameworkValue === 'string'
+          ? frameworkValue.trim()
+          : '';
+        // No repository available → no historyRowKey is known. Leave null.
+      }
       if (!strategicFramework) {
         return await this._persistFailed({
           targetDate,
@@ -139,6 +163,7 @@ class GenerateWeeklyAnalysis extends UseCase {
           promptVersion,
           portfolioSnapshot,
           riesgoReading,
+          frameworkHistoryRowKey,
           errorMessage: `strategic framework not configured: set portfolioSettings row "${frameworkKey}" to your framework markdown (see scripts/seed-analysis-framework.example.md)`,
         });
       }
@@ -172,6 +197,7 @@ class GenerateWeeklyAnalysis extends UseCase {
             promptVersion,
             portfolioSnapshot,
             riesgoReading,
+            frameworkHistoryRowKey,
             errorMessage: `cost cap exceeded: ${err.message}`,
           });
         }
@@ -183,6 +209,7 @@ class GenerateWeeklyAnalysis extends UseCase {
             promptVersion,
             portfolioSnapshot,
             riesgoReading,
+            frameworkHistoryRowKey,
             errorMessage: `tool_use schema validation failed: ${err.message}`,
           });
         }
@@ -195,6 +222,7 @@ class GenerateWeeklyAnalysis extends UseCase {
             promptVersion,
             portfolioSnapshot,
             riesgoReading,
+            frameworkHistoryRowKey,
             errorMessage: `LLM request failed: ${sanitized.message}`,
           });
         }
@@ -208,6 +236,7 @@ class GenerateWeeklyAnalysis extends UseCase {
           promptVersion,
           portfolioSnapshot,
           riesgoReading,
+          frameworkHistoryRowKey,
           errorMessage: `unexpected error: ${errType}: ${errMsg}`,
         });
         throw err;
@@ -229,6 +258,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         tokensOut: llmResult.usage.outputTokens,
         costUsd: llmResult.usage.costUsd,
         durationMs: this._clock().getTime() - startedAt.getTime(),
+        frameworkHistoryRowKey,
       });
 
       const orders = (llmResult.orders || []).map((o, idx) => new SuggestedOrder({
@@ -270,7 +300,7 @@ class GenerateWeeklyAnalysis extends UseCase {
 
   // ==================== Helpers ====================
 
-  async _persistFailed({ targetDate, startedAt, model, promptVersion, portfolioSnapshot, riesgoReading, errorMessage }) {
+  async _persistFailed({ targetDate, startedAt, model, promptVersion, portfolioSnapshot, riesgoReading, errorMessage, frameworkHistoryRowKey = null }) {
     const failed = new WeeklyAnalysis({
       date: targetDate,
       status: 'failed',
@@ -285,6 +315,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       costUsd: 0,
       durationMs: this._clock().getTime() - startedAt.getTime(),
       errorMessage,
+      frameworkHistoryRowKey,
     });
     await this._analysisRepository.upsert(failed, []);
     logger.warn('GenerateWeeklyAnalysis: failed', {

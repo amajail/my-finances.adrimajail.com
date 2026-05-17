@@ -1,0 +1,341 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Strategic Framework · my-finances" active="framework">
+  <header class="mb-6">
+    <span class="eyebrow">Strategic framework</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold">Edit the framework used by the weekly analysis</h1>
+    <p class="text-xs text-[var(--color-muted)] mt-2">
+      Save to apply. The next weekly analysis run will use the saved content.
+      Every save is recorded in <span class="font-medium">History</span> below — restore from there if needed.
+    </p>
+  </header>
+
+  <section id="editor-card" class="card p-4 mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold">Active framework</h2>
+      <div id="active-meta" class="text-xs text-[var(--color-muted)]">Loading…</div>
+    </div>
+
+    <label class="block text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1" for="content-area">Content (markdown)</label>
+    <textarea
+      id="content-area"
+      class="w-full border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono"
+      style="min-height: 50vh; resize: vertical;"
+      spellcheck="false"
+      disabled
+    ></textarea>
+
+    <div class="flex flex-wrap items-end gap-3 mt-3">
+      <div class="grow">
+        <label class="block text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1" for="change-note">Change note (optional)</label>
+        <input
+          id="change-note"
+          type="text"
+          maxlength="280"
+          placeholder="e.g. Bumped US-ETFs target to 25%"
+          class="w-full border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm"
+          disabled
+        />
+      </div>
+      <div class="text-xs text-[var(--color-muted)] whitespace-nowrap">
+        <span id="byte-counter">0</span> / <span id="byte-cap">61440</span> bytes
+      </div>
+      <button id="save-btn" class="row-action-btn" disabled>Save</button>
+    </div>
+
+    <div id="toast" class="text-xs mt-3" role="status" aria-live="polite"></div>
+  </section>
+
+  <section id="history-card" class="card p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold">History</h2>
+      <button id="history-refresh-btn" class="text-xs text-[var(--color-muted)] hover:text-[var(--color-text-primary)] underline">
+        Refresh
+      </button>
+    </div>
+    <p id="history-empty" class="text-xs text-[var(--color-muted)] hidden">
+      No history yet — your first save will appear here.
+    </p>
+    <p id="history-loading" class="text-xs text-[var(--color-muted)]">Loading…</p>
+    <ul id="history-list" class="divide-y divide-[var(--color-border)] text-sm"></ul>
+  </section>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+
+  const $ = (id) => document.getElementById(id);
+
+  const ui = {
+    textarea: /** @type {HTMLTextAreaElement} */ ($('content-area')),
+    note: /** @type {HTMLInputElement} */ ($('change-note')),
+    saveBtn: /** @type {HTMLButtonElement} */ ($('save-btn')),
+    byteCounter: $('byte-counter'),
+    byteCap: $('byte-cap'),
+    activeMeta: $('active-meta'),
+    toast: $('toast'),
+    historyList: $('history-list'),
+    historyEmpty: $('history-empty'),
+    historyLoading: $('history-loading'),
+    historyRefresh: $('history-refresh-btn'),
+  };
+
+  const state = {
+    /** @type {string|null} */ lastSavedContent: null,
+    /** @type {number} */ maxBytes: 61440,
+    /** @type {Map<string, string>} cached full content per rowKey */ contentCache: new Map(),
+  };
+
+  function fmtTimestamp(iso) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
+  }
+
+  function byteLength(s) {
+    return new TextEncoder().encode(s ?? '').byteLength;
+  }
+
+  function setToast(text, kind = 'info') {
+    if (!text) {
+      ui.toast.textContent = '';
+      ui.toast.className = 'text-xs mt-3';
+      return;
+    }
+    const color = kind === 'error' ? 'pos-negative' : kind === 'success' ? 'pos-positive' : '';
+    ui.toast.className = `text-xs mt-3 ${color}`;
+    ui.toast.textContent = text;
+  }
+
+  function recomputeSaveState() {
+    const bytes = byteLength(ui.textarea.value);
+    ui.byteCounter.textContent = bytes.toLocaleString();
+    const over = bytes > state.maxBytes;
+    const empty = ui.textarea.value.trim().length === 0;
+    const unchanged = state.lastSavedContent !== null && ui.textarea.value === state.lastSavedContent;
+
+    ui.byteCounter.style.color = over ? 'var(--color-negative, #c00)' : '';
+    ui.saveBtn.disabled = over || empty || unchanged;
+    if (over) {
+      setToast(`Content exceeds maximum size (${state.maxBytes.toLocaleString()} bytes).`, 'error');
+    } else if (ui.toast.textContent && ui.toast.textContent.includes('exceeds maximum size')) {
+      setToast('');
+    }
+  }
+
+  async function loadActive() {
+    try {
+      const data = await api('/framework');
+      state.maxBytes = data.maxBytes || state.maxBytes;
+      ui.byteCap.textContent = state.maxBytes.toLocaleString();
+      ui.textarea.value = data.content || '';
+      ui.textarea.disabled = false;
+      ui.note.disabled = false;
+      state.lastSavedContent = ui.textarea.value;
+      ui.activeMeta.textContent = data.historyRowKey
+        ? `Last saved: ${fmtTimestamp(data.updatedAt)}`
+        : 'Last saved: (seeded — no history row)';
+      recomputeSaveState();
+    } catch (err) {
+      if (err?.status === 404) {
+        ui.activeMeta.textContent = 'Not configured';
+        ui.textarea.disabled = false;
+        ui.note.disabled = false;
+        state.lastSavedContent = '';
+        setToast('No framework configured yet. Save below to create the first version.', 'info');
+        recomputeSaveState();
+        return;
+      }
+      setToast(`Failed to load: ${err?.message || err}`, 'error');
+    }
+  }
+
+  async function save() {
+    ui.saveBtn.disabled = true;
+    setToast('Saving…');
+    try {
+      const result = await api('/framework', {
+        method: 'PUT',
+        body: {
+          content: ui.textarea.value,
+          changeNote: ui.note.value.trim() || null,
+        },
+      });
+      if (result.noop) {
+        setToast('No changes to save (content matches active version).', 'info');
+      } else {
+        setToast(`Saved at ${fmtTimestamp(result.timestamp)}.`, 'success');
+        state.lastSavedContent = ui.textarea.value;
+        ui.note.value = '';
+        ui.activeMeta.textContent = `Last saved: ${fmtTimestamp(result.timestamp)}`;
+        // History will load in US2 (Phase 4).
+      }
+    } catch (err) {
+      setToast(`Save failed: ${err?.message || err}`, 'error');
+    } finally {
+      recomputeSaveState();
+    }
+  }
+
+  function fmtBytes(n) {
+    if (n < 1024) return `${n} B`;
+    return `${(n / 1024).toFixed(1)} KB`;
+  }
+
+  function renderHistoryRow(entry) {
+    const li = document.createElement('li');
+    li.className = 'py-3';
+    li.dataset.rowkey = entry.rowKey;
+
+    const header = document.createElement('div');
+    header.className = 'flex items-center justify-between gap-3 cursor-pointer';
+    header.innerHTML = `
+      <div class="min-w-0">
+        <div class="text-sm font-medium">${fmtTimestamp(entry.timestamp)}</div>
+        <div class="text-xs text-[var(--color-muted)] truncate">
+          ${entry.changeNote ? escapeHtml(entry.changeNote) : '<span class="italic">no note</span>'}
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-[var(--color-muted)] whitespace-nowrap">
+        <span class="px-2 py-0.5 rounded-full bg-[var(--color-surface-2)]">${entry.source}${entry.source === 'restore' ? ` of ${shortKey(entry.restoreOfRowKey)}` : ''}</span>
+        <span>${fmtBytes(entry.contentBytes)}</span>
+        <span aria-hidden="true" class="toggle-caret">▸</span>
+      </div>
+    `;
+
+    const body = document.createElement('div');
+    body.className = 'hidden mt-3 border border-[var(--color-border)] rounded-md';
+    body.innerHTML = `
+      <div class="px-3 py-2 text-xs text-[var(--color-muted)] border-b border-[var(--color-border)] flex items-center justify-between gap-2">
+        <span>Read-only view of this version's content</span>
+        <button class="entry-restore-btn row-action-btn text-xs">Restore</button>
+      </div>
+      <pre class="m-0 px-3 py-2 text-xs overflow-x-auto whitespace-pre-wrap"><code class="entry-content">Loading…</code></pre>
+    `;
+
+    body.querySelector('.entry-restore-btn').addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      await restoreEntry(entry);
+    });
+
+    header.addEventListener('click', async () => {
+      const open = !body.classList.contains('hidden');
+      if (open) {
+        body.classList.add('hidden');
+        header.querySelector('.toggle-caret').textContent = '▸';
+        return;
+      }
+      body.classList.remove('hidden');
+      header.querySelector('.toggle-caret').textContent = '▾';
+      const codeEl = body.querySelector('.entry-content');
+      try {
+        let content = state.contentCache.get(entry.rowKey);
+        if (content === undefined) {
+          const data = await api(`/framework/history/${encodeURIComponent(entry.rowKey)}`);
+          content = data.content || '';
+          state.contentCache.set(entry.rowKey, content);
+        }
+        codeEl.textContent = content;
+      } catch (err) {
+        codeEl.textContent = `Failed to load: ${err?.message || err}`;
+      }
+    });
+
+    li.appendChild(header);
+    li.appendChild(body);
+    return li;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function shortKey(k) {
+    return k ? k.slice(-8) : '—';
+  }
+
+  async function restoreEntry(entry) {
+    const ok = window.confirm(
+      `Restore framework to the version saved on ${fmtTimestamp(entry.timestamp)}?\n\n` +
+      `A new history entry will be created (the current active version stays in history). ` +
+      `This cannot be undone via the UI.`
+    );
+    if (!ok) return;
+
+    setToast('Restoring…');
+    try {
+      const result = await api(`/framework/history/${encodeURIComponent(entry.rowKey)}/restore`, {
+        method: 'POST',
+        body: {},
+      });
+      if (result.noop) {
+        setToast('Already active — no new entry created.', 'info');
+      } else {
+        setToast(`Restored — new entry at ${fmtTimestamp(result.timestamp)}.`, 'success');
+        state.contentCache.clear();
+        await Promise.all([loadActive(), loadHistory()]);
+      }
+    } catch (err) {
+      setToast(`Restore failed: ${err?.message || err}`, 'error');
+    }
+  }
+
+  async function loadHistory() {
+    ui.historyLoading.classList.remove('hidden');
+    ui.historyEmpty.classList.add('hidden');
+    ui.historyList.innerHTML = '';
+    try {
+      const data = await api('/framework/history?limit=50');
+      ui.historyLoading.classList.add('hidden');
+      if (!data.count) {
+        ui.historyEmpty.classList.remove('hidden');
+        return;
+      }
+      for (const entry of data.entries) {
+        ui.historyList.appendChild(renderHistoryRow(entry));
+      }
+      // After rendering, honor any URL hash deep-link from /analysis pages
+      // (Feature 004 / FR-016): #<rowKey> → scroll to + auto-expand that row.
+      await maybeOpenHashTarget();
+    } catch (err) {
+      ui.historyLoading.textContent = `Failed to load history: ${err?.message || err}`;
+    }
+  }
+
+  async function maybeOpenHashTarget() {
+    const hash = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+    if (!hash) return;
+    const li = ui.historyList.querySelector(`li[data-rowkey="${cssEscape(hash)}"]`);
+    if (!li) return;
+    li.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const header = li.querySelector('.cursor-pointer');
+    if (header) header.click();
+  }
+
+  function cssEscape(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/(["\\])/g, '\\$1');
+  }
+
+  ui.textarea.addEventListener('input', recomputeSaveState);
+  ui.saveBtn.addEventListener('click', async () => {
+    await save();
+    state.contentCache.clear();
+    await loadHistory();
+  });
+  ui.historyRefresh.addEventListener('click', () => {
+    state.contentCache.clear();
+    loadHistory();
+  });
+
+  loadActive();
+  loadHistory();
+</script>

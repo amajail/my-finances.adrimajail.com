@@ -38,6 +38,9 @@ app.http('getWeeklyAnalysis', {
         tokensOut: analysis.tokensOut,
         costUsd: analysis.costUsd,
         durationMs: analysis.durationMs,
+        // Feature 004 (FR-016): link to the framework history entry whose
+        // content produced this analysis. Null for pre-feature analyses.
+        frameworkHistoryRowKey: analysis.frameworkHistoryRowKey || null,
       };
 
       if (analysis.isCompleted()) {

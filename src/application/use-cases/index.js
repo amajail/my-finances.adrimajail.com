@@ -24,6 +24,15 @@ const { RefreshPrices } = require('./prices');
 // Analysis use cases
 const GenerateWeeklyAnalysis = require('./analysis/GenerateWeeklyAnalysis');
 
+// Framework use cases (feature 004)
+const {
+  GetActiveFramework,
+  SaveFramework,
+  ListFrameworkHistory,
+  GetFrameworkHistoryEntry,
+  RestoreFrameworkVersion,
+} = require('./framework');
+
 module.exports = {
   UseCase,
   ListBrokers,
@@ -36,5 +45,10 @@ module.exports = {
   GetSetting,
   UpdateSetting,
   RefreshPrices,
-  GenerateWeeklyAnalysis
+  GenerateWeeklyAnalysis,
+  GetActiveFramework,
+  SaveFramework,
+  ListFrameworkHistory,
+  GetFrameworkHistoryEntry,
+  RestoreFrameworkVersion
 };

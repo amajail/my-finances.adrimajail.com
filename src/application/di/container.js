@@ -12,6 +12,7 @@ const AzurePositionRepository = require('../../infrastructure/repositories/Azure
 const AzureSettingsRepository = require('../../infrastructure/repositories/AzureSettingsRepository');
 const AzurePriceRepository = require('../../infrastructure/repositories/AzurePriceRepository');
 const AzureAnalysisRepository = require('../../infrastructure/repositories/AzureAnalysisRepository');
+const AzureFrameworkRepository = require('../../infrastructure/repositories/AzureFrameworkRepository');
 
 // Infrastructure providers
 const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
@@ -33,7 +34,12 @@ const {
   GetSetting,
   UpdateSetting,
   RefreshPrices,
-  GenerateWeeklyAnalysis
+  GenerateWeeklyAnalysis,
+  GetActiveFramework,
+  SaveFramework,
+  ListFrameworkHistory,
+  GetFrameworkHistoryEntry,
+  RestoreFrameworkVersion
 } = require('../use-cases');
 
 /**
@@ -106,6 +112,18 @@ class Container {
       this._singletons.set('analysisRepository', repository);
     }
     return this._singletons.get('analysisRepository');
+  }
+
+  /**
+   * Get FrameworkRepository instance (feature 004).
+   * @returns {IFrameworkRepository}
+   */
+  getFrameworkRepository() {
+    if (!this._singletons.has('frameworkRepository')) {
+      const repository = new AzureFrameworkRepository();
+      this._singletons.set('frameworkRepository', repository);
+    }
+    return this._singletons.get('frameworkRepository');
   }
 
   // ==================== Providers ====================
@@ -329,7 +347,63 @@ class Container {
       llmClient: this.getLLMClient(),
       riesgoPaisProvider: this.getRiesgoPaisProvider(),
       getPortfolioSummary: this.getGetPortfolioSummary(),
-      settingsRepository: this.getSettingsRepository()
+      settingsRepository: this.getSettingsRepository(),
+      // Feature 004: enables snapshotting the active framework's historyRowKey
+      // alongside its content so each analysis row links to its source version.
+      frameworkRepository: this.getFrameworkRepository()
+    });
+  }
+
+  // ==================== Framework Use Cases (feature 004) ====================
+
+  /**
+   * Get GetActiveFramework use case (feature 004).
+   * @returns {GetActiveFramework}
+   */
+  getGetActiveFramework() {
+    return new GetActiveFramework({
+      frameworkRepository: this.getFrameworkRepository()
+    });
+  }
+
+  /**
+   * Get SaveFramework use case (feature 004).
+   * @returns {SaveFramework}
+   */
+  getSaveFramework() {
+    return new SaveFramework({
+      frameworkRepository: this.getFrameworkRepository()
+    });
+  }
+
+  /**
+   * Get ListFrameworkHistory use case (feature 004).
+   * @returns {ListFrameworkHistory}
+   */
+  getListFrameworkHistory() {
+    return new ListFrameworkHistory({
+      frameworkRepository: this.getFrameworkRepository()
+    });
+  }
+
+  /**
+   * Get GetFrameworkHistoryEntry use case (feature 004).
+   * @returns {GetFrameworkHistoryEntry}
+   */
+  getGetFrameworkHistoryEntry() {
+    return new GetFrameworkHistoryEntry({
+      frameworkRepository: this.getFrameworkRepository()
+    });
+  }
+
+  /**
+   * Get RestoreFrameworkVersion use case (feature 004).
+   * @returns {RestoreFrameworkVersion}
+   */
+  getRestoreFrameworkVersion() {
+    return new RestoreFrameworkVersion({
+      frameworkRepository: this.getFrameworkRepository(),
+      saveFramework: this.getSaveFramework()
     });
   }
 

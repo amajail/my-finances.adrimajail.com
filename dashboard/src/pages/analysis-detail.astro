@@ -8,6 +8,7 @@ import Layout from '../layouts/Layout.astro';
     <span class="accent-line"></span>
     <h1 class="text-2xl font-bold" id="hdr-title">Loading…</h1>
     <p class="text-sm text-[var(--color-muted)] mt-1" id="hdr-meta"></p>
+    <p class="text-xs text-[var(--color-muted)] mt-1" id="framework-version-badge"></p>
   </header>
 
   <section id="failed-banner" class="card mb-6 hidden" style="border-left:4px solid #c00">
@@ -99,6 +100,16 @@ import Layout from '../layouts/Layout.astro';
     if (detail.tokensOut) meta.push(`tokens out: ${detail.tokensOut}`);
     if (detail.riesgoPaisBp != null) meta.push(`riesgo país: ${detail.riesgoPaisBp} bp (${detail.riesgoPaisAsOf || '—'})`);
     document.getElementById('hdr-meta').textContent = meta.join(' · ');
+
+    // Feature 004 (FR-016): framework version badge with link.
+    const fwBadge = document.getElementById('framework-version-badge');
+    if (fwBadge) {
+      if (detail.frameworkHistoryRowKey) {
+        fwBadge.innerHTML = `Framework version: <a class="underline hover:text-[var(--color-text-primary)]" href="/framework#${encodeURIComponent(detail.frameworkHistoryRowKey)}">view ${escapeHtml(detail.frameworkHistoryRowKey.slice(-8))}</a>`;
+      } else {
+        fwBadge.textContent = 'Framework version: (pre-history seed)';
+      }
+    }
 
     if (detail.status === 'failed') {
       document.getElementById('failed-reason').textContent = detail.errorMessage || 'No reason recorded.';
