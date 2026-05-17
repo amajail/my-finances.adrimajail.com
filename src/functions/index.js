@@ -10,3 +10,6 @@ require('./portfolioSummary');
 require('./settings');
 require('./refreshPrices');
 require('./refreshPricesTimer');
+require('./weeklyAnalysisTimer');
+require('./getWeeklyAnalysisList');
+require('./getWeeklyAnalysis');

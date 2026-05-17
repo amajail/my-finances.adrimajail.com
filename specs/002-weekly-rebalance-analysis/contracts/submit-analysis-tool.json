@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "submit_analysis",
+  "description": "Submit the structured result of the weekly portfolio rebalance analysis. The summary and markdownBody are the human-readable narrative; orders is the machine-actionable list of buy/sell suggestions. All fields are required.",
+  "input_schema": {
+    "type": "object",
+    "required": ["summary", "markdownBody", "orders"],
+    "additionalProperties": false,
+    "properties": {
+      "summary": {
+        "type": "string",
+        "minLength": 40,
+        "maxLength": 800,
+        "description": "One-paragraph executive summary of the week's recommended action. Plain prose, no markdown. Visible on the dashboard list page."
+      },
+      "markdownBody": {
+        "type": "string",
+        "minLength": 200,
+        "description": "Full narrative report in markdown. Must include sections: Executive Summary, Market Context (with current riesgo país reading and its relation to the 600 bp trigger), Portfolio Assessment, Week-over-week Comparison (omitted on first run), Suggested Actions. Renders on the dashboard detail page."
+      },
+      "orders": {
+        "type": "array",
+        "minItems": 0,
+        "maxItems": 100,
+        "description": "Structured list of suggested buy/sell orders. Empty array is valid when the analysis concludes no action is warranted.",
+        "items": {
+          "type": "object",
+          "required": ["broker", "symbol", "side", "quantity", "rationale", "conviction"],
+          "additionalProperties": false,
+          "properties": {
+            "broker": {
+              "type": "string",
+              "enum": ["galicia", "iol", "ibkr", "bullmarket", "cash"],
+              "description": "Target broker for the order. Must match an existing broker record."
+            },
+            "symbol": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "description": "Instrument symbol as the broker would recognize it (e.g., BRK.B, GD41D, SGOV)."
+            },
+            "side": {
+              "type": "string",
+              "enum": ["buy", "sell"],
+              "description": "buy or sell. There is no 'hold' value — hold-style commentary belongs in markdownBody, not here."
+            },
+            "quantity": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Positive quantity in the instrument's natural unit (shares for equities/ETFs, nominales for bonds, etc.)."
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 1000,
+              "description": "Justification citing at least one of: allocation drift, a standing position-level directive, an active trigger condition (e.g., riesgo país threshold), or new market context. ARS-denominated orders must acknowledge commission + IVA."
+            },
+            "conviction": {
+              "type": "string",
+              "enum": ["low", "medium", "high"],
+              "description": "Self-rated confidence in the suggestion. 'high' is required to propose >25% portfolio rotation in a single week."
+            }
+          }
+        }
+      }
+    }
+  }
+}

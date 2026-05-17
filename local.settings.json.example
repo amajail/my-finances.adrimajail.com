@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AzureWebJobsFeatureFlags": "EnableWorkerIndexing",
+    "TZ": "America/New_York",
+
+    "_comment_anthropic": "Required for the weekly rebalance analysis (feature 002). Get a key at https://console.anthropic.com/. The constitution amendment in version 1.1.0 authorizes this off-repo data path. Never commit a real key — local.settings.json is gitignored.",
+    "ANTHROPIC_API_KEY": ""
+  },
+  "Host": {
+    "LocalHttpPort": 7071,
+    "CORS": "*",
+    "CORSCredentials": false
+  }
+}

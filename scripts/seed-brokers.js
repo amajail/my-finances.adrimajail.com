@@ -20,9 +20,10 @@ const BROKERS = [
   { id: 'cash',     displayName: 'Cash holdings',    type: 'cash_holder', accentColor: '#94a3b8' },
 ];
 
-const SETTINGS = [
-  { key: 'mep_rate', value: '1250' },
-];
+// `mep_rate` is no longer seeded — the MEP rate is fetched dynamically at
+// run time from api.argentinadatos.com via ArgentinaDatosMepProvider. If the
+// row already exists in the table from a prior seed it is harmlessly ignored.
+const SETTINGS = [];
 
 async function send(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {

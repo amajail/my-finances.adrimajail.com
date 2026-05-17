@@ -11,9 +11,15 @@ const AzureBrokerRepository = require('../../infrastructure/repositories/AzureBr
 const AzurePositionRepository = require('../../infrastructure/repositories/AzurePositionRepository');
 const AzureSettingsRepository = require('../../infrastructure/repositories/AzureSettingsRepository');
 const AzurePriceRepository = require('../../infrastructure/repositories/AzurePriceRepository');
+const AzureAnalysisRepository = require('../../infrastructure/repositories/AzureAnalysisRepository');
 
 // Infrastructure providers
 const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
+const ArgentinaDatosRiesgoPaisProvider = require('../../infrastructure/providers/ArgentinaDatosRiesgoPaisProvider');
+const ArgentinaDatosMepProvider = require('../../infrastructure/providers/ArgentinaDatosMepProvider');
+
+// Infrastructure LLM
+const AnthropicLLMClient = require('../../infrastructure/llm/AnthropicLLMClient');
 
 // Use cases
 const {
@@ -26,7 +32,8 @@ const {
   GetPortfolioSummary,
   GetSetting,
   UpdateSetting,
-  RefreshPrices
+  RefreshPrices,
+  GenerateWeeklyAnalysis
 } = require('../use-cases');
 
 /**
@@ -89,6 +96,18 @@ class Container {
     return this._singletons.get('priceRepository');
   }
 
+  /**
+   * Get AnalysisRepository instance (feature 002).
+   * @returns {IAnalysisRepository}
+   */
+  getAnalysisRepository() {
+    if (!this._singletons.has('analysisRepository')) {
+      const repository = new AzureAnalysisRepository();
+      this._singletons.set('analysisRepository', repository);
+    }
+    return this._singletons.get('analysisRepository');
+  }
+
   // ==================== Providers ====================
 
   /**
@@ -141,6 +160,45 @@ class Container {
       this._singletons.set('priceProviderRouter', router);
     }
     return this._singletons.get('priceProviderRouter');
+  }
+
+  /**
+   * Get ArgentinaDatosRiesgoPaisProvider instance (feature 002).
+   * @returns {IRiesgoPaisProvider}
+   */
+  getRiesgoPaisProvider() {
+    if (!this._singletons.has('riesgoPaisProvider')) {
+      const provider = new ArgentinaDatosRiesgoPaisProvider();
+      this._singletons.set('riesgoPaisProvider', provider);
+    }
+    return this._singletons.get('riesgoPaisProvider');
+  }
+
+  /**
+   * Get ArgentinaDatosMepProvider instance — replaces the legacy `mep_rate`
+   * portfolioSettings row. Fetches the dólar bolsa quote dynamically.
+   * @returns {IMepProvider}
+   */
+  getMepProvider() {
+    if (!this._singletons.has('mepProvider')) {
+      const provider = new ArgentinaDatosMepProvider();
+      this._singletons.set('mepProvider', provider);
+    }
+    return this._singletons.get('mepProvider');
+  }
+
+  // ==================== LLM ====================
+
+  /**
+   * Get AnthropicLLMClient instance (feature 002).
+   * @returns {ILLMClient}
+   */
+  getLLMClient() {
+    if (!this._singletons.has('llmClient')) {
+      const client = new AnthropicLLMClient();
+      this._singletons.set('llmClient', client);
+    }
+    return this._singletons.get('llmClient');
   }
 
   // ==================== Broker Use Cases ====================
@@ -218,8 +276,8 @@ class Container {
     return new GetPortfolioSummary({
       brokerRepository: this.getBrokerRepository(),
       positionRepository: this.getPositionRepository(),
-      settingsRepository: this.getSettingsRepository(),
-      priceRepository: this.getPriceRepository()
+      priceRepository: this.getPriceRepository(),
+      mepProvider: this.getMepProvider()
     });
   }
 
@@ -256,6 +314,22 @@ class Container {
       positionRepository: this.getPositionRepository(),
       priceRepository: this.getPriceRepository(),
       priceProviderRouter: this.getPriceProviderRouter()
+    });
+  }
+
+  // ==================== Analysis Use Cases (feature 002) ====================
+
+  /**
+   * Get GenerateWeeklyAnalysis use case (feature 002).
+   * @returns {GenerateWeeklyAnalysis}
+   */
+  getGenerateWeeklyAnalysis() {
+    return new GenerateWeeklyAnalysis({
+      analysisRepository: this.getAnalysisRepository(),
+      llmClient: this.getLLMClient(),
+      riesgoPaisProvider: this.getRiesgoPaisProvider(),
+      getPortfolioSummary: this.getGetPortfolioSummary(),
+      settingsRepository: this.getSettingsRepository()
     });
   }
 
