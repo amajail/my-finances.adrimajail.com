@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { fmtUsd, fmtArs, fmtPct, pnlClass, brokerTypeLabel } from './format.js';
-import { effectivePrice, marketValue, costBasis } from './pricing.js';
+import { marketValue, costBasis } from './pricing.js';
 
 // Per-broker positions table state: rows + active sort + active asset filter.
 // Each broker's table re-renders from its own state when the user sorts or
@@ -8,23 +8,19 @@ import { effectivePrice, marketValue, costBasis } from './pricing.js';
 const brokerState = new Map();
 
 const SORT_ACCESSORS = {
-  symbol:      r => r.p.symbol,
-  quantity:    r => r.p.quantity,
-  averageCost: r => r.p.averageCost,
-  price:       r => r.price,
-  value:       r => r.mv,
-  pnl:         r => r.pnl,
-  pct:         r => r.pct,
+  symbol: r => r.p.symbol,
+  value:  r => r.mv,
+  pnl:    r => r.pnl,
+  pct:    r => r.pct,
 };
 
 function buildBrokerRows(positions) {
   return positions.map(p => {
     const cb = costBasis(p);
-    const price = effectivePrice(p);
     const mv = marketValue(p);
     const pnl = mv != null ? mv - cb : null;
     const pct = (cb > 0 && pnl != null) ? (pnl / cb) * 100 : null;
-    return { p, price, mv, pnl, pct };
+    return { p, mv, pnl, pct };
   });
 }
 
@@ -44,13 +40,10 @@ function sortRows(rows, sortKey, sortDir) {
   });
 }
 
-function brokerRowHtml({ p, price, mv, pnl, pct }) {
+function brokerRowHtml({ p, mv, pnl, pct }) {
   return `
     <tr class="border-t border-[var(--color-border)]" data-asset-type="${p.assetType}">
       <td class="px-4 py-2"><span class="font-semibold">${p.symbol}</span> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
-      <td class="px-4 py-2 text-right num-mono">${p.quantity}</td>
-      <td class="px-4 py-2 text-right num-mono">${p.averageCost.toFixed(2)} ${p.currency}</td>
-      <td class="px-4 py-2 text-right num-mono">${price != null ? price.toFixed(2) : '—'}</td>
       <td class="px-4 py-2 text-right num-mono">${mv != null ? mv.toFixed(0) + ' ' + p.currency : '—'}</td>
       <td class="px-4 py-2 text-right num-mono ${pnlClass(pnl)}">${pnl != null ? pnl.toFixed(0) : '—'}</td>
       <td class="px-4 py-2 text-right num-mono ${pnlClass(pct)}">${fmtPct(pct)}</td>
@@ -70,7 +63,7 @@ function renderBrokerRows(brokerId) {
   const tbody = table.querySelector('tbody');
   tbody.innerHTML = sorted.length
     ? sorted.map(brokerRowHtml).join('')
-    : '<tr><td colspan="7" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No matching positions.</td></tr>';
+    : '<tr><td colspan="4" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No matching positions.</td></tr>';
   table.querySelectorAll('th[data-sort-key] .sort-indicator').forEach(span => {
     const key = span.parentElement.dataset.sortKey;
     span.textContent = key === state.sortKey ? (state.sortDir === 'asc' ? '▲' : '▼') : '';
@@ -225,9 +218,6 @@ async function load() {
             <thead class="bg-[var(--color-surface-2)]">
               <tr class="text-xs uppercase text-[var(--color-muted)]">
                 <th class="text-left px-4 py-2 sort-th" data-sort-key="symbol">Symbol<span class="sort-indicator"></span></th>
-                <th class="text-right px-4 py-2 sort-th" data-sort-key="quantity">Qty<span class="sort-indicator"></span></th>
-                <th class="text-right px-4 py-2 sort-th" data-sort-key="averageCost">PPC<span class="sort-indicator"></span></th>
-                <th class="text-right px-4 py-2 sort-th" data-sort-key="price">Last<span class="sort-indicator"></span></th>
                 <th class="text-right px-4 py-2 sort-th" data-sort-key="value">Value<span class="sort-indicator"></span></th>
                 <th class="text-right px-4 py-2 sort-th" data-sort-key="pnl">P&L<span class="sort-indicator"></span></th>
                 <th class="text-right px-4 py-2 sort-th" data-sort-key="pct">%<span class="sort-indicator"></span></th>
@@ -242,8 +232,8 @@ async function load() {
     for (const [brokerId, brokerPositions] of positionBrokerEntries) {
       brokerState.set(brokerId, {
         rows: buildBrokerRows(brokerPositions),
-        sortKey: null,
-        sortDir: 'asc',
+        sortKey: 'value',
+        sortDir: 'desc',
         activeAsset: 'all',
       });
       renderBrokerRows(brokerId);

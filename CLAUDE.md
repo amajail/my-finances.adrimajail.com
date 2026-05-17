@@ -77,4 +77,8 @@ shell commands, and other important information, read the current plan at
 `specs/004-editable-strategic-framework/plan.md` (Phase 1 complete; tasks
 pending). Companion artifacts in the same folder: `spec.md`, `research.md`,
 `data-model.md`, `quickstart.md`, `contracts/api.md`.
+`specs/003-dashboard-metrics-trim/plan.md` (Phase 1 complete; tasks
+pending). Companion artifacts in the same folder: `spec.md`, `research.md`,
+`data-model.md`, `quickstart.md`. No `contracts/` directory — this feature
+exposes no new external interface.
 <!-- SPECKIT END -->
