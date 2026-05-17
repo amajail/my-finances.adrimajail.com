@@ -123,3 +123,8 @@ plan-rebalanceo-brokers.html
 # Private strategic doc — contains real position performance figures
 # (P&L percentages on real positions). Never commit.
 metaprompt-rebalance-plan.md
+
+# Owner-private strategic framework, seeded into portfolioSettings at run time
+# via `node scripts/seed-analysis-framework.js`. The example template at
+# scripts/seed-analysis-framework.example.md IS committed (placeholders).
+scripts/analysis-framework.local.md
