@@ -119,3 +119,7 @@ scripts/update-*.js
 # Reference reports — contain real broker/holdings data
 portfolio-report.html
 plan-rebalanceo-brokers.html
+
+# Private strategic doc — contains real position performance figures
+# (P&L percentages on real positions). Never commit.
+metaprompt-rebalance-plan.md
