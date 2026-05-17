@@ -8,6 +8,14 @@
 
 **Input**: User description: "Dashboard should display only three metrics per position in each broker table: value, P&L, and %. Remove the other metric columns from each broker's positions table on the home dashboard."
 
+## Clarifications
+
+### Session 2026-05-17
+
+- Q: When you said "only columns: value, P&L, %", did you mean literally three cells per row, or three *metric* columns alongside the existing Symbol row identifier? → A: Keep Symbol column as row identifier; the three *metric* columns are Value, P&L, %. Table has 4 columns total (Symbol + 3 metrics).
+- Q: When the dashboard hides Quantity / PPC / Last price, how should the portfolio owner still see those values when curious? → A: They are not available on the home dashboard at all. The portfolio owner navigates to the Positions page when they need quantity, PPC, or last price. No tooltip, popover, or expand-on-click is added to the home dashboard.
+- Q: What is the default sort order when a broker's table first renders, before the user clicks any column header? → A: Sort by **Value descending** — biggest holdings on top. The user can still click any sortable column to override.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Glance at each holding's outcome (Priority: P1)
@@ -21,8 +29,9 @@ When the portfolio owner opens the home dashboard, each broker's positions table
 **Acceptance Scenarios**:
 
 1. **Given** the portfolio owner has open positions across multiple brokers, **When** they load the home dashboard, **Then** every broker's positions table displays exactly four columns: Symbol, Value, P&L, %.
-2. **Given** a broker's positions table is showing trimmed columns, **When** the portfolio owner sorts the table, **Then** they can sort by any of the three metric columns (Value, P&L, %) and by Symbol; sort options for removed columns are gone.
-3. **Given** the asset-type filter pills above a broker table, **When** the portfolio owner filters by a specific asset type, **Then** the table still displays only Symbol, Value, P&L, % for the filtered rows.
+2. **Given** a broker's positions table has just rendered for the first time, **When** the portfolio owner has not yet clicked any column header, **Then** rows are ordered by Value descending so the largest holdings appear at the top.
+3. **Given** a broker's positions table is showing trimmed columns, **When** the portfolio owner sorts the table, **Then** they can sort by any of the three metric columns (Value, P&L, %) and by Symbol; sort options for removed columns are gone.
+4. **Given** the asset-type filter pills above a broker table, **When** the portfolio owner filters by a specific asset type, **Then** the table still displays only Symbol, Value, P&L, % for the filtered rows.
 
 ### Edge Cases
 
@@ -36,8 +45,9 @@ When the portfolio owner opens the home dashboard, each broker's positions table
 ### Functional Requirements
 
 - **FR-001**: The per-broker positions table on the home dashboard MUST display only the following columns, in this order: Symbol, Value, P&L, %.
-- **FR-002**: The system MUST remove the Quantity, PPC (average cost), and Last (current price) columns from each broker's positions table on the home dashboard.
+- **FR-002**: The system MUST remove the Quantity, PPC (average cost), and Last (current price) columns from each broker's positions table on the home dashboard. These values MUST NOT be exposed via tooltip, hover popover, expandable row, side panel, or any other secondary interaction on the home dashboard. The Positions page remains the place to view or edit them.
 - **FR-003**: Sorting controls MUST remain available for the columns that are still displayed (Symbol, Value, P&L, %) and MUST be removed for any column that is no longer displayed.
+- **FR-003a**: Each broker's table MUST default-sort by **Value descending** on first render. A user-initiated sort (clicking a column header) overrides the default for the duration of the page session.
 - **FR-004**: The asset-type filter above each broker's table MUST continue to work and MUST keep filtering the same trimmed column set.
 - **FR-005**: Per-row Value, P&L, and % MUST be computed and shown the same way they are shown today (same units, same currency handling per row, same "not available" placeholder when a value cannot be computed).
 - **FR-006**: P&L and % cells MUST keep the existing visual cue that distinguishes a gain from a loss.
