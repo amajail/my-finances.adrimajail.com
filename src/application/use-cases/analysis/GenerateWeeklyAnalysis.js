@@ -122,10 +122,14 @@ class GenerateWeeklyAnalysis extends UseCase {
       // 5. Strategic framework (the owner's personal content — bucket→symbol
       // mappings, targets, deploy priorities, standing directives). Lives in
       // settings, NOT in the prompt template file, so it never enters git.
+      //
+      // NOTE: AzureSettingsRepository.get(key) returns the raw value string
+      // (or null), NOT a { value } wrapper. That wrapper shape only exists
+      // at the API boundary via GetSetting.execute.
       const frameworkKey = `analysis.strategicFrameworkV1`;
-      const frameworkSetting = await this._readSettingRaw(frameworkKey);
-      const strategicFramework = frameworkSetting && typeof frameworkSetting.value === 'string'
-        ? frameworkSetting.value.trim()
+      const frameworkValue = await this._readSettingRaw(frameworkKey);
+      const strategicFramework = typeof frameworkValue === 'string'
+        ? frameworkValue.trim()
         : '';
       if (!strategicFramework) {
         return await this._persistFailed({
@@ -363,9 +367,11 @@ class GenerateWeeklyAnalysis extends UseCase {
   }
 
   async _getSetting(key, defaultValue) {
+    // AzureSettingsRepository.get returns the raw value string (or null) —
+    // no { value } wrapper at the repository boundary.
     try {
-      const setting = await this._settingsRepository.get(key);
-      if (setting && setting.value) return setting.value;
+      const value = await this._settingsRepository.get(key);
+      if (value !== null && value !== undefined && value !== '') return value;
     } catch (_) { /* fallthrough to default */ }
     return defaultValue;
   }

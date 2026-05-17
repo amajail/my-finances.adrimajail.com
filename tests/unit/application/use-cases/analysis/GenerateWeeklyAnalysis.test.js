@@ -51,9 +51,11 @@ function mockLlmClientReturning(orders = []) {
   };
 }
 
+// AzureSettingsRepository.get returns the raw value string (or null) — not a
+// { value } wrapper. Mock the same contract.
 function mockSettingsRepo(map = {}) {
   return {
-    get: jest.fn(async (key) => map[key] ? { value: map[key] } : null),
+    get: jest.fn(async (key) => (key in map ? map[key] : null)),
   };
 }
 
