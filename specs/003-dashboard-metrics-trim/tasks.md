@@ -48,7 +48,7 @@ This feature is web-app frontend-only. All edits land in `dashboard/src/lib/port
 
 ### Implementation for User Story 1
 
-- [ ] T001 [US1] Trim the per-broker table's column set in `dashboard/src/lib/portfolio-page.js` so the rendered table has exactly four columns — Symbol, Value, P&L, % — by making all four coupled edits in this single task:
+- [X] T001 [US1] Trim the per-broker table's column set in `dashboard/src/lib/portfolio-page.js` so the rendered table has exactly four columns — Symbol, Value, P&L, % — by making all four coupled edits in this single task:
   - Remove the `quantity`, `averageCost`, and `price` keys from `SORT_ACCESSORS` (keep `symbol`, `value`, `pnl`, `pct`).
   - In the inline `<table>` template inside `load()`, delete the three `<th>` cells whose `data-sort-key` is `quantity`, `averageCost`, and `price`. Keep the four `<th>` cells for `symbol`, `value`, `pnl`, `pct` in that order.
   - Rewrite `brokerRowHtml({ p, price, mv, pnl, pct })` to return a `<tr>` with exactly four `<td>` cells in this order: Symbol (with the existing `assetType` tag), Value (`${mv.toFixed(0)} ${p.currency}` when non-null, else `'—'`), P&L (`${pnl.toFixed(0)}` when non-null else `'—'`, with `pnlClass(pnl)`), % (`fmtPct(pct)` with `pnlClass(pct)`). All formatting and the gain/loss color cue stay identical to today (FR-005, FR-006).
@@ -57,7 +57,7 @@ This feature is web-app frontend-only. All edits land in `dashboard/src/lib/port
 
   After this task: every broker's positions table on the home page renders four columns and produces no JS errors. Sort still works on the four remaining columns. The asset-type filter still works. Default sort order is whatever the API returned (T002 will fix that).
 
-- [ ] T002 [US1] Set the per-broker default sort to **Value descending** on first render in `dashboard/src/lib/portfolio-page.js`. In the loop that initializes per-broker state via `brokerState.set(brokerId, { rows: buildBrokerRows(brokerPositions), sortKey: null, sortDir: 'asc', activeAsset: 'all' })`, change `sortKey: null` to `sortKey: 'value'` and `sortDir: 'asc'` to `sortDir: 'desc'`. Leave `activeAsset: 'all'` unchanged. The existing `renderBrokerRows()` already emits the `▼` sort indicator on the Value header when `state.sortKey === 'value'` and `state.sortDir === 'desc'`, so no template change is needed. (FR-003a, AC-2.)
+- [X] T002 [US1] Set the per-broker default sort to **Value descending** on first render in `dashboard/src/lib/portfolio-page.js`. In the loop that initializes per-broker state via `brokerState.set(brokerId, { rows: buildBrokerRows(brokerPositions), sortKey: null, sortDir: 'asc', activeAsset: 'all' })`, change `sortKey: null` to `sortKey: 'value'` and `sortDir: 'asc'` to `sortDir: 'desc'`. Leave `activeAsset: 'all'` unchanged. The existing `renderBrokerRows()` already emits the `▼` sort indicator on the Value header when `state.sortKey === 'value'` and `state.sortDir === 'desc'`, so no template change is needed. (FR-003a, AC-2.)
 
 **Checkpoint (end of Phase 3)**: User Story 1 is fully delivered. Visit `/` locally; every broker's table has four columns, biggest holding on top, sort and filter both functional. No automated tests run — verification is the manual check in T004 below.
 
@@ -67,7 +67,7 @@ This feature is web-app frontend-only. All edits land in `dashboard/src/lib/port
 
 **Purpose**: Optional cleanups and the manual verification check.
 
-- [ ] T003 Optional cleanup in `dashboard/src/lib/portfolio-page.js`: drop the now-unused `price` field from the row object literal returned by `buildBrokerRows()` (it is no longer read by `brokerRowHtml()` after T001, nor by any remaining `SORT_ACCESSORS` entry — `marketValue()` continues to call `effectivePrice()` internally, so dropping the field is safe). Pure dead-code removal; the diff is one line. Skip this task if you'd rather keep the row shape stable for future use.
+- [X] T003 Optional cleanup in `dashboard/src/lib/portfolio-page.js`: drop the now-unused `price` field from the row object literal returned by `buildBrokerRows()` (it is no longer read by `brokerRowHtml()` after T001, nor by any remaining `SORT_ACCESSORS` entry — `marketValue()` continues to call `effectivePrice()` internally, so dropping the field is safe). Pure dead-code removal; the diff is one line. Skip this task if you'd rather keep the row shape stable for future use.
 
 - [ ] T004 Run the manual smoke check in `specs/003-dashboard-metrics-trim/quickstart.md` end to end (steps 1–7). Confirm all four acceptance scenarios in `specs/003-dashboard-metrics-trim/spec.md` pass and that the unchanged page elements listed in FR-007 / SC-004 are visually identical to pre-feature state.
 
