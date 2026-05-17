@@ -41,6 +41,24 @@ The script writes the four defaults directly to the `portfolioSettings` table vi
 
 For prod, run the same script against the production storage account (set `AZURE_STORAGE_CONNECTION_STRING` to the prod value), or modify the four rows directly via Azure Storage Explorer / the portal.
 
+### Seed the strategic framework (REQUIRED — owner-private content)
+
+The prompt template (`src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`) is intentionally generic and committable. Your real strategic framework — bucket→symbol mappings, target allocations, deploy priorities, standing directives — lives in the `analysis.strategicFrameworkV1` row of `portfolioSettings` and is injected into the prompt at runtime.
+
+```bash
+# First time: copy the placeholder template, then edit with your real framework
+cp scripts/seed-analysis-framework.example.md scripts/analysis-framework.local.md
+$EDITOR scripts/analysis-framework.local.md
+
+# Push to local function host
+node scripts/seed-analysis-framework.js
+
+# Or push to prod
+API_BASE=https://my-fn.azurewebsites.net/api FN_KEY=<your-key> node scripts/seed-analysis-framework.js
+```
+
+`scripts/analysis-framework.local.md` is gitignored. If `analysis.strategicFrameworkV1` is missing or empty when a run fires, the use-case persists a `failed` analysis row with a clean error message pointing back here — the run will never silently send a generic prompt.
+
 ## Run the timer locally
 
 Azure Functions Core Tools doesn't fire timers on schedule in local dev unless you explicitly invoke them. Two options:

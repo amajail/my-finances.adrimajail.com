@@ -61,10 +61,14 @@ function buildUseCase({
   llmClient = mockLlmClientReturning(),
   repository = mockRepositoryEmpty(),
   riesgoPaisProvider = { getLatest: jest.fn().mockResolvedValue({ basisPoints: 524, asOf: '2026-05-15' }) },
-  settingsRepository = mockSettingsRepo({ 'analysis.model': 'claude-opus-4-7', 'analysis.promptVersion': 'weekly-rebalance-v1' }),
+  settingsRepository = mockSettingsRepo({
+    'analysis.model': 'claude-opus-4-7',
+    'analysis.promptVersion': 'weekly-rebalance-v1',
+    'analysis.strategicFrameworkV1': '## Framework (test fixture)\n- Buckets: US, ARG, OffSystem\n- Targets: US 55%, ARG 30%, OffSystem 15%',
+  }),
   portfolioSummary = fakePortfolioSummary(),
   fixedNow = new Date('2026-05-15T21:00:00Z'),
-  loadPrompt = jest.fn().mockReturnValue('# SYSTEM PROMPT v1\n…framework content…\n'),
+  loadPrompt = jest.fn().mockReturnValue('# SYSTEM PROMPT v1\n\n## Strategic Framework\n\n{{strategicFramework}}\n\n## End\n'),
 } = {}) {
   let nowMs = fixedNow.getTime();
   const clock = () => new Date(nowMs++); // advances by 1ms so duration > 0
@@ -126,6 +130,7 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
       settingsRepository: mockSettingsRepo({
         'analysis.model': 'claude-sonnet-4-6',
         'analysis.promptVersion': 'weekly-rebalance-v1',
+        'analysis.strategicFrameworkV1': '## fixture framework',
       }),
     });
     await useCase.execute({ targetDate: '2026-05-15' });
@@ -136,9 +141,12 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     );
   });
 
-  it('falls back to default model / prompt when settings missing', async () => {
+  it('falls back to default model / prompt / caps when those settings are missing (framework still required)', async () => {
+    // Only the framework is provided — everything else falls back to defaults.
     const { useCase, llmClient, loadPrompt } = buildUseCase({
-      settingsRepository: { get: jest.fn().mockResolvedValue(null) },
+      settingsRepository: mockSettingsRepo({
+        'analysis.strategicFrameworkV1': '## fixture framework — defaults test',
+      }),
     });
     await useCase.execute({ targetDate: '2026-05-15' });
 
@@ -187,6 +195,56 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     expect(submitCall.userMessage).toContain('"date": "2026-05-08"');
     expect(submitCall.userMessage).toContain('"portfolioSnapshot"');
     expect(submitCall.userMessage).toContain('"symbol": "MU"');
+  });
+
+  it('splices the strategic framework from settings into the {{strategicFramework}} slot', async () => {
+    const { useCase, llmClient, settingsRepository } = buildUseCase({
+      settingsRepository: mockSettingsRepo({
+        'analysis.model': 'claude-opus-4-7',
+        'analysis.promptVersion': 'weekly-rebalance-v1',
+        'analysis.strategicFrameworkV1': '### MY OWNER FRAMEWORK\n- bucket-X: [SYMBOL_REDACTED]\n- directive: HOLD [WHATEVER]',
+      }),
+    });
+    await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(settingsRepository.get).toHaveBeenCalledWith('analysis.strategicFrameworkV1');
+    const submitCall = llmClient.submitAnalysis.mock.calls[0][0];
+    expect(submitCall.systemPrompt).toContain('MY OWNER FRAMEWORK');
+    expect(submitCall.systemPrompt).not.toContain('{{strategicFramework}}');
+  });
+
+  it('persists a failed row when the strategic framework setting is missing', async () => {
+    const repo = mockRepositoryEmpty();
+    const { useCase } = buildUseCase({
+      repository: repo,
+      // No analysis.strategicFrameworkV1 in the settings map.
+      settingsRepository: mockSettingsRepo({
+        'analysis.model': 'claude-opus-4-7',
+        'analysis.promptVersion': 'weekly-rebalance-v1',
+      }),
+    });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.status).toBe('failed');
+    expect(result.errorMessage).toMatch(/strategic framework not configured/);
+    expect(repo.upsert).toHaveBeenCalledTimes(1);
+    // No orders persisted on failure
+    expect(repo.upsert.mock.calls[0][1]).toEqual([]);
+  });
+
+  it('persists a failed row when the strategic framework setting is an empty string', async () => {
+    const { useCase } = buildUseCase({
+      settingsRepository: mockSettingsRepo({
+        'analysis.model': 'claude-opus-4-7',
+        'analysis.promptVersion': 'weekly-rebalance-v1',
+        'analysis.strategicFrameworkV1': '   \n  ',
+      }),
+    });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+    expect(result.status).toBe('failed');
+    expect(result.errorMessage).toMatch(/strategic framework not configured/);
   });
 
   it('does not log the prompt body or the response body', async () => {

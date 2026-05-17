@@ -119,8 +119,28 @@ class GenerateWeeklyAnalysis extends UseCase {
       // 4. Previous week's analysis (if any).
       const previousAnalysis = await this._loadPreviousAnalysis(targetDate);
 
-      // 5. Render the prompt.
-      const systemPrompt = this._loadPrompt(promptVersion);
+      // 5. Strategic framework (the owner's personal content — bucket→symbol
+      // mappings, targets, deploy priorities, standing directives). Lives in
+      // settings, NOT in the prompt template file, so it never enters git.
+      const frameworkKey = `analysis.strategicFrameworkV1`;
+      const frameworkSetting = await this._readSettingRaw(frameworkKey);
+      const strategicFramework = frameworkSetting && typeof frameworkSetting.value === 'string'
+        ? frameworkSetting.value.trim()
+        : '';
+      if (!strategicFramework) {
+        return await this._persistFailed({
+          targetDate,
+          startedAt,
+          model,
+          promptVersion,
+          portfolioSnapshot,
+          riesgoReading,
+          errorMessage: `strategic framework not configured: set portfolioSettings row "${frameworkKey}" to your framework markdown (see scripts/seed-analysis-framework.example.md)`,
+        });
+      }
+
+      // 6. Render the prompt: load the generic template and splice the framework.
+      const systemPrompt = this._renderSystemPrompt(promptVersion, strategicFramework);
       const userMessage = this._buildUserMessage({
         generatedAt: startedAt.toISOString(),
         portfolioSummary,
@@ -348,6 +368,32 @@ class GenerateWeeklyAnalysis extends UseCase {
       if (setting && setting.value) return setting.value;
     } catch (_) { /* fallthrough to default */ }
     return defaultValue;
+  }
+
+  /**
+   * Like _getSetting but returns the raw setting object (or null) without
+   * falling back to a default. Used for the strategic framework, where a
+   * missing value must surface as a `failed` run (not silently default).
+   * @private
+   */
+  async _readSettingRaw(key) {
+    try {
+      return await this._settingsRepository.get(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
+   * Load the prompt template file and splice {{strategicFramework}} with the
+   * owner's framework markdown (which lives in portfolioSettings, never in
+   * the repo). Other slots like {{portfolioSummary}} are NOT substituted
+   * here — those go into the userMessage, not the system prompt.
+   * @private
+   */
+  _renderSystemPrompt(promptVersion, strategicFramework) {
+    const template = this._loadPrompt(promptVersion);
+    return template.replace(/\{\{strategicFramework\}\}/g, strategicFramework);
   }
 
   async _getSettingNumber(key, defaultValue) {
