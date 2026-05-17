@@ -50,10 +50,16 @@ import Layout from '../layouts/Layout.astro';
   </section>
 
   <section id="history-card" class="card p-4">
-    <h2 class="font-semibold mb-3">History</h2>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold">History</h2>
+      <button id="history-refresh-btn" class="text-xs text-[var(--color-muted)] hover:text-[var(--color-text-primary)] underline">
+        Refresh
+      </button>
+    </div>
     <p id="history-empty" class="text-xs text-[var(--color-muted)] hidden">
       No history yet — your first save will appear here.
     </p>
+    <p id="history-loading" class="text-xs text-[var(--color-muted)]">Loading…</p>
     <ul id="history-list" class="divide-y divide-[var(--color-border)] text-sm"></ul>
   </section>
 </Layout>
@@ -73,11 +79,14 @@ import Layout from '../layouts/Layout.astro';
     toast: $('toast'),
     historyList: $('history-list'),
     historyEmpty: $('history-empty'),
+    historyLoading: $('history-loading'),
+    historyRefresh: $('history-refresh-btn'),
   };
 
   const state = {
     /** @type {string|null} */ lastSavedContent: null,
     /** @type {number} */ maxBytes: 61440,
+    /** @type {Map<string, string>} cached full content per rowKey */ contentCache: new Map(),
   };
 
   function fmtTimestamp(iso) {
@@ -174,11 +183,159 @@ import Layout from '../layouts/Layout.astro';
     }
   }
 
-  ui.textarea.addEventListener('input', recomputeSaveState);
-  ui.saveBtn.addEventListener('click', save);
+  function fmtBytes(n) {
+    if (n < 1024) return `${n} B`;
+    return `${(n / 1024).toFixed(1)} KB`;
+  }
 
-  // History list — placeholder (US2 fleshes this out). For now show empty state.
-  ui.historyEmpty.classList.remove('hidden');
+  function renderHistoryRow(entry) {
+    const li = document.createElement('li');
+    li.className = 'py-3';
+    li.dataset.rowkey = entry.rowKey;
+
+    const header = document.createElement('div');
+    header.className = 'flex items-center justify-between gap-3 cursor-pointer';
+    header.innerHTML = `
+      <div class="min-w-0">
+        <div class="text-sm font-medium">${fmtTimestamp(entry.timestamp)}</div>
+        <div class="text-xs text-[var(--color-muted)] truncate">
+          ${entry.changeNote ? escapeHtml(entry.changeNote) : '<span class="italic">no note</span>'}
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-[var(--color-muted)] whitespace-nowrap">
+        <span class="px-2 py-0.5 rounded-full bg-[var(--color-surface-2)]">${entry.source}${entry.source === 'restore' ? ` of ${shortKey(entry.restoreOfRowKey)}` : ''}</span>
+        <span>${fmtBytes(entry.contentBytes)}</span>
+        <span aria-hidden="true" class="toggle-caret">▸</span>
+      </div>
+    `;
+
+    const body = document.createElement('div');
+    body.className = 'hidden mt-3 border border-[var(--color-border)] rounded-md';
+    body.innerHTML = `
+      <div class="px-3 py-2 text-xs text-[var(--color-muted)] border-b border-[var(--color-border)] flex items-center justify-between gap-2">
+        <span>Read-only view of this version's content</span>
+        <button class="entry-restore-btn row-action-btn text-xs">Restore</button>
+      </div>
+      <pre class="m-0 px-3 py-2 text-xs overflow-x-auto whitespace-pre-wrap"><code class="entry-content">Loading…</code></pre>
+    `;
+
+    body.querySelector('.entry-restore-btn').addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      await restoreEntry(entry);
+    });
+
+    header.addEventListener('click', async () => {
+      const open = !body.classList.contains('hidden');
+      if (open) {
+        body.classList.add('hidden');
+        header.querySelector('.toggle-caret').textContent = '▸';
+        return;
+      }
+      body.classList.remove('hidden');
+      header.querySelector('.toggle-caret').textContent = '▾';
+      const codeEl = body.querySelector('.entry-content');
+      try {
+        let content = state.contentCache.get(entry.rowKey);
+        if (content === undefined) {
+          const data = await api(`/framework/history/${encodeURIComponent(entry.rowKey)}`);
+          content = data.content || '';
+          state.contentCache.set(entry.rowKey, content);
+        }
+        codeEl.textContent = content;
+      } catch (err) {
+        codeEl.textContent = `Failed to load: ${err?.message || err}`;
+      }
+    });
+
+    li.appendChild(header);
+    li.appendChild(body);
+    return li;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function shortKey(k) {
+    return k ? k.slice(-8) : '—';
+  }
+
+  async function restoreEntry(entry) {
+    const ok = window.confirm(
+      `Restore framework to the version saved on ${fmtTimestamp(entry.timestamp)}?\n\n` +
+      `A new history entry will be created (the current active version stays in history). ` +
+      `This cannot be undone via the UI.`
+    );
+    if (!ok) return;
+
+    setToast('Restoring…');
+    try {
+      const result = await api(`/framework/history/${encodeURIComponent(entry.rowKey)}/restore`, {
+        method: 'POST',
+        body: {},
+      });
+      if (result.noop) {
+        setToast('Already active — no new entry created.', 'info');
+      } else {
+        setToast(`Restored — new entry at ${fmtTimestamp(result.timestamp)}.`, 'success');
+        state.contentCache.clear();
+        await Promise.all([loadActive(), loadHistory()]);
+      }
+    } catch (err) {
+      setToast(`Restore failed: ${err?.message || err}`, 'error');
+    }
+  }
+
+  async function loadHistory() {
+    ui.historyLoading.classList.remove('hidden');
+    ui.historyEmpty.classList.add('hidden');
+    ui.historyList.innerHTML = '';
+    try {
+      const data = await api('/framework/history?limit=50');
+      ui.historyLoading.classList.add('hidden');
+      if (!data.count) {
+        ui.historyEmpty.classList.remove('hidden');
+        return;
+      }
+      for (const entry of data.entries) {
+        ui.historyList.appendChild(renderHistoryRow(entry));
+      }
+      // After rendering, honor any URL hash deep-link from /analysis pages
+      // (Feature 004 / FR-016): #<rowKey> → scroll to + auto-expand that row.
+      await maybeOpenHashTarget();
+    } catch (err) {
+      ui.historyLoading.textContent = `Failed to load history: ${err?.message || err}`;
+    }
+  }
+
+  async function maybeOpenHashTarget() {
+    const hash = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+    if (!hash) return;
+    const li = ui.historyList.querySelector(`li[data-rowkey="${cssEscape(hash)}"]`);
+    if (!li) return;
+    li.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const header = li.querySelector('.cursor-pointer');
+    if (header) header.click();
+  }
+
+  function cssEscape(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/(["\\])/g, '\\$1');
+  }
+
+  ui.textarea.addEventListener('input', recomputeSaveState);
+  ui.saveBtn.addEventListener('click', async () => {
+    await save();
+    state.contentCache.clear();
+    await loadHistory();
+  });
+  ui.historyRefresh.addEventListener('click', () => {
+    state.contentCache.clear();
+    loadHistory();
+  });
 
   loadActive();
+  loadHistory();
 </script>

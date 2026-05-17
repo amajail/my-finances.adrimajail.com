@@ -46,6 +46,9 @@ class WeeklyAnalysis {
    * @param {number} [data.costUsd] - Default 0.
    * @param {number} [data.durationMs] - Default 0.
    * @param {string} [data.errorMessage] - Required when status === 'failed'.
+   * @param {string|null} [data.frameworkHistoryRowKey] - Feature 004: id of the
+   *   FrameworkHistoryEntry whose content was the framework input for this run.
+   *   Null/absent for analyses produced from pre-feature seeded content.
    */
   constructor(data) {
     this._date = String(data.date || '').trim();
@@ -65,6 +68,7 @@ class WeeklyAnalysis {
     this._costUsd = data.costUsd !== undefined ? Number(data.costUsd) : 0;
     this._durationMs = data.durationMs !== undefined ? Number(data.durationMs) : 0;
     this._errorMessage = data.errorMessage || null;
+    this._frameworkHistoryRowKey = data.frameworkHistoryRowKey || null;
 
     this._validate();
     Object.freeze(this._portfolioSnapshot);
@@ -138,6 +142,7 @@ class WeeklyAnalysis {
   get costUsd() { return this._costUsd; }
   get durationMs() { return this._durationMs; }
   get errorMessage() { return this._errorMessage; }
+  get frameworkHistoryRowKey() { return this._frameworkHistoryRowKey; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -166,6 +171,7 @@ class WeeklyAnalysis {
       costUsd: this._costUsd,
       durationMs: this._durationMs,
       errorMessage: this._errorMessage,
+      frameworkHistoryRowKey: this._frameworkHistoryRowKey,
     };
   }
 

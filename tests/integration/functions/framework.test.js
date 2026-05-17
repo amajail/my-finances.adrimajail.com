@@ -194,3 +194,176 @@ describe('PUT /api/framework', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('GET /api/framework/history', () => {
+  it('returns the list shape', async () => {
+    jest.spyOn(container, 'getListFrameworkHistory').mockReturnValue({
+      execute: jest.fn(async () => ({
+        entries: [
+          { rowKey: 'r1', timestamp: '2026-05-17T14:00Z', changeNote: 'edit', source: 'edit', restoreOfRowKey: null, contentBytes: 100 },
+        ],
+        count: 1,
+      })),
+    });
+
+    const res = await httpHandlers.listFrameworkHistory.handler(
+      makeRequest({ query: {} }),
+      makeContext()
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody.count).toBe(1);
+    expect(res.jsonBody.entries[0]).toEqual(expect.objectContaining({
+      rowKey: 'r1', contentBytes: 100, source: 'edit',
+    }));
+  });
+
+  it('forwards the limit query param to the use-case', async () => {
+    const exec = jest.fn(async () => ({ entries: [], count: 0 }));
+    jest.spyOn(container, 'getListFrameworkHistory').mockReturnValue({ execute: exec });
+
+    await httpHandlers.listFrameworkHistory.handler(
+      makeRequest({ query: { limit: '25' } }),
+      makeContext()
+    );
+
+    expect(exec).toHaveBeenCalledWith({ limit: 25 });
+  });
+
+  it('returns 400 when limit is out of range', async () => {
+    const { ValidationError } = require('../../../src/shared/errors');
+    jest.spyOn(container, 'getListFrameworkHistory').mockReturnValue({
+      execute: jest.fn(async () => { throw new ValidationError('limit must be between 1 and 200'); }),
+    });
+
+    const res = await httpHandlers.listFrameworkHistory.handler(
+      makeRequest({ query: { limit: '500' } }),
+      makeContext()
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 200 + empty list when no entries exist (FR-013)', async () => {
+    jest.spyOn(container, 'getListFrameworkHistory').mockReturnValue({
+      execute: jest.fn(async () => ({ entries: [], count: 0 })),
+    });
+
+    const res = await httpHandlers.listFrameworkHistory.handler(makeRequest(), makeContext());
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toEqual({ entries: [], count: 0 });
+  });
+});
+
+describe('GET /api/framework/history/{rowKey}', () => {
+  it('returns the full entry shape', async () => {
+    jest.spyOn(container, 'getGetFrameworkHistoryEntry').mockReturnValue({
+      execute: jest.fn(async ({ rowKey }) => ({
+        rowKey,
+        timestamp: '2026-05-17T14:00Z',
+        changeNote: 'note',
+        source: 'edit',
+        restoreOfRowKey: null,
+        content: '## body',
+      })),
+    });
+
+    const res = await httpHandlers.getFrameworkHistoryEntry.handler(
+      makeRequest({ params: { rowKey: 'r-abc' } }),
+      makeContext()
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody.content).toBe('## body');
+    expect(res.jsonBody.rowKey).toBe('r-abc');
+  });
+
+  it('returns 404 when the entry does not exist', async () => {
+    const { NotFoundError } = require('../../../src/shared/errors');
+    jest.spyOn(container, 'getGetFrameworkHistoryEntry').mockReturnValue({
+      execute: jest.fn(async () => { throw new NotFoundError('history entry', 'r-missing'); }),
+    });
+
+    const res = await httpHandlers.getFrameworkHistoryEntry.handler(
+      makeRequest({ params: { rowKey: 'r-missing' } }),
+      makeContext()
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.jsonBody.error).toMatch(/history entry not found/);
+  });
+});
+
+describe('POST /api/framework/history/{rowKey}/restore', () => {
+  it('returns 200 with the new history row reference', async () => {
+    jest.spyOn(container, 'getRestoreFrameworkVersion').mockReturnValue({
+      execute: jest.fn(async ({ rowKey }) => ({
+        historyRowKey: 'new-row',
+        timestamp: '2026-05-17T14:30:00Z',
+        restoreOfRowKey: rowKey,
+        noop: false,
+      })),
+    });
+
+    const res = await httpHandlers.restoreFrameworkVersion.handler(
+      makeRequest({ params: { rowKey: 'r-target' }, body: { changeNote: 'rolling back' } }),
+      makeContext()
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toEqual({
+      historyRowKey: 'new-row',
+      timestamp: '2026-05-17T14:30:00Z',
+      restoreOfRowKey: 'r-target',
+      noop: false,
+    });
+  });
+
+  it('returns 200 with noop:true when the target equals active', async () => {
+    jest.spyOn(container, 'getRestoreFrameworkVersion').mockReturnValue({
+      execute: jest.fn(async ({ rowKey }) => ({
+        historyRowKey: 'curr-x',
+        timestamp: 'curr-t',
+        restoreOfRowKey: rowKey,
+        noop: true,
+      })),
+    });
+
+    const res = await httpHandlers.restoreFrameworkVersion.handler(
+      makeRequest({ params: { rowKey: 'r-same' }, body: {} }),
+      makeContext()
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody.noop).toBe(true);
+  });
+
+  it('returns 404 for an unknown rowKey', async () => {
+    const { NotFoundError } = require('../../../src/shared/errors');
+    jest.spyOn(container, 'getRestoreFrameworkVersion').mockReturnValue({
+      execute: jest.fn(async () => { throw new NotFoundError('history entry', 'r-missing'); }),
+    });
+
+    const res = await httpHandlers.restoreFrameworkVersion.handler(
+      makeRequest({ params: { rowKey: 'r-missing' }, body: {} }),
+      makeContext()
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 when changeNote exceeds 280 chars', async () => {
+    const { ValidationError } = require('../../../src/shared/errors');
+    jest.spyOn(container, 'getRestoreFrameworkVersion').mockReturnValue({
+      execute: jest.fn(async () => { throw new ValidationError('changeNote exceeds 280 characters'); }),
+    });
+
+    const res = await httpHandlers.restoreFrameworkVersion.handler(
+      makeRequest({ params: { rowKey: 'r-x' }, body: { changeNote: 'y'.repeat(281) } }),
+      makeContext()
+    );
+
+    expect(res.status).toBe(400);
+  });
+});

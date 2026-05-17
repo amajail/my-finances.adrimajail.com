@@ -4,6 +4,15 @@
  * local markdown file. The file is gitignored — only the example template at
  * `scripts/seed-analysis-framework.example.md` is committed.
  *
+ * ⚠️ ONE-TIME BOOTSTRAP ONLY (since feature 004).
+ *
+ * The supported edit path is now the dashboard at `/framework`, which writes
+ * the same `portfolioSettings` row AND records an immutable history entry in
+ * `portfolioFrameworkHistory`. Saves made through this script do NOT create
+ * a history entry — they look like the original "pre-history seed" to the
+ * runtime. Use this script only for: (a) fresh Azurite resets where no row
+ * exists yet, or (b) initial provisioning of a new environment.
+ *
  * Usage:
  *
  *   # First time: copy the example, edit with your real framework
@@ -15,6 +24,9 @@
  *
  *   # Or push to prod
  *   API_BASE=https://my-fn.azurewebsites.net/api FN_KEY=... node scripts/seed-analysis-framework.js
+ *
+ * After the first run, use the dashboard at `/framework` for all subsequent
+ * edits. See `specs/004-editable-strategic-framework/quickstart.md`.
  */
 
 const fs = require('fs');

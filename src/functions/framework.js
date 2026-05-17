@@ -10,11 +10,6 @@
  * Writes (PUT, POST) and reads alike use `authLevel: 'function'`, matching
  * the operator-only gating already in place for `settings`, `prices/refresh`,
  * etc. (FR-010).
- *
- * The list/detail/restore routes are registered but their use-cases will be
- * wired in later phases (US2/US3). Each handler throws NotFoundError until
- * its use-case lands, which mapError turns into a 404 — leaving the routes
- * safe to register up-front without 500s.
  */
 
 const { app } = require('@azure/functions');
@@ -53,6 +48,70 @@ app.http('updateFramework', {
       const useCase = container.getSaveFramework();
       const result = await useCase.execute({
         content: body?.content,
+        changeNote: body?.changeNote ?? null,
+      });
+      return ok(result);
+    } catch (err) {
+      return mapError(err, context);
+    }
+  },
+});
+
+/**
+ * GET /api/framework/history — list newest-first.
+ * Query: ?limit=N (1..200, default 50)
+ */
+app.http('listFrameworkHistory', {
+  methods: ['GET'],
+  authLevel: 'function',
+  route: 'framework/history',
+  handler: async (request, context) => {
+    try {
+      const rawLimit = request.query.get('limit');
+      const limit = rawLimit !== null && rawLimit !== '' ? Number(rawLimit) : undefined;
+      const useCase = container.getListFrameworkHistory();
+      const result = await useCase.execute({ limit });
+      return ok(result);
+    } catch (err) {
+      return mapError(err, context);
+    }
+  },
+});
+
+/**
+ * GET /api/framework/history/{rowKey} — full content of one entry.
+ */
+app.http('getFrameworkHistoryEntry', {
+  methods: ['GET'],
+  authLevel: 'function',
+  route: 'framework/history/{rowKey}',
+  handler: async (request, context) => {
+    try {
+      const rowKey = request.params.rowKey;
+      const useCase = container.getGetFrameworkHistoryEntry();
+      const result = await useCase.execute({ rowKey });
+      return ok(result);
+    } catch (err) {
+      return mapError(err, context);
+    }
+  },
+});
+
+/**
+ * POST /api/framework/history/{rowKey}/restore — promote a past entry to active.
+ * Body (optional): { changeNote?: string }
+ */
+app.http('restoreFrameworkVersion', {
+  methods: ['POST'],
+  authLevel: 'function',
+  route: 'framework/history/{rowKey}/restore',
+  handler: async (request, context) => {
+    try {
+      const rowKey = request.params.rowKey;
+      const body = await request.json().catch(() => ({}));
+      const useCase = container.getRestoreFrameworkVersion();
+      const result = await useCase.execute({
+        rowKey,
         changeNote: body?.changeNote ?? null,
       });
       return ok(result);

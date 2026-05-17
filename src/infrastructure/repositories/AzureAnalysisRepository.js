@@ -160,7 +160,7 @@ class AzureAnalysisRepository extends IAnalysisRepository {
 
   _analysisToEntity(wa) {
     const id = WeeklyAnalysis.id(wa.date);
-    return {
+    const entity = {
       partitionKey: id.partitionKey,
       rowKey: id.rowKey,
       status: wa.status,
@@ -178,6 +178,13 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       durationMs: wa.durationMs,
       errorMessage: wa.errorMessage || '',
     };
+    // Feature 004 (FR-015): only include the property when non-null. Older
+    // rows pre-feature simply lack it; Azure Tables tolerates the missing
+    // property on read.
+    if (wa.frameworkHistoryRowKey) {
+      entity.frameworkHistoryRowKey = wa.frameworkHistoryRowKey;
+    }
+    return entity;
   }
 
   _analysisFromEntity(entity) {
@@ -206,6 +213,8 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       costUsd: entity.costUsd || 0,
       durationMs: entity.durationMs || 0,
       errorMessage: entity.errorMessage || null,
+      // Feature 004 (FR-015): absent on pre-feature rows → null.
+      frameworkHistoryRowKey: entity.frameworkHistoryRowKey || null,
     });
   }
 
