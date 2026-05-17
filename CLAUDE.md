@@ -74,8 +74,8 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/002-weekly-rebalance-analysis/plan.md` (Phase 1 complete; tasks
+`specs/003-dashboard-metrics-trim/plan.md` (Phase 1 complete; tasks
 pending). Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/api.md`,
-`contracts/submit-analysis-tool.json`.
+`data-model.md`, `quickstart.md`. No `contracts/` directory — this feature
+exposes no new external interface.
 <!-- SPECKIT END -->

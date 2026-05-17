@@ -1,6 +1,6 @@
 # Feature Specification: Dashboard Metrics Trim
 
-**Feature Branch**: `feature/dashboard-metrics-trim`
+**Feature Branch**: `feature/003-dashboard-metrics-trim`
 
 **Created**: 2026-05-17
 
