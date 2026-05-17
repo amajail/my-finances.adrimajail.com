@@ -8,6 +8,16 @@
 
 **Input**: User description: "the prompt with my plan has to be editable from the ui, each change should be persisted in database and get an history track"
 
+## Clarifications
+
+### Session 2026-05-17
+
+- Q: If a weekly rebalance analysis is mid-flight (framework already loaded) and the owner saves a new framework version before the run finishes, which version does the in-flight run use? → A: Snapshot-at-start — the analysis uses the framework version that was active when the run started; mid-run saves do not affect in-flight runs.
+- Q: Should a generated weekly analysis record which framework version it used, and surface that link to the owner? → A: Yes — each analysis output stores a reference to the framework history entry it used, and the analysis UI surfaces it (e.g., "Framework version: 2026-05-17 14:02").
+- Q: Where in the dashboard navigation should the Strategic Framework editor and history live? → A: Dedicated top-level dashboard route (e.g., "Framework" in the main nav), sibling to other top-level areas; editor and history are reached from there.
+- Q: Should the editor warn the owner before navigating away with unsaved edits? → A: No guard — navigating away silently discards edits; no confirmation prompt and no autosave drafts in v1.
+- Q: Should the system enforce a maximum size on framework content? → A: Yes — enforce a soft cap of ~60 KB with a clear UI error when exceeded. Single source of truth for the limit, enforced server-side and mirrored in the editor.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Edit and save the strategic framework from the dashboard (Priority: P1)
@@ -24,7 +34,7 @@ The portfolio owner opens the dashboard, navigates to a "Strategic Framework" pa
 2. **Given** the owner has edited the framework, **When** they save, **Then** the new content becomes the active framework and a confirmation is shown.
 3. **Given** the framework was just saved, **When** a weekly rebalance analysis is generated, **Then** the analysis prompt contains the just-saved framework content (not the prior version).
 4. **Given** an empty save is attempted (no content), **When** the owner clicks save, **Then** the save is rejected with a clear message and the previously active framework remains in effect.
-5. **Given** the owner abandons their edits without saving, **When** they navigate away and back, **Then** the displayed content is the last-saved active framework — unsaved changes are discarded.
+5. **Given** the owner abandons their edits without saving, **When** they navigate away and back, **Then** the displayed content is the last-saved active framework — unsaved changes are discarded silently with no confirmation prompt and no draft recovery.
 
 ---
 
@@ -63,17 +73,18 @@ After reviewing history, the owner decides a prior version was better and wants 
 ### Edge Cases
 
 - **Existing seeded framework with no UI history**: when the feature ships, the currently-active framework already exists in storage but has no history row associated with it. The system must display this content as active and not crash the history view when no entries exist.
-- **Very long content**: the framework is free-form markdown and may grow over time. The editor must handle multi-page content without truncation, and storage must accept it within reasonable size limits (see Assumptions).
+- **Very long content**: the framework is free-form markdown and may grow over time. The editor must handle multi-page content without truncation up to the 60 KB cap (FR-017); content exceeding the cap is rejected at save time with a clear error.
 - **Identical save (no actual change)**: if the owner saves content byte-identical to the current active version, the system should detect this and skip recording a no-op history entry to avoid history noise.
 - **Failure during save**: if the save operation fails partway (e.g., network error), the previously active framework must remain in effect and the owner must see a clear error so they can retry without losing their pending edits.
 - **Stale view**: if the framework was changed in another session/tab while the owner is editing, on save the system overwrites (last-save-wins) — but the overwritten version remains visible in history as a prior entry.
 - **Empty or whitespace-only save**: rejected as invalid (the framework must contain content because the analysis prompt depends on it).
+- **Save during an in-flight analysis run**: the save is accepted normally and recorded as a new history entry; the in-flight run continues with the framework it snapshotted at start. Only runs that begin after the save will see the new framework.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The dashboard MUST provide a dedicated page where the owner can view and edit the strategic framework as free-form text/markdown.
+- **FR-001**: The dashboard MUST provide a dedicated **top-level** navigation entry (e.g., "Framework") that opens a page where the owner can view and edit the strategic framework as free-form text/markdown. The history view (FR-006) is reached from this same top-level area.
 - **FR-002**: The editor MUST be pre-populated with the currently active framework content on load.
 - **FR-003**: The system MUST persist a saved framework such that subsequent weekly rebalance analyses use the saved content as the framework input.
 - **FR-004**: The system MUST reject saves where the content is empty or whitespace-only, and surface the rejection reason to the owner.
@@ -86,11 +97,16 @@ After reviewing history, the owner decides a prior version was better and wants 
 - **FR-011**: If a save attempt produces content byte-identical to the current active framework, the system MUST NOT create a new history entry (no-op detection).
 - **FR-012**: The system MUST preserve and display the framework content with whitespace and formatting intact, since it is consumed downstream as markdown injected into an analysis prompt.
 - **FR-013**: When no UI-driven history exists yet (first run after the feature ships), the system MUST still display the pre-existing seeded framework as active, and the history view MUST render an explicit empty state rather than an error.
+- **FR-014**: A weekly rebalance analysis run MUST bind to the framework version that is active at the moment the run starts (snapshot-at-start). Saves that occur after a run has started but before it finishes MUST NOT alter that run's framework input — they take effect only for subsequent runs.
+- **FR-015**: Each generated weekly analysis MUST persist a reference to the specific framework history entry whose content was used as input for that run. For an analysis produced before this feature ships (i.e., from the pre-existing seeded framework with no history row), the reference may be empty or indicate "pre-history seed".
+- **FR-016**: The analysis-output UI MUST surface the framework version that produced each analysis (at minimum a timestamp and, when available, the optional change note from that history entry) and allow the owner to view the full content of that exact framework version in read-only form.
+- **FR-017**: The system MUST reject saves whose content exceeds a documented maximum size (60 KB). The limit MUST be enforced server-side and mirrored in the editor (e.g., live character/byte counter and disabled save button when over the cap), with a clear error message rather than a raw storage-layer error.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Strategic Framework (active)**: The single current source of truth for the framework content used by the weekly rebalance analysis. There is exactly one active framework at any time. Key attributes: content (markdown text), last-updated timestamp, pointer to the history entry that produced it (when one exists).
-- **Strategic Framework History Entry**: An immutable snapshot recorded each time the framework is saved through the UI (including restores). Key attributes: full content, timestamp, optional change note, source-of-change indicator (direct edit vs. restore-of-version-X). History entries are ordered by timestamp.
+- **Strategic Framework History Entry**: An immutable snapshot recorded each time the framework is saved through the UI (including restores). Key attributes: stable identifier, full content, timestamp, optional change note, source-of-change indicator (direct edit vs. restore-of-version-X). History entries are ordered by timestamp.
+- **Weekly Analysis Output (existing entity, extended)**: gains a new attribute — a reference to the Strategic Framework History Entry whose content was the framework input for that analysis run. May be empty for analyses produced from the pre-existing seeded framework (no history row).
 
 ## Success Criteria *(mandatory)*
 
@@ -113,3 +129,4 @@ After reviewing history, the owner decides a prior version was better and wants 
 - **No history-entry deletion or editing**: history is append-only by design. Trimming/archival, if ever needed, is out of scope for v1.
 - **Pre-existing seeded content**: at feature launch a framework already exists in storage (from the current seed script). This pre-existing content is treated as active and is NOT retroactively backfilled as a history row — the first UI save will be the first history entry.
 - **Change-note is optional**: the owner may save without supplying a change note. Notes are for the owner's own memory and are not required for correctness.
+- **No unsaved-changes guard in v1**: the editor does not warn before navigating away with unsaved edits and does not autosave drafts. The owner is responsible for clicking Save before leaving the page.
