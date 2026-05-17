@@ -53,6 +53,7 @@ This feature is web-app frontend-only. All edits land in `dashboard/src/lib/port
   - In the inline `<table>` template inside `load()`, delete the three `<th>` cells whose `data-sort-key` is `quantity`, `averageCost`, and `price`. Keep the four `<th>` cells for `symbol`, `value`, `pnl`, `pct` in that order.
   - Rewrite `brokerRowHtml({ p, price, mv, pnl, pct })` to return a `<tr>` with exactly four `<td>` cells in this order: Symbol (with the existing `assetType` tag), Value (`${mv.toFixed(0)} ${p.currency}` when non-null, else `'—'`), P&L (`${pnl.toFixed(0)}` when non-null else `'—'`, with `pnlClass(pnl)`), % (`fmtPct(pct)` with `pnlClass(pct)`). All formatting and the gain/loss color cue stay identical to today (FR-005, FR-006).
   - Change the empty-state row's `colspan` from `7` to `4` (the `<tr><td colspan="7">No matching positions.</td></tr>` literal inside `renderBrokerRows()`).
+  - **Do not modify** `attachAssetFilters()`, `renderBrokerRows()`'s asset-filter `filtered = …` block, or the `<div data-broker-filter="…">` pill markup. These implement FR-004 (asset-type filter must keep working) by remaining untouched; an unrelated cleanup here would silently break that requirement, which has no other edit task guarding it.
 
   After this task: every broker's positions table on the home page renders four columns and produces no JS errors. Sort still works on the four remaining columns. The asset-type filter still works. Default sort order is whatever the API returned (T002 will fix that).
 
