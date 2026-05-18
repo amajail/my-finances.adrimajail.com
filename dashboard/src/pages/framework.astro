@@ -19,14 +19,26 @@ import Layout from '../layouts/Layout.astro';
       <div id="active-meta" class="text-xs text-[var(--color-muted)]">Loading…</div>
     </div>
 
+    <div class="tab-bar flex gap-1 mb-2" role="tablist" aria-label="Editor mode">
+      <button id="tab-edit" type="button" role="tab" aria-selected="true"
+              aria-controls="content-area" class="tab-btn tab-active">Edit</button>
+      <button id="tab-preview" type="button" role="tab" aria-selected="false"
+              aria-controls="preview-area" class="tab-btn">Preview</button>
+    </div>
+
     <label class="block text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1" for="content-area">Content (markdown)</label>
     <textarea
       id="content-area"
+      role="tabpanel"
+      aria-labelledby="tab-edit"
       class="w-full border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono"
       style="min-height: 50vh; resize: vertical;"
       spellcheck="false"
       disabled
     ></textarea>
+    <div id="preview-area" role="tabpanel" aria-labelledby="tab-preview"
+         class="hidden w-full border border-[var(--color-border)] rounded-md px-3 py-2 text-sm overflow-auto"
+         style="min-height: 50vh;"></div>
 
     <div class="flex flex-wrap items-end gap-3 mt-3">
       <div class="grow">
@@ -66,6 +78,8 @@ import Layout from '../layouts/Layout.astro';
 
 <script>
   import { api } from '../lib/api.js';
+  import { marked } from 'marked';
+  import DOMPurify from 'dompurify';
 
   const $ = (id) => document.getElementById(id);
 
@@ -81,12 +95,16 @@ import Layout from '../layouts/Layout.astro';
     historyEmpty: $('history-empty'),
     historyLoading: $('history-loading'),
     historyRefresh: $('history-refresh-btn'),
+    tabEdit: $('tab-edit'),
+    tabPreview: $('tab-preview'),
+    preview: $('preview-area'),
   };
 
   const state = {
     /** @type {string|null} */ lastSavedContent: null,
     /** @type {number} */ maxBytes: 61440,
     /** @type {Map<string, string>} cached full content per rowKey */ contentCache: new Map(),
+    /** @type {'edit'|'preview'} */ mode: 'edit',
   };
 
   function fmtTimestamp(iso) {
@@ -111,6 +129,28 @@ import Layout from '../layouts/Layout.astro';
     const color = kind === 'error' ? 'pos-negative' : kind === 'success' ? 'pos-positive' : '';
     ui.toast.className = `text-xs mt-3 ${color}`;
     ui.toast.textContent = text;
+  }
+
+  function renderPreview() {
+    const src = ui.textarea.value;
+    if (!src.trim()) {
+      ui.preview.innerHTML = '<p class="text-xs text-[var(--color-muted)] italic">Nothing to preview yet</p>';
+      return;
+    }
+    ui.preview.innerHTML = DOMPurify.sanitize(marked.parse(src, { gfm: true, breaks: false }));
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    const editing = mode === 'edit';
+    ui.textarea.classList.toggle('hidden', !editing);
+    ui.preview.classList.toggle('hidden', editing);
+    ui.tabEdit.setAttribute('aria-selected', String(editing));
+    ui.tabPreview.setAttribute('aria-selected', String(!editing));
+    ui.tabEdit.classList.toggle('tab-active', editing);
+    ui.tabPreview.classList.toggle('tab-active', !editing);
+    if (editing) ui.textarea.focus();
+    else renderPreview();
   }
 
   function recomputeSaveState() {
@@ -335,7 +375,26 @@ import Layout from '../layouts/Layout.astro';
     state.contentCache.clear();
     loadHistory();
   });
+  ui.tabEdit.addEventListener('click', () => setMode('edit'));
+  ui.tabPreview.addEventListener('click', () => setMode('preview'));
 
   loadActive();
   loadHistory();
 </script>
+
+<style is:global>
+  .tab-btn {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+  }
+  .tab-btn.tab-active {
+    background: var(--color-surface-2);
+    color: var(--color-text-primary);
+  }
+</style>
