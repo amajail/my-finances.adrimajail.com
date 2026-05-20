@@ -95,6 +95,7 @@ import Layout from '../layouts/Layout.astro';
   let brokers = [];
   let currentBrokerFilter = 'all';
   let currentStatusFilter = 'open';
+  let editingKey = null;
 
   async function loadBrokers() {
     try {
@@ -138,6 +139,26 @@ import Layout from '../layouts/Layout.astro';
     tbody.innerHTML = filtered.length
       ? filtered.map(p => {
           const brokerName = brokers.find(b => b.id === p.brokerId)?.displayName || p.brokerId;
+          const inputCls = 'w-24 text-right border border-[var(--color-border)] rounded-md px-2 py-1 text-sm num-mono';
+          if (`${p.brokerId}/${p.id}` === editingKey) {
+            return `
+            <tr class="border-t border-[var(--color-border)] bg-[var(--color-surface-2)]">
+              <td class="px-4 py-2"><strong>${p.symbol}</strong> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
+              <td class="px-4 py-2 text-right"><input id="edit-quantity" type="number" step="0.01" value="${p.quantity}" class="${inputCls}" /></td>
+              <td class="px-4 py-2 text-right"><input id="edit-averageCost" type="number" step="0.01" value="${p.averageCost}" class="${inputCls}" /></td>
+              <td class="px-4 py-2 text-right num-mono">${p.currentPrice != null ? p.currentPrice.toFixed(2) : '—'}</td>
+              <td class="px-4 py-2 text-right">${p.currency}</td>
+              <td class="px-4 py-2 text-sm text-[var(--color-muted)]">${p.maturityDate ? p.maturityDate.substring(0, 10) : '—'}</td>
+              <td class="px-4 py-2">
+                <span class="badge ${p.status === 'closed' ? 'badge-failed' : 'badge-success'}">${p.status}</span>
+              </td>
+              <td class="px-4 py-2 text-right space-x-1">
+                <button class="row-action-btn save-edit-btn" data-broker="${p.brokerId}" data-rowkey="${p.id}">Save</button>
+                <button class="row-action-btn cancel-edit-btn">Cancel</button>
+              </td>
+            </tr>
+          `;
+          }
           return `
             <tr class="border-t border-[var(--color-border)]">
               <td class="px-4 py-2"><strong>${p.symbol}</strong> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
@@ -195,21 +216,40 @@ import Layout from '../layouts/Layout.astro';
     });
 
     document.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        editingKey = `${e.target.dataset.broker}/${e.target.dataset.rowkey}`;
+        renderPositions();
+      });
+    });
+
+    document.querySelectorAll('.cancel-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        editingKey = null;
+        renderPositions();
+      });
+    });
+
+    document.querySelectorAll('.save-edit-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const broker = e.target.dataset.broker;
         const rowkey = e.target.dataset.rowkey;
-        const symbol = e.target.dataset.symbol;
-        const newPrice = prompt(`Update current price for ${symbol}:`, '');
-        if (newPrice !== null && newPrice !== '') {
-          try {
-            await api(`/positions/${broker}/${rowkey}`, {
-              method: 'PUT',
-              body: { currentPrice: parseFloat(newPrice) }
-            });
-            loadPositions();
-          } catch (err) {
-            alert(`Failed: ${err.message}`);
-          }
+        const quantity = parseFloat(document.getElementById('edit-quantity').value);
+        const averageCost = parseFloat(document.getElementById('edit-averageCost').value);
+        if (Number.isNaN(quantity) || Number.isNaN(averageCost)) {
+          alert('Quantity and PPC must be valid numbers.');
+          return;
+        }
+        e.target.disabled = true;
+        try {
+          await api(`/positions/${broker}/${rowkey}`, {
+            method: 'PUT',
+            body: { quantity, averageCost }
+          });
+          editingKey = null;
+          loadPositions();
+        } catch (err) {
+          alert(`Failed: ${err.message}`);
+          e.target.disabled = false;
         }
       });
     });
