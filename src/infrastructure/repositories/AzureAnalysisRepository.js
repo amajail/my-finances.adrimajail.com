@@ -178,9 +178,12 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       durationMs: wa.durationMs,
       errorMessage: wa.errorMessage || '',
     };
-    // Feature 004 (FR-015): only include the property when non-null. Older
-    // rows pre-feature simply lack it; Azure Tables tolerates the missing
-    // property on read.
+    // Feature 005 (FR-012): only include the property when non-null. Older
+    // rows simply lack it; Azure Tables tolerates the missing property on read.
+    if (wa.instructionsHistoryRowKey) {
+      entity.instructionsHistoryRowKey = wa.instructionsHistoryRowKey;
+    }
+    // Feature 004 (legacy): preserve the framework reference for pre-005 rows.
     if (wa.frameworkHistoryRowKey) {
       entity.frameworkHistoryRowKey = wa.frameworkHistoryRowKey;
     }
@@ -213,7 +216,9 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       costUsd: entity.costUsd || 0,
       durationMs: entity.durationMs || 0,
       errorMessage: entity.errorMessage || null,
-      // Feature 004 (FR-015): absent on pre-feature rows → null.
+      // Feature 005 (FR-012/FR-013): absent on pre-feature rows → null.
+      instructionsHistoryRowKey: entity.instructionsHistoryRowKey || null,
+      // Feature 004 (legacy): absent on pre-004 and post-005 rows → null.
       frameworkHistoryRowKey: entity.frameworkHistoryRowKey || null,
     });
   }

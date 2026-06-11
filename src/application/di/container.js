@@ -12,7 +12,7 @@ const AzurePositionRepository = require('../../infrastructure/repositories/Azure
 const AzureSettingsRepository = require('../../infrastructure/repositories/AzureSettingsRepository');
 const AzurePriceRepository = require('../../infrastructure/repositories/AzurePriceRepository');
 const AzureAnalysisRepository = require('../../infrastructure/repositories/AzureAnalysisRepository');
-const AzureFrameworkRepository = require('../../infrastructure/repositories/AzureFrameworkRepository');
+const AzureInstructionsRepository = require('../../infrastructure/repositories/AzureInstructionsRepository');
 
 // Infrastructure providers
 const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
@@ -35,11 +35,11 @@ const {
   UpdateSetting,
   RefreshPrices,
   GenerateWeeklyAnalysis,
-  GetActiveFramework,
-  SaveFramework,
-  ListFrameworkHistory,
-  GetFrameworkHistoryEntry,
-  RestoreFrameworkVersion
+  GetActiveInstructions,
+  SaveInstructions,
+  ListInstructionsHistory,
+  GetInstructionsHistoryEntry,
+  RestoreInstructionsVersion
 } = require('../use-cases');
 
 /**
@@ -115,15 +115,15 @@ class Container {
   }
 
   /**
-   * Get FrameworkRepository instance (feature 004).
-   * @returns {IFrameworkRepository}
+   * Get InstructionsRepository instance (feature 005).
+   * @returns {IInstructionsRepository}
    */
-  getFrameworkRepository() {
-    if (!this._singletons.has('frameworkRepository')) {
-      const repository = new AzureFrameworkRepository();
-      this._singletons.set('frameworkRepository', repository);
+  getInstructionsRepository() {
+    if (!this._singletons.has('instructionsRepository')) {
+      const repository = new AzureInstructionsRepository();
+      this._singletons.set('instructionsRepository', repository);
     }
-    return this._singletons.get('frameworkRepository');
+    return this._singletons.get('instructionsRepository');
   }
 
   // ==================== Providers ====================
@@ -348,62 +348,63 @@ class Container {
       riesgoPaisProvider: this.getRiesgoPaisProvider(),
       getPortfolioSummary: this.getGetPortfolioSummary(),
       settingsRepository: this.getSettingsRepository(),
-      // Feature 004: enables snapshotting the active framework's historyRowKey
-      // alongside its content so each analysis row links to its source version.
-      frameworkRepository: this.getFrameworkRepository()
+      // Feature 005: the active instructions document is the AI system prompt
+      // (used verbatim). Reading content + historyRowKey in one call preserves
+      // snapshot-at-start (FR-012) and links each analysis to its source version.
+      instructionsRepository: this.getInstructionsRepository()
     });
   }
 
-  // ==================== Framework Use Cases (feature 004) ====================
+  // ==================== Instructions Use Cases (feature 005) ====================
 
   /**
-   * Get GetActiveFramework use case (feature 004).
-   * @returns {GetActiveFramework}
+   * Get GetActiveInstructions use case (feature 005).
+   * @returns {GetActiveInstructions}
    */
-  getGetActiveFramework() {
-    return new GetActiveFramework({
-      frameworkRepository: this.getFrameworkRepository()
-    });
-  }
-
-  /**
-   * Get SaveFramework use case (feature 004).
-   * @returns {SaveFramework}
-   */
-  getSaveFramework() {
-    return new SaveFramework({
-      frameworkRepository: this.getFrameworkRepository()
+  getGetActiveInstructions() {
+    return new GetActiveInstructions({
+      instructionsRepository: this.getInstructionsRepository()
     });
   }
 
   /**
-   * Get ListFrameworkHistory use case (feature 004).
-   * @returns {ListFrameworkHistory}
+   * Get SaveInstructions use case (feature 005).
+   * @returns {SaveInstructions}
    */
-  getListFrameworkHistory() {
-    return new ListFrameworkHistory({
-      frameworkRepository: this.getFrameworkRepository()
+  getSaveInstructions() {
+    return new SaveInstructions({
+      instructionsRepository: this.getInstructionsRepository()
     });
   }
 
   /**
-   * Get GetFrameworkHistoryEntry use case (feature 004).
-   * @returns {GetFrameworkHistoryEntry}
+   * Get ListInstructionsHistory use case (feature 005).
+   * @returns {ListInstructionsHistory}
    */
-  getGetFrameworkHistoryEntry() {
-    return new GetFrameworkHistoryEntry({
-      frameworkRepository: this.getFrameworkRepository()
+  getListInstructionsHistory() {
+    return new ListInstructionsHistory({
+      instructionsRepository: this.getInstructionsRepository()
     });
   }
 
   /**
-   * Get RestoreFrameworkVersion use case (feature 004).
-   * @returns {RestoreFrameworkVersion}
+   * Get GetInstructionsHistoryEntry use case (feature 005).
+   * @returns {GetInstructionsHistoryEntry}
    */
-  getRestoreFrameworkVersion() {
-    return new RestoreFrameworkVersion({
-      frameworkRepository: this.getFrameworkRepository(),
-      saveFramework: this.getSaveFramework()
+  getGetInstructionsHistoryEntry() {
+    return new GetInstructionsHistoryEntry({
+      instructionsRepository: this.getInstructionsRepository()
+    });
+  }
+
+  /**
+   * Get RestoreInstructionsVersion use case (feature 005).
+   * @returns {RestoreInstructionsVersion}
+   */
+  getRestoreInstructionsVersion() {
+    return new RestoreInstructionsVersion({
+      instructionsRepository: this.getInstructionsRepository(),
+      saveInstructions: this.getSaveInstructions()
     });
   }
 

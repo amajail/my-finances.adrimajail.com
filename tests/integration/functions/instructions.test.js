@@ -1,5 +1,5 @@
 /**
- * HTTP smoke tests for the framework endpoints (feature 004).
+ * HTTP smoke tests for the instructions endpoints (feature 005).
  *
  * Mocks the DI container so the tests run without Azurite. Asserts status
  * codes + response shapes against contracts/api.md.
@@ -17,9 +17,9 @@ jest.mock('@azure/functions', () => ({
 }));
 
 const container = require('../../../src/application/di/container');
-const FrameworkHistoryEntry = require('../../../src/domain/entities/FrameworkHistoryEntry');
+const InstructionsHistoryEntry = require('../../../src/domain/entities/InstructionsHistoryEntry');
 
-require('../../../src/functions/framework');
+require('../../../src/functions/instructions');
 
 function makeContext() {
   return {
@@ -39,61 +39,61 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('GET /api/framework', () => {
-  it('returns the active framework with maxBytes', async () => {
-    jest.spyOn(container, 'getGetActiveFramework').mockReturnValue({
+describe('GET /api/instructions', () => {
+  it('returns the active instructions with maxBytes', async () => {
+    jest.spyOn(container, 'getGetActiveInstructions').mockReturnValue({
       execute: jest.fn(async () => ({
         content: '## Buckets\n- US: example\n',
         historyRowKey: '8284032399876-a3f9',
         updatedAt: '2026-05-17T14:02:03.456Z',
-        maxBytes: FrameworkHistoryEntry.MAX_BYTES,
+        maxBytes: InstructionsHistoryEntry.MAX_BYTES,
       })),
     });
 
-    const res = await httpHandlers.getFramework.handler(makeRequest(), makeContext());
+    const res = await httpHandlers.getInstructions.handler(makeRequest(), makeContext());
 
     expect(res.status).toBe(200);
     expect(res.jsonBody).toEqual({
       content: '## Buckets\n- US: example\n',
       historyRowKey: '8284032399876-a3f9',
       updatedAt: '2026-05-17T14:02:03.456Z',
-      maxBytes: FrameworkHistoryEntry.MAX_BYTES,
+      maxBytes: InstructionsHistoryEntry.MAX_BYTES,
     });
   });
 
   it('surfaces null historyRowKey/updatedAt for pre-feature seeded content (FR-013)', async () => {
-    jest.spyOn(container, 'getGetActiveFramework').mockReturnValue({
+    jest.spyOn(container, 'getGetActiveInstructions').mockReturnValue({
       execute: jest.fn(async () => ({
         content: 'seeded content',
         historyRowKey: null,
         updatedAt: null,
-        maxBytes: FrameworkHistoryEntry.MAX_BYTES,
+        maxBytes: InstructionsHistoryEntry.MAX_BYTES,
       })),
     });
 
-    const res = await httpHandlers.getFramework.handler(makeRequest(), makeContext());
+    const res = await httpHandlers.getInstructions.handler(makeRequest(), makeContext());
 
     expect(res.status).toBe(200);
     expect(res.jsonBody.historyRowKey).toBeNull();
     expect(res.jsonBody.updatedAt).toBeNull();
   });
 
-  it('returns 404 when no framework is configured', async () => {
+  it('returns 404 when no instructions are configured', async () => {
     const { NotFoundError } = require('../../../src/shared/errors');
-    jest.spyOn(container, 'getGetActiveFramework').mockReturnValue({
-      execute: jest.fn(async () => { throw new NotFoundError('strategic framework', 'analysis.strategicFrameworkV1'); }),
+    jest.spyOn(container, 'getGetActiveInstructions').mockReturnValue({
+      execute: jest.fn(async () => { throw new NotFoundError('instructions', 'analysis.instructionsV1'); }),
     });
 
-    const res = await httpHandlers.getFramework.handler(makeRequest(), makeContext());
+    const res = await httpHandlers.getInstructions.handler(makeRequest(), makeContext());
 
     expect(res.status).toBe(404);
-    expect(res.jsonBody.error).toMatch(/strategic framework not found/);
+    expect(res.jsonBody.error).toMatch(/instructions not found/);
   });
 });
 
-describe('PUT /api/framework', () => {
+describe('PUT /api/instructions', () => {
   it('returns 200 + noop=false when a new save lands', async () => {
-    jest.spyOn(container, 'getSaveFramework').mockReturnValue({
+    jest.spyOn(container, 'getSaveInstructions').mockReturnValue({
       execute: jest.fn(async () => ({
         historyRowKey: '8284032399876-a3f9',
         timestamp: '2026-05-17T14:02:03.456Z',
@@ -101,7 +101,7 @@ describe('PUT /api/framework', () => {
       })),
     });
 
-    const res = await httpHandlers.updateFramework.handler(
+    const res = await httpHandlers.updateInstructions.handler(
       makeRequest({ body: { content: 'new content', changeNote: 'bumped' } }),
       makeContext()
     );
@@ -115,7 +115,7 @@ describe('PUT /api/framework', () => {
   });
 
   it('returns 200 + noop=true when content matches active (FR-011)', async () => {
-    jest.spyOn(container, 'getSaveFramework').mockReturnValue({
+    jest.spyOn(container, 'getSaveInstructions').mockReturnValue({
       execute: jest.fn(async () => ({
         historyRowKey: '8284032399000-bb12',
         timestamp: '2026-05-17T13:45:11.222Z',
@@ -123,7 +123,7 @@ describe('PUT /api/framework', () => {
       })),
     });
 
-    const res = await httpHandlers.updateFramework.handler(
+    const res = await httpHandlers.updateInstructions.handler(
       makeRequest({ body: { content: 'same as active' } }),
       makeContext()
     );
@@ -134,11 +134,11 @@ describe('PUT /api/framework', () => {
 
   it('returns 400 when content is empty (FR-004)', async () => {
     const { ValidationError } = require('../../../src/shared/errors');
-    jest.spyOn(container, 'getSaveFramework').mockReturnValue({
+    jest.spyOn(container, 'getSaveInstructions').mockReturnValue({
       execute: jest.fn(async () => { throw new ValidationError('content is required'); }),
     });
 
-    const res = await httpHandlers.updateFramework.handler(
+    const res = await httpHandlers.updateInstructions.handler(
       makeRequest({ body: { content: '' } }),
       makeContext()
     );
@@ -147,30 +147,30 @@ describe('PUT /api/framework', () => {
     expect(res.jsonBody.error).toMatch(/content is required/);
   });
 
-  it('returns 400 when content exceeds the 60 KB cap (FR-017)', async () => {
+  it('returns 400 when content exceeds the 256 KB cap (FR-017)', async () => {
     const { ValidationError } = require('../../../src/shared/errors');
-    jest.spyOn(container, 'getSaveFramework').mockReturnValue({
+    jest.spyOn(container, 'getSaveInstructions').mockReturnValue({
       execute: jest.fn(async () => {
-        throw new ValidationError('content exceeds maximum size of 61440 bytes (got 70000)');
+        throw new ValidationError('content exceeds maximum size of 262144 bytes (got 70000)');
       }),
     });
 
-    const res = await httpHandlers.updateFramework.handler(
+    const res = await httpHandlers.updateInstructions.handler(
       makeRequest({ body: { content: 'x'.repeat(70000) } }),
       makeContext()
     );
 
     expect(res.status).toBe(400);
-    expect(res.jsonBody.error).toMatch(/exceeds maximum size of 61440 bytes/);
+    expect(res.jsonBody.error).toMatch(/exceeds maximum size of 262144 bytes/);
   });
 
   it('passes content + changeNote through to the use-case', async () => {
     const exec = jest.fn(async () => ({
       historyRowKey: 'x', timestamp: 't', noop: false,
     }));
-    jest.spyOn(container, 'getSaveFramework').mockReturnValue({ execute: exec });
+    jest.spyOn(container, 'getSaveInstructions').mockReturnValue({ execute: exec });
 
-    await httpHandlers.updateFramework.handler(
+    await httpHandlers.updateInstructions.handler(
       makeRequest({ body: { content: 'c', changeNote: 'n' } }),
       makeContext()
     );
@@ -180,7 +180,7 @@ describe('PUT /api/framework', () => {
 
   it('treats missing JSON body as empty (lets the use-case reject)', async () => {
     const { ValidationError } = require('../../../src/shared/errors');
-    jest.spyOn(container, 'getSaveFramework').mockReturnValue({
+    jest.spyOn(container, 'getSaveInstructions').mockReturnValue({
       execute: jest.fn(async () => { throw new ValidationError('content is required'); }),
     });
 
@@ -189,15 +189,15 @@ describe('PUT /api/framework', () => {
       query: { get: () => null },
       json: async () => { throw new Error('not json'); },
     };
-    const res = await httpHandlers.updateFramework.handler(req, makeContext());
+    const res = await httpHandlers.updateInstructions.handler(req, makeContext());
 
     expect(res.status).toBe(400);
   });
 });
 
-describe('GET /api/framework/history', () => {
+describe('GET /api/instructions/history', () => {
   it('returns the list shape', async () => {
-    jest.spyOn(container, 'getListFrameworkHistory').mockReturnValue({
+    jest.spyOn(container, 'getListInstructionsHistory').mockReturnValue({
       execute: jest.fn(async () => ({
         entries: [
           { rowKey: 'r1', timestamp: '2026-05-17T14:00Z', changeNote: 'edit', source: 'edit', restoreOfRowKey: null, contentBytes: 100 },
@@ -206,7 +206,7 @@ describe('GET /api/framework/history', () => {
       })),
     });
 
-    const res = await httpHandlers.listFrameworkHistory.handler(
+    const res = await httpHandlers.listInstructionsHistory.handler(
       makeRequest({ query: {} }),
       makeContext()
     );
@@ -220,9 +220,9 @@ describe('GET /api/framework/history', () => {
 
   it('forwards the limit query param to the use-case', async () => {
     const exec = jest.fn(async () => ({ entries: [], count: 0 }));
-    jest.spyOn(container, 'getListFrameworkHistory').mockReturnValue({ execute: exec });
+    jest.spyOn(container, 'getListInstructionsHistory').mockReturnValue({ execute: exec });
 
-    await httpHandlers.listFrameworkHistory.handler(
+    await httpHandlers.listInstructionsHistory.handler(
       makeRequest({ query: { limit: '25' } }),
       makeContext()
     );
@@ -232,11 +232,11 @@ describe('GET /api/framework/history', () => {
 
   it('returns 400 when limit is out of range', async () => {
     const { ValidationError } = require('../../../src/shared/errors');
-    jest.spyOn(container, 'getListFrameworkHistory').mockReturnValue({
+    jest.spyOn(container, 'getListInstructionsHistory').mockReturnValue({
       execute: jest.fn(async () => { throw new ValidationError('limit must be between 1 and 200'); }),
     });
 
-    const res = await httpHandlers.listFrameworkHistory.handler(
+    const res = await httpHandlers.listInstructionsHistory.handler(
       makeRequest({ query: { limit: '500' } }),
       makeContext()
     );
@@ -245,20 +245,20 @@ describe('GET /api/framework/history', () => {
   });
 
   it('returns 200 + empty list when no entries exist (FR-013)', async () => {
-    jest.spyOn(container, 'getListFrameworkHistory').mockReturnValue({
+    jest.spyOn(container, 'getListInstructionsHistory').mockReturnValue({
       execute: jest.fn(async () => ({ entries: [], count: 0 })),
     });
 
-    const res = await httpHandlers.listFrameworkHistory.handler(makeRequest(), makeContext());
+    const res = await httpHandlers.listInstructionsHistory.handler(makeRequest(), makeContext());
 
     expect(res.status).toBe(200);
     expect(res.jsonBody).toEqual({ entries: [], count: 0 });
   });
 });
 
-describe('GET /api/framework/history/{rowKey}', () => {
+describe('GET /api/instructions/history/{rowKey}', () => {
   it('returns the full entry shape', async () => {
-    jest.spyOn(container, 'getGetFrameworkHistoryEntry').mockReturnValue({
+    jest.spyOn(container, 'getGetInstructionsHistoryEntry').mockReturnValue({
       execute: jest.fn(async ({ rowKey }) => ({
         rowKey,
         timestamp: '2026-05-17T14:00Z',
@@ -269,7 +269,7 @@ describe('GET /api/framework/history/{rowKey}', () => {
       })),
     });
 
-    const res = await httpHandlers.getFrameworkHistoryEntry.handler(
+    const res = await httpHandlers.getInstructionsHistoryEntry.handler(
       makeRequest({ params: { rowKey: 'r-abc' } }),
       makeContext()
     );
@@ -281,11 +281,11 @@ describe('GET /api/framework/history/{rowKey}', () => {
 
   it('returns 404 when the entry does not exist', async () => {
     const { NotFoundError } = require('../../../src/shared/errors');
-    jest.spyOn(container, 'getGetFrameworkHistoryEntry').mockReturnValue({
+    jest.spyOn(container, 'getGetInstructionsHistoryEntry').mockReturnValue({
       execute: jest.fn(async () => { throw new NotFoundError('history entry', 'r-missing'); }),
     });
 
-    const res = await httpHandlers.getFrameworkHistoryEntry.handler(
+    const res = await httpHandlers.getInstructionsHistoryEntry.handler(
       makeRequest({ params: { rowKey: 'r-missing' } }),
       makeContext()
     );
@@ -295,9 +295,9 @@ describe('GET /api/framework/history/{rowKey}', () => {
   });
 });
 
-describe('POST /api/framework/history/{rowKey}/restore', () => {
+describe('POST /api/instructions/history/{rowKey}/restore', () => {
   it('returns 200 with the new history row reference', async () => {
-    jest.spyOn(container, 'getRestoreFrameworkVersion').mockReturnValue({
+    jest.spyOn(container, 'getRestoreInstructionsVersion').mockReturnValue({
       execute: jest.fn(async ({ rowKey }) => ({
         historyRowKey: 'new-row',
         timestamp: '2026-05-17T14:30:00Z',
@@ -306,7 +306,7 @@ describe('POST /api/framework/history/{rowKey}/restore', () => {
       })),
     });
 
-    const res = await httpHandlers.restoreFrameworkVersion.handler(
+    const res = await httpHandlers.restoreInstructionsVersion.handler(
       makeRequest({ params: { rowKey: 'r-target' }, body: { changeNote: 'rolling back' } }),
       makeContext()
     );
@@ -321,7 +321,7 @@ describe('POST /api/framework/history/{rowKey}/restore', () => {
   });
 
   it('returns 200 with noop:true when the target equals active', async () => {
-    jest.spyOn(container, 'getRestoreFrameworkVersion').mockReturnValue({
+    jest.spyOn(container, 'getRestoreInstructionsVersion').mockReturnValue({
       execute: jest.fn(async ({ rowKey }) => ({
         historyRowKey: 'curr-x',
         timestamp: 'curr-t',
@@ -330,7 +330,7 @@ describe('POST /api/framework/history/{rowKey}/restore', () => {
       })),
     });
 
-    const res = await httpHandlers.restoreFrameworkVersion.handler(
+    const res = await httpHandlers.restoreInstructionsVersion.handler(
       makeRequest({ params: { rowKey: 'r-same' }, body: {} }),
       makeContext()
     );
@@ -341,11 +341,11 @@ describe('POST /api/framework/history/{rowKey}/restore', () => {
 
   it('returns 404 for an unknown rowKey', async () => {
     const { NotFoundError } = require('../../../src/shared/errors');
-    jest.spyOn(container, 'getRestoreFrameworkVersion').mockReturnValue({
+    jest.spyOn(container, 'getRestoreInstructionsVersion').mockReturnValue({
       execute: jest.fn(async () => { throw new NotFoundError('history entry', 'r-missing'); }),
     });
 
-    const res = await httpHandlers.restoreFrameworkVersion.handler(
+    const res = await httpHandlers.restoreInstructionsVersion.handler(
       makeRequest({ params: { rowKey: 'r-missing' }, body: {} }),
       makeContext()
     );
@@ -355,11 +355,11 @@ describe('POST /api/framework/history/{rowKey}/restore', () => {
 
   it('returns 400 when changeNote exceeds 280 chars', async () => {
     const { ValidationError } = require('../../../src/shared/errors');
-    jest.spyOn(container, 'getRestoreFrameworkVersion').mockReturnValue({
+    jest.spyOn(container, 'getRestoreInstructionsVersion').mockReturnValue({
       execute: jest.fn(async () => { throw new ValidationError('changeNote exceeds 280 characters'); }),
     });
 
-    const res = await httpHandlers.restoreFrameworkVersion.handler(
+    const res = await httpHandlers.restoreInstructionsVersion.handler(
       makeRequest({ params: { rowKey: 'r-x' }, body: { changeNote: 'y'.repeat(281) } }),
       makeContext()
     );

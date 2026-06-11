@@ -2,11 +2,11 @@
 import Layout from '../layouts/Layout.astro';
 ---
 
-<Layout title="Strategic Framework · my-finances" active="framework">
+<Layout title="Instructions · my-finances" active="instructions">
   <header class="mb-6">
-    <span class="eyebrow">Strategic framework</span>
+    <span class="eyebrow">Instructions</span>
     <span class="accent-line"></span>
-    <h1 class="text-2xl font-bold">Edit the framework used by the weekly analysis</h1>
+    <h1 class="text-2xl font-bold">Edit the complete instructions used by the weekly analysis</h1>
     <p class="text-xs text-[var(--color-muted)] mt-2">
       Save to apply. The next weekly analysis run will use the saved content.
       Every save is recorded in <span class="font-medium">History</span> below — restore from there if needed.
@@ -15,7 +15,7 @@ import Layout from '../layouts/Layout.astro';
 
   <section id="editor-card" class="card p-4 mb-6">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold">Active framework</h2>
+      <h2 class="font-semibold">Active instructions</h2>
       <div id="active-meta" class="text-xs text-[var(--color-muted)]">Loading…</div>
     </div>
 
@@ -53,7 +53,7 @@ import Layout from '../layouts/Layout.astro';
         />
       </div>
       <div class="text-xs text-[var(--color-muted)] whitespace-nowrap">
-        <span id="byte-counter">0</span> / <span id="byte-cap">61440</span> bytes
+        <span id="byte-counter">0</span> / <span id="byte-cap">262144</span> bytes
       </div>
       <button id="save-btn" class="row-action-btn" disabled>Save</button>
     </div>
@@ -102,7 +102,7 @@ import Layout from '../layouts/Layout.astro';
 
   const state = {
     /** @type {string|null} */ lastSavedContent: null,
-    /** @type {number} */ maxBytes: 61440,
+    /** @type {number} */ maxBytes: 262144,
     /** @type {Map<string, string>} cached full content per rowKey */ contentCache: new Map(),
     /** @type {'edit'|'preview'} */ mode: 'edit',
   };
@@ -171,7 +171,7 @@ import Layout from '../layouts/Layout.astro';
 
   async function loadActive() {
     try {
-      const data = await api('/framework');
+      const data = await api('/instructions');
       state.maxBytes = data.maxBytes || state.maxBytes;
       ui.byteCap.textContent = state.maxBytes.toLocaleString();
       ui.textarea.value = data.content || '';
@@ -188,7 +188,7 @@ import Layout from '../layouts/Layout.astro';
         ui.textarea.disabled = false;
         ui.note.disabled = false;
         state.lastSavedContent = '';
-        setToast('No framework configured yet. Save below to create the first version.', 'info');
+        setToast('No instructions configured yet. Save below to create the first version.', 'info');
         recomputeSaveState();
         return;
       }
@@ -200,7 +200,7 @@ import Layout from '../layouts/Layout.astro';
     ui.saveBtn.disabled = true;
     setToast('Saving…');
     try {
-      const result = await api('/framework', {
+      const result = await api('/instructions', {
         method: 'PUT',
         body: {
           content: ui.textarea.value,
@@ -277,7 +277,7 @@ import Layout from '../layouts/Layout.astro';
       try {
         let content = state.contentCache.get(entry.rowKey);
         if (content === undefined) {
-          const data = await api(`/framework/history/${encodeURIComponent(entry.rowKey)}`);
+          const data = await api(`/instructions/history/${encodeURIComponent(entry.rowKey)}`);
           content = data.content || '';
           state.contentCache.set(entry.rowKey, content);
         }
@@ -304,7 +304,7 @@ import Layout from '../layouts/Layout.astro';
 
   async function restoreEntry(entry) {
     const ok = window.confirm(
-      `Restore framework to the version saved on ${fmtTimestamp(entry.timestamp)}?\n\n` +
+      `Restore instructions to the version saved on ${fmtTimestamp(entry.timestamp)}?\n\n` +
       `A new history entry will be created (the current active version stays in history). ` +
       `This cannot be undone via the UI.`
     );
@@ -312,7 +312,7 @@ import Layout from '../layouts/Layout.astro';
 
     setToast('Restoring…');
     try {
-      const result = await api(`/framework/history/${encodeURIComponent(entry.rowKey)}/restore`, {
+      const result = await api(`/instructions/history/${encodeURIComponent(entry.rowKey)}/restore`, {
         method: 'POST',
         body: {},
       });
@@ -333,7 +333,7 @@ import Layout from '../layouts/Layout.astro';
     ui.historyEmpty.classList.add('hidden');
     ui.historyList.innerHTML = '';
     try {
-      const data = await api('/framework/history?limit=50');
+      const data = await api('/instructions/history?limit=50');
       ui.historyLoading.classList.add('hidden');
       if (!data.count) {
         ui.historyEmpty.classList.remove('hidden');

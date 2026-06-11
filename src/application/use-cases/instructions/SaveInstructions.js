@@ -1,17 +1,17 @@
 /**
- * SaveFramework Use Case
+ * SaveInstructions Use Case
  *
  * Validates input, performs no-op detection against the current active
- * framework, and (when the save is real) delegates persistence to the
- * repository — which writes a new immutable history entry AND updates the
+ * instructions document, and (when the save is real) delegates persistence to
+ * the repository — which writes a new immutable history entry AND updates the
  * active settings row to point at it.
  *
- * Feature: 004-editable-strategic-framework
- * Covers: FR-003, FR-004, FR-005, FR-011, FR-012, FR-017.
+ * Feature: 005-editable-metaprompt
+ * Covers: FR-002, FR-004, FR-005, FR-006, FR-007, FR-008.
  */
 
 const UseCase = require('../UseCase');
-const FrameworkHistoryEntry = require('../../../domain/entities/FrameworkHistoryEntry');
+const InstructionsHistoryEntry = require('../../../domain/entities/InstructionsHistoryEntry');
 const { ValidationError } = require('../../../shared/errors');
 const logger = require('../../../shared/logging');
 
@@ -27,14 +27,14 @@ function normalizeForCompare(s) {
   return String(s ?? '').replace(/\r\n/g, '\n').trim();
 }
 
-class SaveFramework extends UseCase {
+class SaveInstructions extends UseCase {
   /**
    * @param {Object} deps
-   * @param {IFrameworkRepository} deps.frameworkRepository
+   * @param {IInstructionsRepository} deps.instructionsRepository
    */
-  constructor({ frameworkRepository }) {
+  constructor({ instructionsRepository }) {
     super();
-    this._frameworkRepository = frameworkRepository;
+    this._instructionsRepository = instructionsRepository;
   }
 
   /**
@@ -46,19 +46,19 @@ class SaveFramework extends UseCase {
    * @returns {Promise<{ historyRowKey: string|null, timestamp: string|null, noop: boolean }>}
    */
   async execute({ content, changeNote = null, source = 'edit', restoreOfRowKey = null } = {}) {
-    // 1. Content present + non-empty after trim (FR-004).
+    // 1. Content present + non-empty after trim (FR-005).
     if (typeof content !== 'string' || content.trim().length === 0) {
       throw new ValidationError('content is required', [
         { field: 'content', message: 'content is required' },
       ]);
     }
 
-    // 2. Size cap (FR-017).
+    // 2. Size cap (FR-006).
     const bytes = Buffer.byteLength(content, 'utf8');
-    if (bytes > FrameworkHistoryEntry.MAX_BYTES) {
+    if (bytes > InstructionsHistoryEntry.MAX_BYTES) {
       throw new ValidationError(
-        `content exceeds maximum size of ${FrameworkHistoryEntry.MAX_BYTES} bytes (got ${bytes})`,
-        [{ field: 'content', message: `exceeds ${FrameworkHistoryEntry.MAX_BYTES} bytes (got ${bytes})` }]
+        `content exceeds maximum size of ${InstructionsHistoryEntry.MAX_BYTES} bytes (got ${bytes})`,
+        [{ field: 'content', message: `exceeds ${InstructionsHistoryEntry.MAX_BYTES} bytes (got ${bytes})` }]
       );
     }
 
@@ -75,13 +75,13 @@ class SaveFramework extends UseCase {
       normalizedNote = trimmed.length > 0 ? trimmed : null;
     }
 
-    // 4. No-op detection (FR-011): compare normalized content against active.
-    const active = await this._frameworkRepository.getActive();
+    // 4. No-op detection (FR-007): compare normalized content against active.
+    const active = await this._instructionsRepository.getActive();
     if (active) {
       const a = normalizeForCompare(active.content);
       const b = normalizeForCompare(content);
       if (a === b) {
-        logger.debug('SaveFramework: no-op (content matches active)');
+        logger.debug('SaveInstructions: no-op (content matches active)');
         return {
           historyRowKey: active.historyRowKey,
           timestamp: active.updatedAt,
@@ -91,14 +91,14 @@ class SaveFramework extends UseCase {
     }
 
     // 5. Persist.
-    const entry = await this._frameworkRepository.saveActive({
+    const entry = await this._instructionsRepository.saveActive({
       content,
       changeNote: normalizedNote,
       source,
       restoreOfRowKey: source === 'restore' ? restoreOfRowKey : null,
     });
 
-    logger.info('Framework saved', {
+    logger.info('Instructions saved', {
       historyRowKey: entry.id,
       source: entry.source,
       bytes,
@@ -112,4 +112,4 @@ class SaveFramework extends UseCase {
   }
 }
 
-module.exports = SaveFramework;
+module.exports = SaveInstructions;

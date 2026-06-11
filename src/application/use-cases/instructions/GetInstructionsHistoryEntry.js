@@ -1,23 +1,23 @@
 /**
- * GetFrameworkHistoryEntry Use Case
+ * GetInstructionsHistoryEntry Use Case
  *
- * Returns the full content + metadata for one framework history entry.
+ * Returns the full content + metadata for one instructions history entry.
  *
- * Feature: 004-editable-strategic-framework (spec FR-007).
+ * Feature: 005-editable-metaprompt (spec FR-010).
  */
 
 const UseCase = require('../UseCase');
 const { ValidationError, NotFoundError } = require('../../../shared/errors');
 const logger = require('../../../shared/logging');
 
-class GetFrameworkHistoryEntry extends UseCase {
+class GetInstructionsHistoryEntry extends UseCase {
   /**
    * @param {Object} deps
-   * @param {IFrameworkRepository} deps.frameworkRepository
+   * @param {IInstructionsRepository} deps.instructionsRepository
    */
-  constructor({ frameworkRepository }) {
+  constructor({ instructionsRepository }) {
     super();
-    this._frameworkRepository = frameworkRepository;
+    this._instructionsRepository = instructionsRepository;
   }
 
   /**
@@ -32,9 +32,9 @@ class GetFrameworkHistoryEntry extends UseCase {
       ]);
     }
 
-    logger.debug('GetFrameworkHistoryEntry: executing', { rowKey });
+    logger.debug('GetInstructionsHistoryEntry: executing', { rowKey });
 
-    const entry = await this._frameworkRepository.getHistoryEntry(rowKey);
+    const entry = await this._instructionsRepository.getHistoryEntry(rowKey);
     if (!entry) {
       throw new NotFoundError('history entry', rowKey);
     }
@@ -50,4 +50,4 @@ class GetFrameworkHistoryEntry extends UseCase {
   }
 }
 
-module.exports = GetFrameworkHistoryEntry;
+module.exports = GetInstructionsHistoryEntry;

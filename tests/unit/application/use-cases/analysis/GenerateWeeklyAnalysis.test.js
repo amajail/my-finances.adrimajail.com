@@ -2,7 +2,8 @@
  * GenerateWeeklyAnalysis use-case tests (happy path).
  *
  * Mocks all collaborators. Asserts:
- *   - prompt is rendered with the settings-driven model/version
+ *   - the active instructions document is used VERBATIM as the system prompt
+ *     (feature 005 — no template file, no token substitution)
  *   - LLM result is materialized into WeeklyAnalysis + SuggestedOrder entities
  *   - repository.upsert is called once with the right shapes
  *   - the persisted entity has status === 'completed'
@@ -13,6 +14,11 @@ const GenerateWeeklyAnalysis = require('../../../../../src/application/use-cases
 const WeeklyAnalysis = require('../../../../../src/domain/entities/WeeklyAnalysis');
 
 const longBody = 'This is a long-enough narrative body for validation. '.repeat(10);
+
+// The full editable instructions document the AI receives (feature 005). Used
+// verbatim — what we set here is exactly the systemPrompt the LLM client sees.
+const DEFAULT_INSTRUCTIONS =
+  '# FULL INSTRUCTIONS DOCUMENT\n\nRole, guardrails, and the owner framework — all inline as one document.';
 
 function fakePortfolioSummary() {
   return {
@@ -59,18 +65,20 @@ function mockSettingsRepo(map = {}) {
   };
 }
 
+// Feature 005: the instructions document repository. getActive() returns the
+// active document + the history rowKey produced it.
+function mockInstructionsRepo({ content = DEFAULT_INSTRUCTIONS, historyRowKey = 'rk-active', updatedAt = '2026-06-11T14:00:00Z' } = {}) {
+  return { getActive: jest.fn(async () => ({ content, historyRowKey, updatedAt })) };
+}
+
 function buildUseCase({
   llmClient = mockLlmClientReturning(),
   repository = mockRepositoryEmpty(),
   riesgoPaisProvider = { getLatest: jest.fn().mockResolvedValue({ basisPoints: 524, asOf: '2026-05-15' }) },
-  settingsRepository = mockSettingsRepo({
-    'analysis.model': 'claude-opus-4-7',
-    'analysis.promptVersion': 'weekly-rebalance-v1',
-    'analysis.strategicFrameworkV1': '## Framework (test fixture)\n- Buckets: US, ARG, OffSystem\n- Targets: US 55%, ARG 30%, OffSystem 15%',
-  }),
+  settingsRepository = mockSettingsRepo({ 'analysis.model': 'claude-opus-4-7' }),
+  instructionsRepository = mockInstructionsRepo(),
   portfolioSummary = fakePortfolioSummary(),
   fixedNow = new Date('2026-05-15T21:00:00Z'),
-  loadPrompt = jest.fn().mockReturnValue('# SYSTEM PROMPT v1\n\n## Strategic Framework\n\n{{strategicFramework}}\n\n## End\n'),
 } = {}) {
   let nowMs = fixedNow.getTime();
   const clock = () => new Date(nowMs++); // advances by 1ms so duration > 0
@@ -81,13 +89,13 @@ function buildUseCase({
       riesgoPaisProvider,
       getPortfolioSummary: { execute: jest.fn().mockResolvedValue(portfolioSummary) },
       settingsRepository,
-      loadPrompt,
+      instructionsRepository,
       clock,
     }),
     repository,
     llmClient,
     settingsRepository,
-    loadPrompt,
+    instructionsRepository,
     riesgoPaisProvider,
   };
 }
@@ -110,7 +118,8 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     expect(result.status).toBe('completed');
     expect(result.date).toBe('2026-05-15');
     expect(result.modelUsed).toBe('claude-opus-4-7');
-    expect(result.promptVersion).toBe('weekly-rebalance-v1');
+    expect(result.promptVersion).toBe('editable-instructions-v1');
+    expect(result.instructionsHistoryRowKey).toBe('rk-active');
     expect(result.tokensIn).toBe(12000);
     expect(result.tokensOut).toBe(1500);
     expect(result.costUsd).toBeCloseTo(0.30);
@@ -127,28 +136,21 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     expect(persistedOrders[1].index).toBe(1);
   });
 
-  it('uses settings-driven model + prompt version', async () => {
-    const { useCase, llmClient, loadPrompt } = buildUseCase({
-      settingsRepository: mockSettingsRepo({
-        'analysis.model': 'claude-sonnet-4-6',
-        'analysis.promptVersion': 'weekly-rebalance-v1',
-        'analysis.strategicFrameworkV1': '## fixture framework',
-      }),
+  it('uses the settings-driven model', async () => {
+    const { useCase, llmClient } = buildUseCase({
+      settingsRepository: mockSettingsRepo({ 'analysis.model': 'claude-sonnet-4-6' }),
     });
     await useCase.execute({ targetDate: '2026-05-15' });
 
-    expect(loadPrompt).toHaveBeenCalledWith('weekly-rebalance-v1');
     expect(llmClient.submitAnalysis).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'claude-sonnet-4-6' })
     );
   });
 
-  it('falls back to default model / prompt / caps when those settings are missing (framework still required)', async () => {
-    // Only the framework is provided — everything else falls back to defaults.
-    const { useCase, llmClient, loadPrompt } = buildUseCase({
-      settingsRepository: mockSettingsRepo({
-        'analysis.strategicFrameworkV1': '## fixture framework — defaults test',
-      }),
+  it('falls back to default model / caps when those settings are missing', async () => {
+    // No model setting — everything falls back to defaults. Instructions still required.
+    const { useCase, llmClient } = buildUseCase({
+      settingsRepository: mockSettingsRepo({}),
     });
     await useCase.execute({ targetDate: '2026-05-15' });
 
@@ -159,7 +161,6 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
         maxOutputTokens: 8000,
       })
     );
-    expect(loadPrompt).toHaveBeenCalledWith('weekly-rebalance-v1');
   });
 
   it('passes previousAnalysis: null when no prior row exists (first run)', async () => {
@@ -178,7 +179,7 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
       status: 'completed',
       generatedAt: '2026-05-08T21:00:14Z',
       modelUsed: 'claude-opus-4-7',
-      promptVersion: 'weekly-rebalance-v1',
+      promptVersion: 'editable-instructions-v1',
       summary: 'Prior week summary — concise paragraph about last week.',
       markdownBody: longBody,
       riesgoPaisBp: 538,
@@ -199,54 +200,42 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     expect(submitCall.userMessage).toContain('"symbol": "MU"');
   });
 
-  it('splices the strategic framework from settings into the {{strategicFramework}} slot', async () => {
-    const { useCase, llmClient, settingsRepository } = buildUseCase({
-      settingsRepository: mockSettingsRepo({
-        'analysis.model': 'claude-opus-4-7',
-        'analysis.promptVersion': 'weekly-rebalance-v1',
-        'analysis.strategicFrameworkV1': '### MY OWNER FRAMEWORK\n- bucket-X: [SYMBOL_REDACTED]\n- directive: HOLD [WHATEVER]',
-      }),
+  it('uses the active instructions document verbatim as the system prompt (FR-003/FR-004)', async () => {
+    const content = '### MY OWNER INSTRUCTIONS\n- bucket-X: [SYMBOL_REDACTED]\n- directive: HOLD [WHATEVER]';
+    const { useCase, llmClient, instructionsRepository } = buildUseCase({
+      instructionsRepository: mockInstructionsRepo({ content }),
     });
     await useCase.execute({ targetDate: '2026-05-15' });
 
-    expect(settingsRepository.get).toHaveBeenCalledWith('analysis.strategicFrameworkV1');
+    expect(instructionsRepository.getActive).toHaveBeenCalledTimes(1);
     const submitCall = llmClient.submitAnalysis.mock.calls[0][0];
-    expect(submitCall.systemPrompt).toContain('MY OWNER FRAMEWORK');
-    expect(submitCall.systemPrompt).not.toContain('{{strategicFramework}}');
+    expect(submitCall.systemPrompt).toBe(content);
   });
 
-  it('persists a failed row when the strategic framework setting is missing', async () => {
+  it('persists a failed row when no active instructions document exists', async () => {
     const repo = mockRepositoryEmpty();
     const { useCase } = buildUseCase({
       repository: repo,
-      // No analysis.strategicFrameworkV1 in the settings map.
-      settingsRepository: mockSettingsRepo({
-        'analysis.model': 'claude-opus-4-7',
-        'analysis.promptVersion': 'weekly-rebalance-v1',
-      }),
+      instructionsRepository: { getActive: jest.fn().mockResolvedValue(null) },
     });
 
     const result = await useCase.execute({ targetDate: '2026-05-15' });
 
     expect(result.status).toBe('failed');
-    expect(result.errorMessage).toMatch(/strategic framework not configured/);
+    expect(result.errorMessage).toMatch(/instructions not configured/);
     expect(repo.upsert).toHaveBeenCalledTimes(1);
     // No orders persisted on failure
     expect(repo.upsert.mock.calls[0][1]).toEqual([]);
   });
 
-  it('persists a failed row when the strategic framework setting is an empty string', async () => {
+  it('persists a failed row when the active instructions document is empty', async () => {
     const { useCase } = buildUseCase({
-      settingsRepository: mockSettingsRepo({
-        'analysis.model': 'claude-opus-4-7',
-        'analysis.promptVersion': 'weekly-rebalance-v1',
-        'analysis.strategicFrameworkV1': '   \n  ',
-      }),
+      instructionsRepository: mockInstructionsRepo({ content: '   \n  ', historyRowKey: 'rk-empty' }),
     });
 
     const result = await useCase.execute({ targetDate: '2026-05-15' });
     expect(result.status).toBe('failed');
-    expect(result.errorMessage).toMatch(/strategic framework not configured/);
+    expect(result.errorMessage).toMatch(/instructions not configured/);
   });
 
   it('does not log the prompt body or the response body', async () => {
@@ -265,7 +254,7 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
       ...warnSpy.mock.calls.flat(),
     ];
     const asJson = JSON.stringify(allLogArgs);
-    expect(asJson).not.toContain('# SYSTEM PROMPT v1');
+    expect(asJson).not.toContain('FULL INSTRUCTIONS DOCUMENT');
     expect(asJson).not.toContain('Executive summary: trim MU');
     expect(asJson).not.toContain(longBody.slice(0, 30));
 
@@ -275,9 +264,9 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
 });
 
 // =========================================================================
-// Failure-branch coverage (T043)
+// Failure-branch coverage
 //
-// Verifies the five typed-error paths in GenerateWeeklyAnalysis.execute:
+// Verifies the typed-error paths in GenerateWeeklyAnalysis.execute:
 //   - RiesgoPaisFetchError      → persist failed, do not call LLM
 //   - CostCapExceededError      → persist failed (no API spend)
 //   - LLMSchemaValidationError  → persist failed (cost already incurred)

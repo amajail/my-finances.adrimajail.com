@@ -22,7 +22,7 @@ import Layout from '../layouts/Layout.astro';
           <th class="text-right px-4 py-2">Riesgo país</th>
           <th class="text-right px-4 py-2">Cost (USD)</th>
           <th class="text-left px-4 py-2">Model</th>
-          <th class="text-left px-4 py-2">Framework</th>
+          <th class="text-left px-4 py-2">Instructions</th>
         </tr>
       </thead>
       <tbody id="analysis-tbody">
@@ -61,8 +61,12 @@ import Layout from '../layouts/Layout.astro';
       ? `${item.riesgoPaisBp} bp` + (item.riesgoPaisAsOf ? `<div class="text-xs text-[var(--color-muted)]">${escapeHtml(item.riesgoPaisAsOf)}</div>` : '')
       : '—';
     const cost = item.status === 'completed' ? formatCost(item.costUsd) : '—';
-    const fwCell = item.frameworkHistoryRowKey
-      ? `<a href="/framework#${encodeURIComponent(item.frameworkHistoryRowKey)}" class="text-[var(--color-accent)] underline-offset-2 hover:underline">${escapeHtml(item.frameworkHistoryRowKey.slice(-8))}</a>`
+    // Feature 005 (FR-013): link to the instructions version; fall back to the
+    // legacy feature-004 framework reference for pre-005 rows.
+    const fwCell = item.instructionsHistoryRowKey
+      ? `<a href="/instructions#${encodeURIComponent(item.instructionsHistoryRowKey)}" class="text-[var(--color-accent)] underline-offset-2 hover:underline">${escapeHtml(item.instructionsHistoryRowKey.slice(-8))}</a>`
+      : item.frameworkHistoryRowKey
+      ? `<a href="/instructions#${encodeURIComponent(item.frameworkHistoryRowKey)}" class="text-[var(--color-muted)] underline-offset-2 hover:underline" title="legacy framework version">${escapeHtml(item.frameworkHistoryRowKey.slice(-8))}</a>`
       : '<span class="text-[var(--color-muted)]">(seed)</span>';
     return `
       <tr class="border-t border-[var(--color-border)]">

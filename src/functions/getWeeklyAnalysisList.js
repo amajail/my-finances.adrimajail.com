@@ -26,8 +26,10 @@ app.http('getWeeklyAnalysisList', {
           status: a.status,
           modelUsed: a.modelUsed,
           generatedAt: a.generatedAt instanceof Date ? a.generatedAt.toISOString() : a.generatedAt,
-          // Feature 004 (FR-016): link to the framework version that produced
-          // this analysis. Null for pre-feature rows.
+          // Feature 005 (FR-013): link to the instructions version that
+          // produced this analysis. Null for pre-005 rows.
+          instructionsHistoryRowKey: a.instructionsHistoryRowKey || null,
+          // Feature 004 (legacy): framework reference for pre-005 rows.
           frameworkHistoryRowKey: a.frameworkHistoryRowKey || null,
         };
         if (a.isCompleted()) {

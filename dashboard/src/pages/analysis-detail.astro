@@ -101,13 +101,16 @@ import Layout from '../layouts/Layout.astro';
     if (detail.riesgoPaisBp != null) meta.push(`riesgo país: ${detail.riesgoPaisBp} bp (${detail.riesgoPaisAsOf || '—'})`);
     document.getElementById('hdr-meta').textContent = meta.join(' · ');
 
-    // Feature 004 (FR-016): framework version badge with link.
+    // Feature 005 (FR-013): instructions version badge with link. Falls back
+    // to the legacy feature-004 framework reference for pre-005 analyses.
     const fwBadge = document.getElementById('framework-version-badge');
     if (fwBadge) {
-      if (detail.frameworkHistoryRowKey) {
-        fwBadge.innerHTML = `Framework version: <a class="underline hover:text-[var(--color-text-primary)]" href="/framework#${encodeURIComponent(detail.frameworkHistoryRowKey)}">view ${escapeHtml(detail.frameworkHistoryRowKey.slice(-8))}</a>`;
+      if (detail.instructionsHistoryRowKey) {
+        fwBadge.innerHTML = `Instructions version: <a class="underline hover:text-[var(--color-text-primary)]" href="/instructions#${encodeURIComponent(detail.instructionsHistoryRowKey)}">view ${escapeHtml(detail.instructionsHistoryRowKey.slice(-8))}</a>`;
+      } else if (detail.frameworkHistoryRowKey) {
+        fwBadge.textContent = `Instructions version: (legacy framework ${detail.frameworkHistoryRowKey.slice(-8)})`;
       } else {
-        fwBadge.textContent = 'Framework version: (pre-history seed)';
+        fwBadge.textContent = 'Instructions version: (pre-history seed)';
       }
     }
 

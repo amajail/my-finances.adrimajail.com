@@ -1,11 +1,11 @@
 /**
- * ListFrameworkHistory use-case tests.
+ * ListInstructionsHistory use-case tests.
  *
  * Feature: 004-editable-strategic-framework. Covers FR-006, FR-013, plus
  * limit clamping and empty-state.
  */
 
-const ListFrameworkHistory = require('../../../../../src/application/use-cases/framework/ListFrameworkHistory');
+const ListInstructionsHistory = require('../../../../../src/application/use-cases/instructions/ListInstructionsHistory');
 const { ValidationError } = require('../../../../../src/shared/errors');
 
 function makeRepo(entries = []) {
@@ -17,13 +17,13 @@ function makeRepo(entries = []) {
   };
 }
 
-describe('ListFrameworkHistory', () => {
+describe('ListInstructionsHistory', () => {
   it('returns repository rows mapped to API shape', async () => {
     const repo = makeRepo([
       { id: '8284000000000-aaaa', timestamp: '2026-05-17T14:00:00Z', changeNote: 'edit one', source: 'edit', restoreOfRowKey: null, contentBytes: 100 },
       { id: '8284100000000-bbbb', timestamp: '2026-05-15T12:00:00Z', changeNote: null, source: 'restore', restoreOfRowKey: '9000000000000-zzzz', contentBytes: 90 },
     ]);
-    const uc = new ListFrameworkHistory({ frameworkRepository: repo });
+    const uc = new ListInstructionsHistory({ instructionsRepository: repo });
 
     const result = await uc.execute({ limit: 10 });
 
@@ -52,7 +52,7 @@ describe('ListFrameworkHistory', () => {
 
   it('defaults limit to 50 when omitted', async () => {
     const repo = makeRepo([]);
-    const uc = new ListFrameworkHistory({ frameworkRepository: repo });
+    const uc = new ListInstructionsHistory({ instructionsRepository: repo });
 
     await uc.execute();
 
@@ -61,7 +61,7 @@ describe('ListFrameworkHistory', () => {
 
   it('returns empty array (count 0) when no rows exist — FR-013 empty state', async () => {
     const repo = makeRepo([]);
-    const uc = new ListFrameworkHistory({ frameworkRepository: repo });
+    const uc = new ListInstructionsHistory({ instructionsRepository: repo });
 
     const result = await uc.execute({ limit: 10 });
 
@@ -70,7 +70,7 @@ describe('ListFrameworkHistory', () => {
 
   it('rejects limit below 1', async () => {
     const repo = makeRepo([]);
-    const uc = new ListFrameworkHistory({ frameworkRepository: repo });
+    const uc = new ListInstructionsHistory({ instructionsRepository: repo });
 
     await expect(uc.execute({ limit: 0 })).rejects.toBeInstanceOf(ValidationError);
     await expect(uc.execute({ limit: -5 })).rejects.toThrow(/limit must be between 1 and 200/);
@@ -78,14 +78,14 @@ describe('ListFrameworkHistory', () => {
 
   it('rejects limit above 200', async () => {
     const repo = makeRepo([]);
-    const uc = new ListFrameworkHistory({ frameworkRepository: repo });
+    const uc = new ListInstructionsHistory({ instructionsRepository: repo });
 
     await expect(uc.execute({ limit: 201 })).rejects.toThrow(/limit must be between 1 and 200/);
   });
 
   it('rejects non-integer limit', async () => {
     const repo = makeRepo([]);
-    const uc = new ListFrameworkHistory({ frameworkRepository: repo });
+    const uc = new ListInstructionsHistory({ instructionsRepository: repo });
 
     await expect(uc.execute({ limit: 'abc' })).rejects.toThrow(/limit must be between/);
     await expect(uc.execute({ limit: 1.5 })).rejects.toThrow(/limit must be between/);
@@ -93,7 +93,7 @@ describe('ListFrameworkHistory', () => {
 
   it('accepts the boundary values 1 and 200', async () => {
     const repo = makeRepo([]);
-    const uc = new ListFrameworkHistory({ frameworkRepository: repo });
+    const uc = new ListInstructionsHistory({ instructionsRepository: repo });
 
     await expect(uc.execute({ limit: 1 })).resolves.toBeDefined();
     await expect(uc.execute({ limit: 200 })).resolves.toBeDefined();
@@ -103,7 +103,7 @@ describe('ListFrameworkHistory', () => {
     const repo = makeRepo([
       { id: 'x', timestamp: 't', changeNote: undefined, source: 'edit', restoreOfRowKey: undefined, contentBytes: 5 },
     ]);
-    const uc = new ListFrameworkHistory({ frameworkRepository: repo });
+    const uc = new ListInstructionsHistory({ instructionsRepository: repo });
 
     const result = await uc.execute();
 
