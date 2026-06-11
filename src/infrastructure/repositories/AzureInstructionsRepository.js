@@ -1,23 +1,26 @@
 /**
- * Azure Framework Repository
+ * Azure Instructions Repository
  *
- * Implementation of IFrameworkRepository using Azure Table Storage.
- * Owns the `portfolioFrameworkHistory` table; reads/writes one specific row
- * of `portfolioSettings` (rowKey 'analysis.strategicFrameworkV1') to keep
- * the active framework where GenerateWeeklyAnalysis already reads from.
+ * Implementation of IInstructionsRepository using Azure Table Storage.
+ * Owns the `portfolioInstructionsHistory` table; reads/writes one specific
+ * row of `portfolioSettings` (rowKey 'analysis.instructionsV1') which holds
+ * the active instructions document GenerateWeeklyAnalysis uses verbatim.
  *
- * Feature: 004-editable-strategic-framework.
+ * Feature: 005-editable-metaprompt. New storage (table + settings key) per
+ * research.md R1 so history starts fresh; feature 004's
+ * `portfolioFrameworkHistory` / `analysis.strategicFrameworkV1` are left in
+ * place, orphaned and non-destructively.
  */
 
-const IFrameworkRepository = require('../../application/interfaces/IFrameworkRepository');
-const FrameworkHistoryEntry = require('../../domain/entities/FrameworkHistoryEntry');
+const IInstructionsRepository = require('../../application/interfaces/IInstructionsRepository');
+const InstructionsHistoryEntry = require('../../domain/entities/InstructionsHistoryEntry');
 const logger = require('../../shared/logging');
 
 const SETTINGS_PARTITION = 'settings';
-const SETTINGS_ROWKEY = 'analysis.strategicFrameworkV1';
-const HISTORY_PARTITION = 'framework';
+const SETTINGS_ROWKEY = 'analysis.instructionsV1';
+const HISTORY_PARTITION = 'instructions';
 
-class AzureFrameworkRepository extends IFrameworkRepository {
+class AzureInstructionsRepository extends IInstructionsRepository {
   /**
    * @param {AzureTableDatabase} [database=null] - Database instance; lazy-created when null.
    */
@@ -58,30 +61,30 @@ class AzureFrameworkRepository extends IFrameworkRepository {
       if (error.statusCode === 404) {
         return null;
       }
-      logger.error('Failed to read active framework', error);
+      logger.error('Failed to read active instructions', error);
       throw error;
     }
   }
 
   /**
    * Append a new history row, then upsert the active settings row to point
-   * at it. See research.md R2 for failure-mode rationale.
+   * at it. See research.md R1/R2 for failure-mode rationale.
    *
    * @param {Object} input
    * @param {string} input.content
    * @param {string|null} [input.changeNote]
    * @param {'edit'|'restore'} input.source
    * @param {string|null} [input.restoreOfRowKey]
-   * @returns {Promise<FrameworkHistoryEntry>}
+   * @returns {Promise<InstructionsHistoryEntry>}
    */
   async saveActive({ content, changeNote = null, source, restoreOfRowKey = null }) {
     await this._ensureInitialized();
 
     const now = Date.now();
     const timestamp = new Date(now).toISOString();
-    const rowKey = FrameworkHistoryEntry.buildRowKey(now);
+    const rowKey = InstructionsHistoryEntry.buildRowKey(now);
 
-    const entry = new FrameworkHistoryEntry({
+    const entry = new InstructionsHistoryEntry({
       id: rowKey,
       content,
       timestamp,
@@ -106,9 +109,9 @@ class AzureFrameworkRepository extends IFrameworkRepository {
     }
 
     try {
-      await this._database.frameworkHistoryClient.createEntity(historyEntity);
+      await this._database.instructionsHistoryClient.createEntity(historyEntity);
     } catch (error) {
-      logger.error('Failed to write framework history entry', error);
+      logger.error('Failed to write instructions history entry', error);
       throw error;
     }
 
@@ -128,7 +131,7 @@ class AzureFrameworkRepository extends IFrameworkRepository {
     } catch (error) {
       // Orphan-history scenario: history row exists but settings row is not
       // pointing at it. Caller surfaces as 500; next save reconciles.
-      logger.error('Failed to update active framework settings row', error);
+      logger.error('Failed to update active instructions settings row', error);
       throw error;
     }
 
@@ -146,7 +149,7 @@ class AzureFrameworkRepository extends IFrameworkRepository {
     const out = [];
 
     try {
-      for await (const entity of this._database.frameworkHistoryClient.listEntities({
+      for await (const entity of this._database.instructionsHistoryClient.listEntities({
         queryOptions: { filter: `PartitionKey eq '${HISTORY_PARTITION}'` },
       })) {
         // RowKey encoding (research R1) means natural sort = newest first.
@@ -164,21 +167,21 @@ class AzureFrameworkRepository extends IFrameworkRepository {
       }
       return out;
     } catch (error) {
-      logger.error('Failed to list framework history', error);
+      logger.error('Failed to list instructions history', error);
       throw error;
     }
   }
 
   /**
    * @param {string} rowKey
-   * @returns {Promise<FrameworkHistoryEntry|null>}
+   * @returns {Promise<InstructionsHistoryEntry|null>}
    */
   async getHistoryEntry(rowKey) {
     await this._ensureInitialized();
 
     try {
-      const entity = await this._database.frameworkHistoryClient.getEntity(HISTORY_PARTITION, rowKey);
-      return new FrameworkHistoryEntry({
+      const entity = await this._database.instructionsHistoryClient.getEntity(HISTORY_PARTITION, rowKey);
+      return new InstructionsHistoryEntry({
         id: entity.rowKey,
         content: entity.content,
         timestamp: entity.timestamp,
@@ -190,10 +193,10 @@ class AzureFrameworkRepository extends IFrameworkRepository {
       if (error.statusCode === 404) {
         return null;
       }
-      logger.error(`Failed to fetch framework history entry: ${rowKey}`, error);
+      logger.error(`Failed to fetch instructions history entry: ${rowKey}`, error);
       throw error;
     }
   }
 }
 
-module.exports = AzureFrameworkRepository;
+module.exports = AzureInstructionsRepository;

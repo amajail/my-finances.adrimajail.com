@@ -1,12 +1,12 @@
 /**
- * RestoreFrameworkVersion Use Case
+ * RestoreInstructionsVersion Use Case
  *
- * Promotes a past history entry's content to the new active framework by
- * delegating to SaveFramework with source='restore' and a restoreOfRowKey
- * pointing at the original entry. Append-only — the original entry is
- * never mutated.
+ * Promotes a past history entry's content to the new active instructions
+ * document by delegating to SaveInstructions with source='restore' and a
+ * restoreOfRowKey pointing at the original entry. Append-only — the original
+ * entry is never mutated.
  *
- * Feature: 004-editable-strategic-framework (spec FR-008).
+ * Feature: 005-editable-metaprompt (spec FR-011).
  */
 
 const UseCase = require('../UseCase');
@@ -15,16 +15,16 @@ const logger = require('../../../shared/logging');
 
 const MAX_CHANGE_NOTE = 280;
 
-class RestoreFrameworkVersion extends UseCase {
+class RestoreInstructionsVersion extends UseCase {
   /**
    * @param {Object} deps
-   * @param {IFrameworkRepository} deps.frameworkRepository
-   * @param {SaveFramework} deps.saveFramework - Shared SaveFramework instance.
+   * @param {IInstructionsRepository} deps.instructionsRepository
+   * @param {SaveInstructions} deps.saveInstructions - Shared SaveInstructions instance.
    */
-  constructor({ frameworkRepository, saveFramework }) {
+  constructor({ instructionsRepository, saveInstructions }) {
     super();
-    this._frameworkRepository = frameworkRepository;
-    this._saveFramework = saveFramework;
+    this._instructionsRepository = instructionsRepository;
+    this._saveInstructions = saveInstructions;
   }
 
   /**
@@ -50,9 +50,9 @@ class RestoreFrameworkVersion extends UseCase {
       }
     }
 
-    logger.debug('RestoreFrameworkVersion: executing', { rowKey });
+    logger.debug('RestoreInstructionsVersion: executing', { rowKey });
 
-    const target = await this._frameworkRepository.getHistoryEntry(rowKey);
+    const target = await this._instructionsRepository.getHistoryEntry(rowKey);
     if (!target) {
       throw new NotFoundError('history entry', rowKey);
     }
@@ -61,7 +61,7 @@ class RestoreFrameworkVersion extends UseCase {
       ? String(changeNote).trim()
       : `Restored from ${target.timestamp}`;
 
-    const saveResult = await this._saveFramework.execute({
+    const saveResult = await this._saveInstructions.execute({
       content: target.content,
       changeNote: effectiveNote,
       source: 'restore',
@@ -77,4 +77,4 @@ class RestoreFrameworkVersion extends UseCase {
   }
 }
 
-module.exports = RestoreFrameworkVersion;
+module.exports = RestoreInstructionsVersion;

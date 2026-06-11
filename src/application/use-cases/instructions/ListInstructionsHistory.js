@@ -1,12 +1,12 @@
 /**
- * ListFrameworkHistory Use Case
+ * ListInstructionsHistory Use Case
  *
- * Returns framework history rows in newest-first order. The repository
+ * Returns instructions history rows in newest-first order. The repository
  * already returns rows in that order (descending-timestamp rowKey, see
  * research R1) and replaces `content` with `contentBytes` to keep the
  * list payload small.
  *
- * Feature: 004-editable-strategic-framework (spec FR-006, FR-013).
+ * Feature: 005-editable-metaprompt (spec FR-008, FR-010).
  */
 
 const UseCase = require('../UseCase');
@@ -17,14 +17,14 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const MIN_LIMIT = 1;
 
-class ListFrameworkHistory extends UseCase {
+class ListInstructionsHistory extends UseCase {
   /**
    * @param {Object} deps
-   * @param {IFrameworkRepository} deps.frameworkRepository
+   * @param {IInstructionsRepository} deps.instructionsRepository
    */
-  constructor({ frameworkRepository }) {
+  constructor({ instructionsRepository }) {
     super();
-    this._frameworkRepository = frameworkRepository;
+    this._instructionsRepository = instructionsRepository;
   }
 
   /**
@@ -44,9 +44,9 @@ class ListFrameworkHistory extends UseCase {
       safeLimit = n;
     }
 
-    logger.debug('ListFrameworkHistory: executing', { limit: safeLimit });
+    logger.debug('ListInstructionsHistory: executing', { limit: safeLimit });
 
-    const rows = await this._frameworkRepository.listHistory({ limit: safeLimit });
+    const rows = await this._instructionsRepository.listHistory({ limit: safeLimit });
     const entries = rows.map((r) => ({
       rowKey: r.id,
       timestamp: r.timestamp,
@@ -60,4 +60,4 @@ class ListFrameworkHistory extends UseCase {
   }
 }
 
-module.exports = ListFrameworkHistory;
+module.exports = ListInstructionsHistory;

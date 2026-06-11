@@ -1,27 +1,31 @@
 /**
- * FrameworkHistoryEntry Entity
+ * InstructionsHistoryEntry Entity
  *
- * One immutable snapshot of the strategic framework prompt, recorded each
- * time the framework is saved through the UI (including restores).
+ * One immutable snapshot of the complete analysis instructions document
+ * (the AI system prompt), recorded each time the document is saved through
+ * the UI (including restores).
  *
- * Owned (created) by the SaveFramework use-case; queried back via
- * IFrameworkRepository. The active framework lives in `portfolioSettings`;
- * history rows live in `portfolioFrameworkHistory`.
+ * Owned (created) by the SaveInstructions use-case; queried back via
+ * IInstructionsRepository. The active document lives in `portfolioSettings`
+ * (rowKey 'analysis.instructionsV1'); history rows live in
+ * `portfolioInstructionsHistory`.
  *
- * Feature: 004-editable-strategic-framework (spec FR-005, FR-009, FR-017).
+ * Feature: 005-editable-metaprompt (spec FR-005, FR-006, FR-009). Supersedes
+ * feature 004's FrameworkHistoryEntry — the document is now the whole
+ * metaprompt, not just the framework slot, hence the larger byte cap.
  */
 
 const { ValidationError, DomainError } = require('../../shared/errors');
 
 const SOURCES = ['edit', 'restore'];
-const MAX_BYTES = 61440; // 60 KB UTF-8; comfortably under Azure Table 64 KB per-property cap.
+const MAX_BYTES = 262144; // 256 KB UTF-8 (FR-006); accommodates the merged metaprompt.
 const MAX_CHANGE_NOTE = 280;
 
-class FrameworkHistoryEntry {
+class InstructionsHistoryEntry {
   /**
    * @param {Object} data
    * @param {string} data.id - Stable identifier, doubles as storage RowKey.
-   * @param {string} data.content - Framework markdown (non-empty after trim, <= 60 KB UTF-8).
+   * @param {string} data.content - Instructions document (non-empty after trim, <= 256 KB UTF-8).
    * @param {string} data.timestamp - ISO 8601 timestamp set by the use-case.
    * @param {string|null} [data.changeNote] - Optional owner-supplied note.
    * @param {string} data.source - 'edit' | 'restore'.
@@ -75,7 +79,7 @@ class FrameworkHistoryEntry {
     if (errors.length > 0) {
       throw new DomainError(
         errors.join('; '),
-        { entity: 'FrameworkHistoryEntry', errors }
+        { entity: 'InstructionsHistoryEntry', errors }
       );
     }
   }
@@ -123,4 +127,4 @@ class FrameworkHistoryEntry {
 // keep the import even when unused locally to surface the symbol via require cache.
 void ValidationError;
 
-module.exports = FrameworkHistoryEntry;
+module.exports = InstructionsHistoryEntry;

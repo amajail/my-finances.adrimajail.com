@@ -1,24 +1,24 @@
 /**
  * GenerateWeeklyAnalysis Use Case
  *
- * The orchestrator for feature 002 (weekly rebalance analysis). Reads the
- * configured model / prompt-version / cost caps from settings; assembles the
- * inputs (current portfolio, prior week's analysis + snapshot, current
- * riesgo país); calls the LLM via ILLMClient; constructs a WeeklyAnalysis +
+ * The orchestrator for the weekly rebalance analysis (feature 002, extended by
+ * features 004 and 005). Reads the configured model / cost caps from settings;
+ * assembles the inputs (current portfolio, prior week's analysis + snapshot,
+ * current riesgo país); reads the active instructions document and uses it
+ * VERBATIM as the AI system prompt (feature 005 — no template file, no token
+ * substitution); calls the LLM via ILLMClient; constructs a WeeklyAnalysis +
  * SuggestedOrder[] from the result; persists via IAnalysisRepository.
  *
- * Failure handling (US3 in spec):
- *   - Riesgo-país unreachable, cost cap exceeded, LLM SDK error, or LLM
- *     schema validation failure → persist a `failed` WeeklyAnalysis row with
- *     a sanitized errorMessage. The snapshot is included if the portfolio
- *     was already assembled before the failure.
+ * Failure handling (US3 in spec 002):
+ *   - Riesgo-país unreachable, instructions not configured, cost cap exceeded,
+ *     LLM SDK error, or LLM schema validation failure → persist a `failed`
+ *     WeeklyAnalysis row with a sanitized errorMessage. The snapshot is
+ *     included if the portfolio was already assembled before the failure.
  *
  * Reuses GetPortfolioSummary (feature 001) for the portfolio + MEP + price
  * inputs. NEVER logs the prompt body or response body (FR-026 / FR-029).
  */
 
-const fs = require('fs');
-const path = require('path');
 const UseCase = require('../UseCase');
 const WeeklyAnalysis = require('../../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../../domain/entities/SuggestedOrder');
@@ -32,9 +32,15 @@ const {
 
 const TOOL_SCHEMA = require('../../../../specs/002-weekly-rebalance-analysis/contracts/submit-analysis-tool.json');
 
+// Feature 005 retired the `analysis.promptVersion` template-file selector
+// (FR-019). The instructions document is now the single source of the system
+// prompt; analyses are traced by their instructions-version reference. This
+// constant is stamped on every row purely to satisfy WeeklyAnalysis's required
+// `promptVersion` field and to mark which prompt-assembly regime produced it.
+const INSTRUCTIONS_PROMPT_VERSION = 'editable-instructions-v1';
+
 const DEFAULTS = {
   model: 'claude-opus-4-7',
-  promptVersion: 'weekly-rebalance-v1',
   maxInputTokens: 80000,
   maxOutputTokens: 8000,
 };
@@ -42,18 +48,16 @@ const DEFAULTS = {
 class GenerateWeeklyAnalysis extends UseCase {
   /**
    * @param {Object} deps
-   * @param {IAnalysisRepository}    deps.analysisRepository
+   * @param {IAnalysisRepository}     deps.analysisRepository
    * @param {ILLMClient}              deps.llmClient
    * @param {IRiesgoPaisProvider}     deps.riesgoPaisProvider
    * @param {Object}                  deps.getPortfolioSummary - GetPortfolioSummary use-case instance
    * @param {ISettingsRepository}     deps.settingsRepository
-   * @param {IFrameworkRepository}    [deps.frameworkRepository] - Feature 004 (optional).
-   *   When provided, the framework content + historyRowKey are read in a
-   *   single call via getActive() — preserving snapshot-at-start (FR-014) and
-   *   enabling the analysis row to be linked to its source framework version
-   *   (FR-015). When absent, falls back to the legacy settingsRepository read
-   *   path and frameworkHistoryRowKey on the persisted analysis stays null.
-   * @param {Function}                [deps.loadPrompt] - (version: string) => string (injectable for tests)
+   * @param {IInstructionsRepository} deps.instructionsRepository - Feature 005.
+   *   The active instructions document is read here (content + historyRowKey in
+   *   a single call) and used VERBATIM as the system prompt. The historyRowKey
+   *   is snapshotted at run start (FR-012) and stamped onto the analysis row so
+   *   it links to the exact instructions version that produced it (FR-013).
    * @param {Function}                [deps.clock]      - () => Date (injectable for tests)
    * @param {Object}                  [deps.toolSchema] - override for tests
    */
@@ -63,8 +67,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     riesgoPaisProvider,
     getPortfolioSummary,
     settingsRepository,
-    frameworkRepository = null,
-    loadPrompt = null,
+    instructionsRepository,
     clock = () => new Date(),
     toolSchema = TOOL_SCHEMA,
   }) {
@@ -74,8 +77,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     this._riesgoPaisProvider = riesgoPaisProvider;
     this._getPortfolioSummary = getPortfolioSummary;
     this._settingsRepository = settingsRepository;
-    this._frameworkRepository = frameworkRepository;
-    this._loadPrompt = loadPrompt || this._defaultLoadPrompt;
+    this._instructionsRepository = instructionsRepository;
     this._clock = clock;
     this._toolSchema = toolSchema;
   }
@@ -89,10 +91,10 @@ class GenerateWeeklyAnalysis extends UseCase {
     const startedAt = this._clock();
     const targetDate = input.targetDate || this._toIsoDate(startedAt);
 
-    // 1. Load settings (with defaults if missing).
-    const [model, promptVersion, maxInputTokens, maxOutputTokens] = await Promise.all([
+    // 1. Load settings (with defaults if missing). promptVersion is retired
+    //    (feature 005, FR-019) — the instructions document is the system prompt.
+    const [model, maxInputTokens, maxOutputTokens] = await Promise.all([
       this._getSetting('analysis.model', DEFAULTS.model),
-      this._getSetting('analysis.promptVersion', DEFAULTS.promptVersion),
       this._getSettingNumber('analysis.maxInputTokens', DEFAULTS.maxInputTokens),
       this._getSettingNumber('analysis.maxOutputTokens', DEFAULTS.maxOutputTokens),
     ]);
@@ -101,9 +103,10 @@ class GenerateWeeklyAnalysis extends UseCase {
     let portfolioSnapshot = [];
     let portfolioSummary = null;
     let riesgoReading = null;
-    // Feature 004: captured at the moment we read the framework, then stamped
-    // onto every WeeklyAnalysis written by this run (snapshot-at-start, FR-014).
-    let frameworkHistoryRowKey = null;
+    // Feature 005: captured at the moment we read the instructions document,
+    // then stamped onto every WeeklyAnalysis written by this run
+    // (snapshot-at-start, FR-012).
+    let instructionsHistoryRowKey = null;
 
     try {
       // 2. Current portfolio.
@@ -119,7 +122,6 @@ class GenerateWeeklyAnalysis extends UseCase {
             targetDate,
             startedAt,
             model,
-            promptVersion,
             portfolioSnapshot,
             errorMessage: `riesgo-pais source unreachable: ${err.message}`,
           });
@@ -130,46 +132,31 @@ class GenerateWeeklyAnalysis extends UseCase {
       // 4. Previous week's analysis (if any).
       const previousAnalysis = await this._loadPreviousAnalysis(targetDate);
 
-      // 5. Strategic framework (the owner's personal content — bucket→symbol
-      // mappings, targets, deploy priorities, standing directives). Lives in
-      // settings, NOT in the prompt template file, so it never enters git.
-      //
-      // Feature 004: when a frameworkRepository is wired (production path),
-      // we read content + historyRowKey in a single call so the resulting
-      // analysis row can be linked back to the exact framework version that
-      // produced it (FR-015). The legacy settings-only path stays around as
-      // a fallback so existing unit tests that don't inject the new dep
-      // still work — those analyses get frameworkHistoryRowKey: null.
-      const frameworkKey = `analysis.strategicFrameworkV1`;
-      let strategicFramework = '';
-      if (this._frameworkRepository) {
-        const active = await this._frameworkRepository.getActive();
-        strategicFramework = active && typeof active.content === 'string'
-          ? active.content.trim()
-          : '';
-        frameworkHistoryRowKey = active ? (active.historyRowKey || null) : null;
-      } else {
-        const frameworkValue = await this._readSettingRaw(frameworkKey);
-        strategicFramework = typeof frameworkValue === 'string'
-          ? frameworkValue.trim()
-          : '';
-        // No repository available → no historyRowKey is known. Leave null.
-      }
-      if (!strategicFramework) {
+      // 5. Active instructions document (feature 005). This is the COMPLETE AI
+      //    system prompt — the former fixed instructions merged with the
+      //    owner's framework — edited as one document and used verbatim. It
+      //    lives in settings (never in git). We read content + historyRowKey in
+      //    a single call so the resulting analysis row links to the exact
+      //    instructions version that produced it (FR-012/FR-013).
+      const active = await this._instructionsRepository.getActive();
+      const instructionsContent = active && typeof active.content === 'string' ? active.content : '';
+      instructionsHistoryRowKey = active ? (active.historyRowKey || null) : null;
+      if (!instructionsContent.trim()) {
         return await this._persistFailed({
           targetDate,
           startedAt,
           model,
-          promptVersion,
           portfolioSnapshot,
           riesgoReading,
-          frameworkHistoryRowKey,
-          errorMessage: `strategic framework not configured: set portfolioSettings row "${frameworkKey}" to your framework markdown (see scripts/seed-analysis-framework.example.md)`,
+          instructionsHistoryRowKey,
+          errorMessage: 'instructions not configured: save an active instructions document in the dashboard (Instructions) before running the analysis',
         });
       }
 
-      // 6. Render the prompt: load the generic template and splice the framework.
-      const systemPrompt = this._renderSystemPrompt(promptVersion, strategicFramework);
+      // 6. Assemble the prompt. The instructions document IS the system prompt
+      //    verbatim — no token substitution (FR-003, FR-004). Live data is
+      //    delivered separately in the user message, unchanged.
+      const systemPrompt = instructionsContent;
       const userMessage = this._buildUserMessage({
         generatedAt: startedAt.toISOString(),
         portfolioSummary,
@@ -194,10 +181,9 @@ class GenerateWeeklyAnalysis extends UseCase {
             targetDate,
             startedAt,
             model,
-            promptVersion,
             portfolioSnapshot,
             riesgoReading,
-            frameworkHistoryRowKey,
+            instructionsHistoryRowKey,
             errorMessage: `cost cap exceeded: ${err.message}`,
           });
         }
@@ -206,10 +192,9 @@ class GenerateWeeklyAnalysis extends UseCase {
             targetDate,
             startedAt,
             model,
-            promptVersion,
             portfolioSnapshot,
             riesgoReading,
-            frameworkHistoryRowKey,
+            instructionsHistoryRowKey,
             errorMessage: `tool_use schema validation failed: ${err.message}`,
           });
         }
@@ -219,10 +204,9 @@ class GenerateWeeklyAnalysis extends UseCase {
             targetDate,
             startedAt,
             model,
-            promptVersion,
             portfolioSnapshot,
             riesgoReading,
-            frameworkHistoryRowKey,
+            instructionsHistoryRowKey,
             errorMessage: `LLM request failed: ${sanitized.message}`,
           });
         }
@@ -233,10 +217,9 @@ class GenerateWeeklyAnalysis extends UseCase {
           targetDate,
           startedAt,
           model,
-          promptVersion,
           portfolioSnapshot,
           riesgoReading,
-          frameworkHistoryRowKey,
+          instructionsHistoryRowKey,
           errorMessage: `unexpected error: ${errType}: ${errMsg}`,
         });
         throw err;
@@ -248,7 +231,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         status: 'completed',
         generatedAt: startedAt,
         modelUsed: model,
-        promptVersion,
+        promptVersion: INSTRUCTIONS_PROMPT_VERSION,
         summary: llmResult.summary,
         markdownBody: llmResult.markdownBody,
         riesgoPaisBp: riesgoReading.basisPoints,
@@ -258,7 +241,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         tokensOut: llmResult.usage.outputTokens,
         costUsd: llmResult.usage.costUsd,
         durationMs: this._clock().getTime() - startedAt.getTime(),
-        frameworkHistoryRowKey,
+        instructionsHistoryRowKey,
       });
 
       const orders = (llmResult.orders || []).map((o, idx) => new SuggestedOrder({
@@ -279,13 +262,13 @@ class GenerateWeeklyAnalysis extends UseCase {
       logger.info('GenerateWeeklyAnalysis: completed', {
         date: targetDate,
         model,
-        promptVersion,
         tokensIn: analysis.tokensIn,
         tokensOut: analysis.tokensOut,
         costUsd: analysis.costUsd,
         orderCount: orders.length,
         durationMs: analysis.durationMs,
         riesgoPaisBp: analysis.riesgoPaisBp,
+        instructionsHistoryRowKey,
       });
 
       return analysis;
@@ -300,13 +283,13 @@ class GenerateWeeklyAnalysis extends UseCase {
 
   // ==================== Helpers ====================
 
-  async _persistFailed({ targetDate, startedAt, model, promptVersion, portfolioSnapshot, riesgoReading, errorMessage, frameworkHistoryRowKey = null }) {
+  async _persistFailed({ targetDate, startedAt, model, portfolioSnapshot, riesgoReading, errorMessage, instructionsHistoryRowKey = null }) {
     const failed = new WeeklyAnalysis({
       date: targetDate,
       status: 'failed',
       generatedAt: startedAt,
       modelUsed: model,
-      promptVersion,
+      promptVersion: INSTRUCTIONS_PROMPT_VERSION,
       portfolioSnapshot,
       riesgoPaisBp: riesgoReading ? riesgoReading.basisPoints : null,
       riesgoPaisAsOf: riesgoReading ? riesgoReading.asOf : null,
@@ -315,7 +298,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       costUsd: 0,
       durationMs: this._clock().getTime() - startedAt.getTime(),
       errorMessage,
-      frameworkHistoryRowKey,
+      instructionsHistoryRowKey,
     });
     await this._analysisRepository.upsert(failed, []);
     logger.warn('GenerateWeeklyAnalysis: failed', {
@@ -407,32 +390,6 @@ class GenerateWeeklyAnalysis extends UseCase {
     return defaultValue;
   }
 
-  /**
-   * Like _getSetting but returns the raw setting object (or null) without
-   * falling back to a default. Used for the strategic framework, where a
-   * missing value must surface as a `failed` run (not silently default).
-   * @private
-   */
-  async _readSettingRaw(key) {
-    try {
-      return await this._settingsRepository.get(key);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /**
-   * Load the prompt template file and splice {{strategicFramework}} with the
-   * owner's framework markdown (which lives in portfolioSettings, never in
-   * the repo). Other slots like {{portfolioSummary}} are NOT substituted
-   * here — those go into the userMessage, not the system prompt.
-   * @private
-   */
-  _renderSystemPrompt(promptVersion, strategicFramework) {
-    const template = this._loadPrompt(promptVersion);
-    return template.replace(/\{\{strategicFramework\}\}/g, strategicFramework);
-  }
-
   async _getSettingNumber(key, defaultValue) {
     const raw = await this._getSetting(key, String(defaultValue));
     const n = parseInt(raw, 10);
@@ -441,11 +398,6 @@ class GenerateWeeklyAnalysis extends UseCase {
 
   _toIsoDate(date) {
     return date.toISOString().slice(0, 10);
-  }
-
-  _defaultLoadPrompt(version) {
-    const filePath = path.join(__dirname, 'prompts', `${version}.md`);
-    return fs.readFileSync(filePath, 'utf8');
   }
 }
 

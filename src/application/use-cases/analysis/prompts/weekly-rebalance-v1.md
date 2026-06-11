@@ -1,5 +1,13 @@
 # Weekly Portfolio Rebalance Analysis — Prompt Template v1
 
+> **⚠️ Seed source only (since feature 005-editable-metaprompt).** This file is
+> NO LONGER loaded at analysis runtime. The AI system prompt is now the editable
+> "Instructions" document (settings row `analysis.instructionsV1`), used verbatim.
+> This template is retained solely as the input to
+> `scripts/seed-instructions-from-framework.js`, which renders it ⊕ the live
+> framework into the initial instructions version. `analysis.promptVersion` and
+> per-version template files are retired (FR-019).
+>
 > **Version**: `weekly-rebalance-v1`. Stamped onto every `WeeklyAnalysis` row that uses this template. Edits to THIS FILE create a new version (`weekly-rebalance-v2.md`) — do not modify it once it has shipped a run.
 >
 > **Privacy boundary**: this file is generic and committable. The owner's actual strategic framework (bucket→symbol mappings, target allocations, deploy priorities, standing directives, position-level conventions) lives in a `portfolioSettings` row under key `analysis.strategicFrameworkV1` and is **injected at runtime** at the `{{strategicFramework}}` slot below. The file is never personalized.

@@ -1,13 +1,13 @@
 /**
- * SaveFramework use-case tests.
+ * SaveInstructions use-case tests.
  *
  * Feature: 004-editable-strategic-framework.
  * Covers FR-004 (empty rejection), FR-011 (no-op detection),
- * FR-017 (60 KB cap), and validates source/restoreOfRowKey wiring.
+ * FR-017 (256 KB cap), and validates source/restoreOfRowKey wiring.
  */
 
-const SaveFramework = require('../../../../../src/application/use-cases/framework/SaveFramework');
-const FrameworkHistoryEntry = require('../../../../../src/domain/entities/FrameworkHistoryEntry');
+const SaveInstructions = require('../../../../../src/application/use-cases/instructions/SaveInstructions');
+const InstructionsHistoryEntry = require('../../../../../src/domain/entities/InstructionsHistoryEntry');
 const { ValidationError } = require('../../../../../src/shared/errors');
 
 function makeRepo({
@@ -17,7 +17,7 @@ function makeRepo({
   return {
     getActive: jest.fn(async () => active),
     saveActive: jest.fn(async (input) => {
-      return savedEntry || new FrameworkHistoryEntry({
+      return savedEntry || new InstructionsHistoryEntry({
         id: '8000000000000-aaaa',
         content: input.content,
         timestamp: '2026-05-17T14:02:03.456Z',
@@ -31,12 +31,12 @@ function makeRepo({
   };
 }
 
-describe('SaveFramework', () => {
+describe('SaveInstructions', () => {
   it('persists a new edit and returns the history rowKey', async () => {
     const repo = makeRepo({
       active: { content: 'old content', historyRowKey: '9000000000000-1111', updatedAt: '2026-05-10T00:00:00Z' },
     });
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     const result = await uc.execute({ content: 'new content', changeNote: 'bumped target' });
 
@@ -56,7 +56,7 @@ describe('SaveFramework', () => {
 
   it('rejects empty content with ValidationError (FR-004)', async () => {
     const repo = makeRepo();
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     await expect(uc.execute({ content: '' })).rejects.toBeInstanceOf(ValidationError);
     await expect(uc.execute({ content: '' })).rejects.toThrow(/content is required/);
@@ -65,25 +65,25 @@ describe('SaveFramework', () => {
 
   it('rejects whitespace-only content', async () => {
     const repo = makeRepo();
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     await expect(uc.execute({ content: '   \n\n  ' })).rejects.toThrow(/content is required/);
     expect(repo.saveActive).not.toHaveBeenCalled();
   });
 
-  it('rejects content over the 60 KB cap (FR-017)', async () => {
+  it('rejects content over the 256 KB cap (FR-017)', async () => {
     const repo = makeRepo();
-    const uc = new SaveFramework({ frameworkRepository: repo });
-    const tooBig = 'a'.repeat(FrameworkHistoryEntry.MAX_BYTES + 1);
+    const uc = new SaveInstructions({ instructionsRepository: repo });
+    const tooBig = 'a'.repeat(InstructionsHistoryEntry.MAX_BYTES + 1);
 
-    await expect(uc.execute({ content: tooBig })).rejects.toThrow(/exceeds maximum size of 61440 bytes/);
+    await expect(uc.execute({ content: tooBig })).rejects.toThrow(/exceeds maximum size of 262144 bytes/);
     expect(repo.saveActive).not.toHaveBeenCalled();
   });
 
-  it('accepts content at the 60 KB boundary', async () => {
+  it('accepts content at the 256 KB boundary', async () => {
     const repo = makeRepo({ active: null });
-    const uc = new SaveFramework({ frameworkRepository: repo });
-    const justRight = 'a'.repeat(FrameworkHistoryEntry.MAX_BYTES);
+    const uc = new SaveInstructions({ instructionsRepository: repo });
+    const justRight = 'a'.repeat(InstructionsHistoryEntry.MAX_BYTES);
 
     await expect(uc.execute({ content: justRight })).resolves.toEqual(expect.objectContaining({ noop: false }));
     expect(repo.saveActive).toHaveBeenCalledTimes(1);
@@ -97,7 +97,7 @@ describe('SaveFramework', () => {
         updatedAt: '2026-05-10T00:00:00Z',
       },
     });
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     const result = await uc.execute({ content: 'same content' });
 
@@ -117,7 +117,7 @@ describe('SaveFramework', () => {
         updatedAt: '2026-05-10T00:00:00Z',
       },
     });
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     // CRLF-only diff + trailing whitespace → still a no-op.
     const result = await uc.execute({ content: '  line1\r\nline2\r\n  ' });
@@ -128,7 +128,7 @@ describe('SaveFramework', () => {
 
   it('normalizes empty-after-trim changeNote to null', async () => {
     const repo = makeRepo({ active: null });
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     await uc.execute({ content: 'new', changeNote: '   ' });
 
@@ -139,7 +139,7 @@ describe('SaveFramework', () => {
 
   it('rejects changeNote over 280 characters', async () => {
     const repo = makeRepo();
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     await expect(uc.execute({
       content: 'new',
@@ -150,7 +150,7 @@ describe('SaveFramework', () => {
 
   it('passes source=restore and restoreOfRowKey through to the repo', async () => {
     const repo = makeRepo({ active: null });
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     await uc.execute({
       content: 'restored content',
@@ -169,7 +169,7 @@ describe('SaveFramework', () => {
 
   it('ignores restoreOfRowKey when source is edit', async () => {
     const repo = makeRepo({ active: null });
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     await uc.execute({
       content: 'edit content',
@@ -186,7 +186,7 @@ describe('SaveFramework', () => {
 
   it('first save when no active framework exists succeeds', async () => {
     const repo = makeRepo({ active: null });
-    const uc = new SaveFramework({ frameworkRepository: repo });
+    const uc = new SaveInstructions({ instructionsRepository: repo });
 
     const result = await uc.execute({ content: 'first save' });
 

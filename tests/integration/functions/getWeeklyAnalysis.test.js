@@ -66,6 +66,7 @@ describe('GET /api/analysis/weekly/{date}', () => {
       riesgoPaisAsOf: '2026-05-15',
       portfolioSnapshot: [],
       tokensIn: 12000, tokensOut: 1500, costUsd: 0.30, durationMs: 45000,
+      instructionsHistoryRowKey: '8284000000000-aaaa',
     });
     const orders = [
       new SuggestedOrder({
@@ -94,6 +95,8 @@ describe('GET /api/analysis/weekly/{date}', () => {
     expect(res.jsonBody.summary).toContain('Executive summary');
     expect(res.jsonBody.markdownBody).toContain(longBody.slice(0, 30));
     expect(res.jsonBody.riesgoPaisBp).toBe(524);
+    // Feature 005 (FR-013): the instructions version that produced the run.
+    expect(res.jsonBody.instructionsHistoryRowKey).toBe('8284000000000-aaaa');
     expect(res.jsonBody.orders).toHaveLength(2);
     expect(res.jsonBody.orders[0]).toEqual(expect.objectContaining({
       index: 0, broker: 'ibkr', symbol: 'BRK.B', side: 'buy', quantity: 5,
