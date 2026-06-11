@@ -121,18 +121,22 @@ dashboard mirrors it in the byte counter and validation message.
 
 **Rationale**: The merged document (fixed instructions + framework) is materially
 larger than the framework alone; the clarified cap is 256 KB. UTF-8 byte length
-(not character count) matches 004's enforcement and Azure's per-property limits
-(a single string property tolerates up to 32 KB per *value chunk* but the
-`@azure/data-tables` client transparently handles the property; 256 KB is well
-within a single entity's 1 MB cap). Validation message states the limit and the
-actual size, per FR-006.
+(not character count) matches 004's enforcement. Validation message states the
+limit and the actual size, per FR-006.
 
-**Note**: 256 KB < Azure Table Storage's 1 MB per-entity limit and < 64 KB only
-if stored as a single non-string... — confirmed the existing implementation
-stores `content` as a plain string property which Azure permits up to the entity
-size budget; 004 already stored up to 60 KB this way without chunking, so 256 KB
-remains a single-property write. (If a future provider rejects >64 KB string
-properties, the fallback is to chunk; not needed for Azure Tables today.)
+**Storage correction — chunking required (implementation finding).** Azure Table
+Storage caps a **single string property at 64 KB** (32K UTF-16 characters), *not*
+the 1 MB per-entity limit. Feature 004's ≤60 KB framework fit in one `value`/
+`content` property; a 256 KB document does **not** and a single-property write
+fails with `PropertyValueTooLarge`. The repository therefore **chunks** the
+document across `content`, `content1`, … (and `value`, `value1`, … on the active
+settings row) with a `…Chunks` count, splitting on 32000-char boundaries (JS
+string length = UTF-16 code units, matching Azure's character limit; safely under
+32768). Worst case (ASCII 256 KB) → 9 chunks ≈ 576 KB UTF-16, well under the 1 MB
+/ 252-property per-entity limits. Reads reassemble; reads are bounded by the
+current `…Chunks` count so a Merge-updated settings row never returns stale higher
+chunks; rows without a count fall back to the plain property (back-compat). See
+`AzureInstructionsRepository` `setChunked`/`getChunked` and its unit test.
 
 ---
 

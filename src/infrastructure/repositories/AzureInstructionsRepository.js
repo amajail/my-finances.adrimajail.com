@@ -20,6 +20,52 @@ const SETTINGS_PARTITION = 'settings';
 const SETTINGS_ROWKEY = 'analysis.instructionsV1';
 const HISTORY_PARTITION = 'instructions';
 
+// Azure Table Storage caps a single string property at 64 KB (32K UTF-16
+// characters). The instructions document can be up to 256 KB UTF-8 (FR-006),
+// so `content`/`value` are split across `<base>`, `<base>1`, `<base>2`, … with
+// a `<base>Chunks` count, and reassembled on read. JS string length counts
+// UTF-16 code units, matching Azure's character limit; 32000 stays safely under
+// the 32768 cap. Worst case (ASCII) 256 KB → 9 chunks, well under the 1 MB /
+// 252-property per-entity limits.
+const CHUNK_CHARS = 32000;
+
+function splitIntoChunks(str) {
+  const s = typeof str === 'string' ? str : '';
+  const chunks = [];
+  for (let i = 0; i < s.length; i += CHUNK_CHARS) {
+    chunks.push(s.slice(i, i + CHUNK_CHARS));
+  }
+  return chunks.length ? chunks : [''];
+}
+
+/** Write `content` across `<base>`, `<base>1`, … and set `<base>Chunks`. */
+function setChunked(entity, base, content) {
+  const chunks = splitIntoChunks(content);
+  entity[base] = chunks[0];
+  for (let i = 1; i < chunks.length; i += 1) {
+    entity[`${base}${i}`] = chunks[i];
+  }
+  entity[`${base}Chunks`] = chunks.length;
+}
+
+/**
+ * Reassemble a chunked value. Back-compatible: rows without `<base>Chunks`
+ * (e.g. legacy single-property writes) return the plain `<base>` value. On a
+ * Merge-updated settings row, stale higher chunks from a longer prior value are
+ * ignored because the read is bounded by the current `<base>Chunks` count.
+ */
+function getChunked(entity, base) {
+  const count = Number(entity[`${base}Chunks`]) || 0;
+  if (count <= 1) {
+    return typeof entity[base] === 'string' ? entity[base] : '';
+  }
+  let out = typeof entity[base] === 'string' ? entity[base] : '';
+  for (let i = 1; i < count; i += 1) {
+    out += typeof entity[`${base}${i}`] === 'string' ? entity[`${base}${i}`] : '';
+  }
+  return out;
+}
+
 class AzureInstructionsRepository extends IInstructionsRepository {
   /**
    * @param {AzureTableDatabase} [database=null] - Database instance; lazy-created when null.
@@ -53,7 +99,7 @@ class AzureInstructionsRepository extends IInstructionsRepository {
         SETTINGS_ROWKEY
       );
       return {
-        content: typeof entity.value === 'string' ? entity.value : '',
+        content: getChunked(entity, 'value'),
         historyRowKey: entity.historyRowKey || null,
         updatedAt: entity.updatedAt || null,
       };
@@ -93,14 +139,15 @@ class AzureInstructionsRepository extends IInstructionsRepository {
       restoreOfRowKey: source === 'restore' ? restoreOfRowKey : null,
     });
 
-    // 1) Write the history row first.
+    // 1) Write the history row first. `content` is chunked across properties to
+    //    stay under Azure's 64 KB per-property cap.
     const historyEntity = {
       partitionKey: HISTORY_PARTITION,
       rowKey: entry.id,
-      content: entry.content,
       timestamp: entry.timestamp,
       source: entry.source,
     };
+    setChunked(historyEntity, 'content', entry.content);
     if (entry.changeNote !== null) {
       historyEntity.changeNote = entry.changeNote;
     }
@@ -118,16 +165,14 @@ class AzureInstructionsRepository extends IInstructionsRepository {
     // 2) Upsert the active settings row to point at the new history row.
     //    Merge mode preserves any unrelated properties on the settings row.
     try {
-      await this._database.settingsClient.upsertEntity(
-        {
-          partitionKey: SETTINGS_PARTITION,
-          rowKey: SETTINGS_ROWKEY,
-          value: entry.content,
-          historyRowKey: entry.id,
-          updatedAt: entry.timestamp,
-        },
-        'Merge'
-      );
+      const settingsEntity = {
+        partitionKey: SETTINGS_PARTITION,
+        rowKey: SETTINGS_ROWKEY,
+        historyRowKey: entry.id,
+        updatedAt: entry.timestamp,
+      };
+      setChunked(settingsEntity, 'value', entry.content);
+      await this._database.settingsClient.upsertEntity(settingsEntity, 'Merge');
     } catch (error) {
       // Orphan-history scenario: history row exists but settings row is not
       // pointing at it. Caller surfaces as 500; next save reconciles.
@@ -159,7 +204,7 @@ class AzureInstructionsRepository extends IInstructionsRepository {
           changeNote: entity.changeNote || null,
           source: entity.source || 'edit',
           restoreOfRowKey: entity.restoreOfRowKey || null,
-          contentBytes: Buffer.byteLength(entity.content || '', 'utf8'),
+          contentBytes: Buffer.byteLength(getChunked(entity, 'content'), 'utf8'),
         });
         if (out.length >= safeLimit) {
           break;
@@ -183,7 +228,7 @@ class AzureInstructionsRepository extends IInstructionsRepository {
       const entity = await this._database.instructionsHistoryClient.getEntity(HISTORY_PARTITION, rowKey);
       return new InstructionsHistoryEntry({
         id: entity.rowKey,
-        content: entity.content,
+        content: getChunked(entity, 'content'),
         timestamp: entity.timestamp,
         changeNote: entity.changeNote || null,
         source: entity.source || 'edit',

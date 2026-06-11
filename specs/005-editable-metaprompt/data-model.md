@@ -75,7 +75,7 @@ alongside the other tables. Structurally identical to 004's
 |---|---|---|---|
 | `PartitionKey` | string | constant `'instructions'` | Single partition; small row count. |
 | `RowKey` | string | `id` | `<descTimestamp>-<nonce>`. |
-| `content` | string | `content` | Up to 256 KB UTF-8; single-property write (well under Azure's 1 MB per-entity cap). |
+| `content` (+ `content1`, `content2`, …, `contentChunks`) | string(s) + int | `content` | Up to 256 KB UTF-8. **Chunked** across ≤32000-char properties because Azure caps a single string property at 64 KB; reassembled on read. See research R4. |
 | `timestamp` | string (ISO 8601) | `timestamp` | Application-controlled, clock-skew-safe. |
 | `changeNote` | string \| absent | `changeNote` | Omitted when `null`. |
 | `source` | string | `source` | `'edit'` or `'restore'`. |
@@ -97,7 +97,7 @@ New row: `PartitionKey = 'settings'`, `RowKey = 'analysis.instructionsV1'`.
 
 | Property | Storage type | Status | Notes |
 |---|---|---|---|
-| `value` | string | NEW | The active instructions document. `GenerateWeeklyAnalysis` reads it here and uses it verbatim as the system prompt (FR-004). |
+| `value` (+ `value1`, …, `valueChunks`) | string(s) + int | NEW | The active instructions document, **chunked** like `content` above (64 KB per-property cap). `GenerateWeeklyAnalysis` reads the reassembled value via the repository and uses it verbatim as the system prompt (FR-004). |
 | `historyRowKey` | string \| absent | NEW | `id` of the producing `InstructionsHistoryEntry`. |
 | `updatedAt` | string (ISO 8601) \| absent | NEW | When last upserted by the UI. |
 
