@@ -136,7 +136,7 @@ Web app: backend at `src/`, frontend at `dashboard/`, tests at `tests/` (repo ro
 - [X] T039 [P] Remove the superseded framework tests: `tests/integration/functions/framework.test.js`, `tests/unit/domain/entities/FrameworkHistoryEntry.test.js`, `tests/unit/application/use-cases/framework/`.
 - [X] T040 Confirm `analysis.promptVersion` and `prompts/${version}.md` are no longer read anywhere at runtime (`grep -r promptVersion src/`); keep `weekly-rebalance-v1.md` as the committed seed source only and add a header comment noting it is no longer loaded at runtime. (FR-019)
 - [X] T041 [P] Run the full Jest suite and `dashboard` build; fix any red (Constitution IV — no red on main).
-- [ ] T042 Execute `specs/005-editable-metaprompt/quickstart.md` end-to-end: seed, byte-for-byte check (SC-004), edit/save, size + empty + no-op rejections, history, restore, snapshot-at-start traceability, and "no instructions configured" failure.
+- [X] T042 Execute `specs/005-editable-metaprompt/quickstart.md` end-to-end: seed, byte-for-byte check (SC-004), edit/save, size + empty + no-op rejections, history, restore, snapshot-at-start traceability, and "no instructions configured" failure.
 
 ---
 
