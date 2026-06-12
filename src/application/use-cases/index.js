@@ -26,6 +26,7 @@ const GenerateWeeklyAnalysis = require('./analysis/GenerateWeeklyAnalysis');
 const SetOrderExecutionStatus = require('./analysis/SetOrderExecutionStatus');
 const GetSuggestionScorecard = require('./analysis/GetSuggestionScorecard');
 const GetMacroSeries = require('./analysis/GetMacroSeries');
+const GetPerformanceSeries = require('./analysis/GetPerformanceSeries');
 
 // Instructions use cases (feature 005)
 const {
@@ -52,6 +53,7 @@ module.exports = {
   SetOrderExecutionStatus,
   GetSuggestionScorecard,
   GetMacroSeries,
+  GetPerformanceSeries,
   GetActiveInstructions,
   SaveInstructions,
   ListInstructionsHistory,

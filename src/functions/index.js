@@ -16,4 +16,5 @@ require('./getWeeklyAnalysis');
 require('./setOrderExecutionStatus');
 require('./getSuggestionScorecard');
 require('./getMacroSeries');
+require('./getPerformanceSeries');
 require('./instructions');

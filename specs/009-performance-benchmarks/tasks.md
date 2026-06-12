@@ -28,7 +28,7 @@ Backend: `src/`. Dashboard: `dashboard/src/`. Tests: `tests/unit/`.
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Add a "Performance" navigation entry pointing to `/performance` in `dashboard/src/layouts/Layout.astro` (add `'performance'` to the `active` union and the nav list; page built in US1).
+- [x] T001 [P] Add a "Performance" navigation entry pointing to `/performance` in `dashboard/src/layouts/Layout.astro` (add `'performance'` to the `active` union and the nav list; page built in US1).
 
 ---
 
@@ -40,10 +40,10 @@ so US2 only fills in the fetch logic.
 
 **⚠️ CRITICAL**: Blocks the UI stories.
 
-- [ ] T002 [P] `GetPerformanceSeries` use-case in `src/application/use-cases/analysis/GetPerformanceSeries.js`: constructor takes `{ analysisRepository, fredProvider, inflationProvider }`. `execute({ weeks })` → `getLatest(weeks)` → ascending points `{ date, portfolioValueUsd (grandTotalUsd|null), mep:{value:mepRate, asOf, available} }` plus `sp500`/`usCpi`/`arCpi` slots as `{value:null,asOf:null,available:false}` for now; clamp `weeks` (default 60, 1–200); return `{ points, count, benchmarksAvailable }`.
-- [ ] T003 [P] Unit test `tests/unit/application/use-cases/analysis/GetPerformanceSeries.test.js`: ascending by date; portfolio value + MEP mapped from totals; `weeks` clamp; analyses with null totals tolerated; empty → `{ points: [], count: 0 }`.
-- [ ] T004 Wire `GetPerformanceSeries` into `src/application/use-cases/index.js` and `src/application/di/container.js` (`getGetPerformanceSeries()` — inject `analysisRepository`, a `FredProvider` with the key from `process.env['analysis.fredApiKey'] || FRED_API_KEY`, and `ArgentinaDatosInflationProvider`).
-- [ ] T005 `src/functions/getPerformanceSeries.js`: `GET /api/analysis/performance` (auth `function`, `?weeks=`), call the use-case, respond per contracts/api.md — AND register it in `src/functions/index.js` (the feature-007 registration guard test fails otherwise).
+- [x] T002 [P] `GetPerformanceSeries` use-case in `src/application/use-cases/analysis/GetPerformanceSeries.js`: constructor takes `{ analysisRepository, fredProvider, inflationProvider }`. `execute({ weeks })` → `getLatest(weeks)` → ascending points `{ date, portfolioValueUsd (grandTotalUsd|null), mep:{value:mepRate, asOf, available} }` plus `sp500`/`usCpi`/`arCpi` slots as `{value:null,asOf:null,available:false}` for now; clamp `weeks` (default 60, 1–200); return `{ points, count, benchmarksAvailable }`.
+- [x] T003 [P] Unit test `tests/unit/application/use-cases/analysis/GetPerformanceSeries.test.js`: ascending by date; portfolio value + MEP mapped from totals; `weeks` clamp; analyses with null totals tolerated; empty → `{ points: [], count: 0 }`.
+- [x] T004 Wire `GetPerformanceSeries` into `src/application/use-cases/index.js` and `src/application/di/container.js` (`getGetPerformanceSeries()` — inject `analysisRepository`, a `FredProvider` with the key from `process.env['analysis.fredApiKey'] || FRED_API_KEY`, and `ArgentinaDatosInflationProvider`).
+- [x] T005 `src/functions/getPerformanceSeries.js`: `GET /api/analysis/performance` (auth `function`, `?weeks=`), call the use-case, respond per contracts/api.md — AND register it in `src/functions/index.js` (the feature-007 registration guard test fails otherwise).
 
 **Checkpoint**: `GET /api/analysis/performance` returns portfolio value + MEP per date.
 
@@ -57,9 +57,9 @@ Uses only persisted data (no benchmark fetch).
 **Independent Test**: Open the page with several weeks → portfolio + MEP lines both start at 100 and
 track their weekly values; a sharp value jump (deposit) shows as a step.
 
-- [ ] T006 [US1] `dashboard/src/lib/charts.cjs`: add pure `indexTo100(series)` (rebase first available value → 100, `v_i/v_0×100`; gaps stay null; no base → all null) and `multiLineSvg(seriesList, opts)` renderer (multiple series on ONE shared y-axis — all start at 100 — with legend, distinct colors, gaps per series).
-- [ ] T007 [P] [US1] Unit test in `tests/unit/lib/charts.test.js`: `indexTo100` rebases to 100, preserves gaps as null, returns all null when no base value exists.
-- [ ] T008 [US1] `dashboard/src/pages/performance.astro`: fetch `/analysis/performance`, build `indexTo100` series for the portfolio value and MEP, render `multiLineSvg`; loading/error + empty/sparse ("insufficient history") states; label the portfolio line as value growth (deposits show as steps).
+- [x] T006 [US1] `dashboard/src/lib/charts.cjs`: add pure `indexTo100(series)` (rebase first available value → 100, `v_i/v_0×100`; gaps stay null; no base → all null) and `multiLineSvg(seriesList, opts)` renderer (multiple series on ONE shared y-axis — all start at 100 — with legend, distinct colors, gaps per series).
+- [x] T007 [P] [US1] Unit test in `tests/unit/lib/charts.test.js`: `indexTo100` rebases to 100, preserves gaps as null, returns all null when no base value exists.
+- [x] T008 [US1] `dashboard/src/pages/performance.astro`: fetch `/analysis/performance`, build `indexTo100` series for the portfolio value and MEP, render `multiLineSvg`; loading/error + empty/sparse ("insufficient history") states; label the portfolio line as value growth (deposits show as steps).
 
 **Checkpoint**: US1 = the MVP — "did my value grow faster than holding USD?", zero benchmark fetching.
 
@@ -72,16 +72,16 @@ track their weekly values; a sharp value jump (deposit) shows as a step.
 **Independent Test**: With benchmark levels available, the S&P and inflation lines index to 100 and
 overlay; a date preceding a benchmark's series is a gap; a failed benchmark is marked unavailable.
 
-- [ ] T009 [P] [US2] Extend `src/infrastructure/providers/FredProvider.js` with `getObservations(seriesId, { start, end, units })` → `[{ date, value }]` over the range (parse string values, skip `"."`); reuse the existing key/auth/error handling; missing key → `FredConfigError`.
-- [ ] T010 [P] [US2] Unit test `tests/unit/infrastructure/providers/FredProvider.test.js` (add cases): `getObservations` passes `observation_start`/`observation_end`, parses rows, handles `"."`, missing key → `FredConfigError`.
-- [ ] T011 [P] [US2] Extend `src/infrastructure/providers/ArgentinaDatosInflationProvider.js` with `getSeries()` → full monthly series `[{ date, percent }]` ascending.
-- [ ] T012 [P] [US2] `ArCpiIndex` pure service in `src/domain/services/ArCpiIndex.js`: `build(monthly)` → cumulative level index `[{ date, value }]`, `value_n = value_{n-1} × (1 + percent_n/100)`, anchored at 100.
-- [ ] T013 [P] [US2] Unit test `tests/unit/domain/services/ArCpiIndex.test.js`: compounding correctness, ascending order, anchor at 100.
-- [ ] T014 [P] [US2] `BenchmarkAligner` pure service in `src/domain/services/BenchmarkAligner.js`: `alignOnOrBefore(observations, dates)` → per date the latest obs with `obsDate ≤ date` (carry its date as `asOf`), else a gap (`available:false`).
-- [ ] T015 [P] [US2] Unit test `tests/unit/domain/services/BenchmarkAligner.test.js`: on/before match, exact match, date before series → gap, empty observations → all gaps.
-- [ ] T016 [US2] In `GetPerformanceSeries.js`, fetch in parallel (`Promise.allSettled`): FRED `SP500`, FRED `CPIAUCSL`, and AR CPI (`inflationProvider.getSeries()` → `ArCpiIndex.build`) over the date span; `BenchmarkAligner.alignOnOrBefore` each to the analysis dates; populate `sp500`/`usCpi`/`arCpi` per point + `benchmarksAvailable`; a failed source → that benchmark unavailable, others proceed (serializes after T002 — same file; depends on T009/T011/T012/T014).
-- [ ] T017 [P] [US2] Unit test in `GetPerformanceSeries.test.js`: benchmarks populated from mocked providers/aligner; one provider rejecting → that benchmark `available:false` everywhere, others + portfolio/MEP still present (SC-004).
-- [ ] T018 [US2] `dashboard/src/pages/performance.astro`: benchmark toggles (S&P 500 / US CPI / AR CPI) that `indexTo100` and overlay the selected benchmarks; an unavailable benchmark is shown as such, not fabricated (serializes after T008 — same file).
+- [x] T009 [P] [US2] Extend `src/infrastructure/providers/FredProvider.js` with `getObservations(seriesId, { start, end, units })` → `[{ date, value }]` over the range (parse string values, skip `"."`); reuse the existing key/auth/error handling; missing key → `FredConfigError`.
+- [x] T010 [P] [US2] Unit test `tests/unit/infrastructure/providers/FredProvider.test.js` (add cases): `getObservations` passes `observation_start`/`observation_end`, parses rows, handles `"."`, missing key → `FredConfigError`.
+- [x] T011 [P] [US2] Extend `src/infrastructure/providers/ArgentinaDatosInflationProvider.js` with `getSeries()` → full monthly series `[{ date, percent }]` ascending.
+- [x] T012 [P] [US2] `ArCpiIndex` pure service in `src/domain/services/ArCpiIndex.js`: `build(monthly)` → cumulative level index `[{ date, value }]`, `value_n = value_{n-1} × (1 + percent_n/100)`, anchored at 100.
+- [x] T013 [P] [US2] Unit test `tests/unit/domain/services/ArCpiIndex.test.js`: compounding correctness, ascending order, anchor at 100.
+- [x] T014 [P] [US2] `BenchmarkAligner` pure service in `src/domain/services/BenchmarkAligner.js`: `alignOnOrBefore(observations, dates)` → per date the latest obs with `obsDate ≤ date` (carry its date as `asOf`), else a gap (`available:false`).
+- [x] T015 [P] [US2] Unit test `tests/unit/domain/services/BenchmarkAligner.test.js`: on/before match, exact match, date before series → gap, empty observations → all gaps.
+- [x] T016 [US2] In `GetPerformanceSeries.js`, fetch in parallel (`Promise.allSettled`): FRED `SP500`, FRED `CPIAUCSL`, and AR CPI (`inflationProvider.getSeries()` → `ArCpiIndex.build`) over the date span; `BenchmarkAligner.alignOnOrBefore` each to the analysis dates; populate `sp500`/`usCpi`/`arCpi` per point + `benchmarksAvailable`; a failed source → that benchmark unavailable, others proceed (serializes after T002 — same file; depends on T009/T011/T012/T014).
+- [x] T017 [P] [US2] Unit test in `GetPerformanceSeries.test.js`: benchmarks populated from mocked providers/aligner; one provider rejecting → that benchmark `available:false` everywhere, others + portfolio/MEP still present (SC-004).
+- [x] T018 [US2] `dashboard/src/pages/performance.astro`: benchmark toggles (S&P 500 / US CPI / AR CPI) that `indexTo100` and overlay the selected benchmarks; an unavailable benchmark is shown as such, not fabricated (serializes after T008 — same file).
 
 **Checkpoint**: "Did I beat the index / beat inflation?" readable on one chart.
 
@@ -94,9 +94,9 @@ overlay; a date preceding a benchmark's series is a gap; a failed benchmark is m
 **Independent Test**: Summary shows each series' growth % and the portfolio-vs-benchmark gap; changing
 the range re-indexes all series to 100 at the new window start.
 
-- [ ] T019 [US3] `dashboard/src/lib/charts.cjs`: add pure `growthPct(series)` (last available index − 100) and render a summary in `performance.astro` (each series' growth % over the window + portfolio-minus-benchmark gap) (charts.cjs append, after T006; page uses it).
-- [ ] T020 [P] [US3] Unit test in `tests/unit/lib/charts.test.js`: `growthPct` on a series indexed to 100 returns last − 100; handles all-gap (null).
-- [ ] T021 [US3] `dashboard/src/pages/performance.astro`: range selector (8/26/52/all) that slices points (`sliceLastN`), **re-indexes every series to 100** at the new window start, and redraws (serializes after T018 — same file).
+- [x] T019 [US3] `dashboard/src/lib/charts.cjs`: add pure `growthPct(series)` (last available index − 100) and render a summary in `performance.astro` (each series' growth % over the window + portfolio-minus-benchmark gap) (charts.cjs append, after T006; page uses it).
+- [x] T020 [P] [US3] Unit test in `tests/unit/lib/charts.test.js`: `growthPct` on a series indexed to 100 returns last − 100; handles all-gap (null).
+- [x] T021 [US3] `dashboard/src/pages/performance.astro`: range selector (8/26/52/all) that slices points (`sliceLastN`), **re-indexes every series to 100** at the new window start, and redraws (serializes after T018 — same file).
 
 **Checkpoint**: All three stories functional.
 
@@ -104,8 +104,8 @@ the range re-indexes all series to 100 at the new window start.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T022 [P] Privacy scan of the diff: no real holdings/secrets; the FRED key is read server-side only (never in client bundle); fixtures use placeholder values (Constitution I).
-- [ ] T023 Run `quickstart.md` end-to-end (incl. `dashboard` build) and verify SC-001…SC-006 (indexed to 100, deposits-as-steps, beat-USD/index/inflation reads, gaps/unavailable shown, range re-bases, sparse state).
+- [x] T022 [P] Privacy scan of the diff: no real holdings/secrets; the FRED key is read server-side only (never in client bundle); fixtures use placeholder values (Constitution I).
+- [x] T023 Run `quickstart.md` end-to-end (incl. `dashboard` build) and verify SC-001…SC-006 (indexed to 100, deposits-as-steps, beat-USD/index/inflation reads, gaps/unavailable shown, range re-bases, sparse state).
 
 ---
 
