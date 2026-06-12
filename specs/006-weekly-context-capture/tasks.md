@@ -121,10 +121,10 @@ price-only moves; first run → `null`.
 
 - [ ] T032 [P] [US3] `PositionChangeCalculator` pure domain service (`src/domain/services/PositionChangeCalculator.js`): `diff(prior, current)` matching on `broker+assetType+symbol`; classify by quantity delta (`|delta|<1e-9` skipped); `added`/`removed`/`increased`/`reduced` with before/after/delta; return `null` when `prior` is null
 - [ ] T033 [P] [US3] Unit test `tests/unit/domain/services/PositionChangeCalculator.test.js`: each change type; price-only change → `[]`; first run (prior null) → `null`; identity matching; epsilon (covers SC-005)
-- [ ] T034 [US3] `GenerateWeeklyAnalysis.js`: extract the prior analysis's `portfolioSnapshot` (nearest prior with a snapshot, per `_loadPreviousAnalysis`), compute `positionChanges` via the calculator, persist (null vs []), add a `## positionChanges` user-message block (serializes after T028 — same file)
+- [ ] T034 [US3] `GenerateWeeklyAnalysis.js`: extract the prior analysis's `portfolioSnapshot` (nearest prior with a snapshot, per `_loadPreviousAnalysis`), compute `positionChanges` via the calculator, persist (null vs []) on success **and inside `_persistFailed`** (FR-014 — changes are computed before the AI step), add a `## positionChanges` user-message block (serializes after T028 — same file)
 - [ ] T035 [US3] `src/functions/getWeeklyAnalysis.js`: include `positionChanges` in the detail response (after T029 — same file)
 - [ ] T036 [US3] `dashboard/src/pages/analysis-detail.astro`: add a "Changes this week" block (badge per change type, qty before → after); show "no changes" for `[]` and "not available" for `null` (after T030 — same file)
-- [ ] T037 [P] [US3] Unit test in `GenerateWeeklyAnalysis.test.js`: prior snapshot present → changes computed + injected; no prior → `positionChanges === null`
+- [ ] T037 [P] [US3] Unit test in `GenerateWeeklyAnalysis.test.js`: prior snapshot present → changes computed + injected; no prior → `positionChanges === null`; **AI-step failure → computed `positionChanges` still persisted on the failed record (FR-014)**
 
 **Checkpoint**: US1 + US2 + US3 work independently.
 
