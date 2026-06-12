@@ -74,11 +74,13 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/006-weekly-context-capture/plan.md` (Phase 1 complete; tasks pending).
+`specs/007-suggestion-scorecard/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/` (`api.md`, `providers.md`,
-`imf-classify-tool.json`). This feature extends the weekly analysis to capture,
-inject, and display a 9-indicator macro panel, portfolio totals, and exact
-week-over-week position changes — persisted immutably per run, with macro
-fetches individually resilient (no single source failure aborts the run).
+`data-model.md`, `quickstart.md`, `contracts/api.md`. This feature adds an
+owner-set execution status (executed/partial/skipped) to weekly suggested
+orders — stored on the order row, auto-proposed from feature 006's
+positionChanges (propose-only), fed into the next analysis, and summarized in a
+by-conviction scorecard. Marking any order permanently freezes that week
+(re-runs skipped). Builds on feature 006 (shipped). Prior plan:
+`specs/006-weekly-context-capture/plan.md`.
 <!-- SPECKIT END -->
