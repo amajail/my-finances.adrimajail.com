@@ -47,6 +47,7 @@ const {
   GenerateWeeklyAnalysis,
   SetOrderExecutionStatus,
   GetSuggestionScorecard,
+  GetMacroSeries,
   GetActiveInstructions,
   SaveInstructions,
   ListInstructionsHistory,
@@ -419,6 +420,16 @@ class Container {
    */
   getGetSuggestionScorecard() {
     return new GetSuggestionScorecard({
+      analysisRepository: this.getAnalysisRepository(),
+    });
+  }
+
+  /**
+   * Get GetMacroSeries use case (feature 008).
+   * @returns {GetMacroSeries}
+   */
+  getGetMacroSeries() {
+    return new GetMacroSeries({
       analysisRepository: this.getAnalysisRepository(),
     });
   }

@@ -29,7 +29,7 @@ Backend: `src/`. Dashboard: `dashboard/src/`. Tests: `tests/unit/`.
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Add a "Charts" navigation entry pointing to `/charts` in `dashboard/src/layouts/Layout.astro` (add `'charts'` to the `active` union and the nav list; page built in US1).
+- [x] T001 [P] Add a "Charts" navigation entry pointing to `/charts` in `dashboard/src/layouts/Layout.astro` (add `'charts'` to the `active` union and the nav list; page built in US1).
 
 ---
 
@@ -40,10 +40,10 @@ Backend: `src/`. Dashboard: `dashboard/src/`. Tests: `tests/unit/`.
 
 **⚠️ CRITICAL**: Blocks all user stories.
 
-- [ ] T002 [P] `GetMacroSeries` use-case in `src/application/use-cases/analysis/GetMacroSeries.js`: call `analysisRepository.getLatest(weeks)`, map each `WeeklyAnalysis` to `{ date, macroContext, portfolioTotals }`, return ascending by date as `{ points, count }`; clamp `weeks` (default 60, 1–200).
-- [ ] T003 [P] Unit test `tests/unit/application/use-cases/analysis/GetMacroSeries.test.js`: ascending order; `weeks` clamp; analyses with null macro/totals tolerated; empty → `{ points: [], count: 0 }`.
-- [ ] T004 Wire `GetMacroSeries` into `src/application/use-cases/index.js` and `src/application/di/container.js` (`getGetMacroSeries()`).
-- [ ] T005 `src/functions/getMacroSeries.js`: `GET /api/analysis/macro-series` (auth `function`, `?weeks=`), call the use-case, respond per contracts/api.md — AND register it in `src/functions/index.js` (the feature-007 registration guard test fails otherwise).
+- [x] T002 [P] `GetMacroSeries` use-case in `src/application/use-cases/analysis/GetMacroSeries.js`: call `analysisRepository.getLatest(weeks)`, map each `WeeklyAnalysis` to `{ date, macroContext, portfolioTotals }`, return ascending by date as `{ points, count }`; clamp `weeks` (default 60, 1–200).
+- [x] T003 [P] Unit test `tests/unit/application/use-cases/analysis/GetMacroSeries.test.js`: ascending order; `weeks` clamp; analyses with null macro/totals tolerated; empty → `{ points: [], count: 0 }`.
+- [x] T004 Wire `GetMacroSeries` into `src/application/use-cases/index.js` and `src/application/di/container.js` (`getGetMacroSeries()`).
+- [x] T005 `src/functions/getMacroSeries.js`: `GET /api/analysis/macro-series` (auth `function`, `?weeks=`), call the use-case, respond per contracts/api.md — AND register it in `src/functions/index.js` (the feature-007 registration guard test fails otherwise).
 
 **Checkpoint**: `GET /api/analysis/macro-series` returns the ascending projection.
 
@@ -57,10 +57,10 @@ analysis-date axis, with value + as-of on hover.
 **Independent Test**: Open the Charts page with several analyses → a mini-chart per metric, shared
 date axis, independent scales, hover shows value + as-of.
 
-- [ ] T006 [US1] `dashboard/src/lib/charts.js`: pure helpers `buildSeries(points, key)` → `[{date, value|null, asOf, available}]` (value only when present + `available !== false` + finite, else null/gap) and `niceScale(min, max)` → rounded axis bounds. Export the metric catalogue (data-model.md).
-- [ ] T007 [P] [US1] Unit test `tests/unit/lib/charts.test.js`: `buildSeries` maps macro + totals keys, marks unavailable/non-finite as `null`; `niceScale` bounds sane values.
-- [ ] T008 [US1] `dashboard/src/lib/charts.js`: SVG line-chart renderer `lineChart(el, series, opts)` — dots + connecting path, date x-axis, independent y-axis from `niceScale`, hover tooltip (value + asOf) (same file, after T006).
-- [ ] T009 [US1] `dashboard/src/pages/charts.astro`: fetch `/analysis/macro-series`, render a grid of mini-charts (each numeric macro indicator + each portfolio total) via `lineChart`, all sharing the date axis; loading + error states (depends on T005, T008).
+- [x] T006 [US1] `dashboard/src/lib/charts.js`: pure helpers `buildSeries(points, key)` → `[{date, value|null, asOf, available}]` (value only when present + `available !== false` + finite, else null/gap) and `niceScale(min, max)` → rounded axis bounds. Export the metric catalogue (data-model.md).
+- [x] T007 [P] [US1] Unit test `tests/unit/lib/charts.test.js`: `buildSeries` maps macro + totals keys, marks unavailable/non-finite as `null`; `niceScale` bounds sane values.
+- [x] T008 [US1] `dashboard/src/lib/charts.js`: SVG line-chart renderer `lineChart(el, series, opts)` — dots + connecting path, date x-axis, independent y-axis from `niceScale`, hover tooltip (value + asOf) (same file, after T006).
+- [x] T009 [US1] `dashboard/src/pages/charts.astro`: fetch `/analysis/macro-series`, render a grid of mini-charts (each numeric macro indicator + each portfolio total) via `lineChart`, all sharing the date axis; loading + error states (depends on T005, T008).
 
 **Checkpoint**: US1 = the MVP — the small-multiples trend grid.
 
@@ -73,9 +73,9 @@ few/zero points.
 
 **Independent Test**: An indicator unavailable for a week shows a gap/marker, no line through it; 0/1 points render gracefully.
 
-- [ ] T010 [US2] `dashboard/src/lib/charts.js`: in `lineChart`, break the path at `null` points and draw a distinct "unavailable" marker; never plot 0 for a gap (same file, after T008).
-- [ ] T011 [US2] `dashboard/src/pages/charts.astro`: friendly empty state (0 points) and single-point/sparse handling ("not enough history yet") (same file, after T009).
-- [ ] T012 [P] [US2] Unit test in `tests/unit/lib/charts.test.js`: a series with interior gaps segments into non-contiguous runs (no value bridged across a `null`).
+- [x] T010 [US2] `dashboard/src/lib/charts.js`: in `lineChart`, break the path at `null` points and draw a distinct "unavailable" marker; never plot 0 for a gap (same file, after T008).
+- [x] T011 [US2] `dashboard/src/pages/charts.astro`: friendly empty state (0 points) and single-point/sparse handling ("not enough history yet") (same file, after T009).
+- [x] T012 [P] [US2] Unit test in `tests/unit/lib/charts.test.js`: a series with interior gaps segments into non-contiguous runs (no value bridged across a `null`).
 
 **Checkpoint**: Charts are decision-grade — gaps don't lie.
 
@@ -87,9 +87,9 @@ few/zero points.
 
 **Independent Test**: With IMF status changing over dates, the strip shows markers at changes aligned to the shared axis; unavailable → unknown/gap.
 
-- [ ] T013 [P] [US3] `dashboard/src/lib/charts.js`: `imfChangePoints(points)` reducer (collapse consecutive equal statuses; `unavailable`/absent → `unknown`) + `eventStrip(el, changePoints, opts)` SVG renderer (same file — append; independent function).
-- [ ] T014 [P] [US3] Unit test in `tests/unit/lib/charts.test.js`: `imfChangePoints` emits a point only at status changes; maps unavailable to `unknown`.
-- [ ] T015 [US3] `dashboard/src/pages/charts.astro`: render the IMF event strip aligned to the shared date axis (same file, after T011).
+- [x] T013 [P] [US3] `dashboard/src/lib/charts.js`: `imfChangePoints(points)` reducer (collapse consecutive equal statuses; `unavailable`/absent → `unknown`) + `eventStrip(el, changePoints, opts)` SVG renderer (same file — append; independent function).
+- [x] T014 [P] [US3] Unit test in `tests/unit/lib/charts.test.js`: `imfChangePoints` emits a point only at status changes; maps unavailable to `unknown`.
+- [x] T015 [US3] `dashboard/src/pages/charts.astro`: render the IMF event strip aligned to the shared date axis (same file, after T011).
 
 **Checkpoint**: Full macro picture without distorting the categorical onto a numeric axis.
 
@@ -101,9 +101,9 @@ few/zero points.
 
 **Independent Test**: Pick a portfolio and a macro series → one chart, two scales, shared date axis; gaps per series.
 
-- [ ] T016 [US4] `dashboard/src/lib/charts.js`: `dualAxisChart(el, seriesLeft, seriesRight, opts)` — two independent `niceScale`s, left/right axes, shared x, gaps per series (same file — append).
-- [ ] T017 [US4] `dashboard/src/pages/charts.astro`: overlay mode — two selects (one portfolio key, one macro key) + a small-multiples/overlay toggle; render via `dualAxisChart` (same file, after T015).
-- [ ] T018 [P] [US4] Unit test in `tests/unit/lib/charts.test.js`: dual-axis computes two independent scales (a thousands-range series and a near-zero series each scale to their own bounds).
+- [x] T016 [US4] `dashboard/src/lib/charts.js`: `dualAxisChart(el, seriesLeft, seriesRight, opts)` — two independent `niceScale`s, left/right axes, shared x, gaps per series (same file — append).
+- [x] T017 [US4] `dashboard/src/pages/charts.astro`: overlay mode — two selects (one portfolio key, one macro key) + a small-multiples/overlay toggle; render via `dualAxisChart` (same file, after T015).
+- [x] T018 [P] [US4] Unit test in `tests/unit/lib/charts.test.js`: dual-axis computes two independent scales (a thousands-range series and a near-zero series each scale to their own bounds).
 
 **Checkpoint**: Correlation view available.
 
@@ -115,8 +115,8 @@ few/zero points.
 
 **Independent Test**: Pick a range → all charts redraw to that window; fewer points than the window shows all.
 
-- [ ] T019 [US5] `dashboard/src/pages/charts.astro`: a range control (8/26/52/all) that slices the fetched points and re-renders every chart/strip/overlay (same file, after T017).
-- [ ] T020 [P] [US5] Unit test in `tests/unit/lib/charts.test.js`: a `sliceLastN(points, n)` helper returns the last n (or all when fewer); add the helper to `charts.js`.
+- [x] T019 [US5] `dashboard/src/pages/charts.astro`: a range control (8/26/52/all) that slices the fetched points and re-renders every chart/strip/overlay (same file, after T017).
+- [x] T020 [P] [US5] Unit test in `tests/unit/lib/charts.test.js`: a `sliceLastN(points, n)` helper returns the last n (or all when fewer); add the helper to `charts.js`.
 
 **Checkpoint**: All five stories functional.
 
@@ -124,8 +124,8 @@ few/zero points.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T021 [P] Privacy scan of the diff: no real holdings/secrets; fixtures use placeholder values (Constitution I).
-- [ ] T022 Run `quickstart.md` end-to-end (incl. `dashboard` build) and verify SC-001…SC-006 (independent scales, gaps≠zero, as-of on hover, overlay, range, sparse/empty).
+- [x] T021 [P] Privacy scan of the diff: no real holdings/secrets; fixtures use placeholder values (Constitution I).
+- [x] T022 Run `quickstart.md` end-to-end (incl. `dashboard` build) and verify SC-001…SC-006 (independent scales, gaps≠zero, as-of on hover, overlay, range, sparse/empty).
 
 ---
 
