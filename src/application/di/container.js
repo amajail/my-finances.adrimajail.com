@@ -45,6 +45,8 @@ const {
   UpdateSetting,
   RefreshPrices,
   GenerateWeeklyAnalysis,
+  SetOrderExecutionStatus,
+  GetSuggestionScorecard,
   GetActiveInstructions,
   SaveInstructions,
   ListInstructionsHistory,
@@ -398,6 +400,26 @@ class Container {
       // (used verbatim). Reading content + historyRowKey in one call preserves
       // snapshot-at-start (FR-012) and links each analysis to its source version.
       instructionsRepository: this.getInstructionsRepository()
+    });
+  }
+
+  /**
+   * Get SetOrderExecutionStatus use case (feature 007).
+   * @returns {SetOrderExecutionStatus}
+   */
+  getSetOrderExecutionStatus() {
+    return new SetOrderExecutionStatus({
+      analysisRepository: this.getAnalysisRepository(),
+    });
+  }
+
+  /**
+   * Get GetSuggestionScorecard use case (feature 007).
+   * @returns {GetSuggestionScorecard}
+   */
+  getGetSuggestionScorecard() {
+    return new GetSuggestionScorecard({
+      analysisRepository: this.getAnalysisRepository(),
     });
   }
 

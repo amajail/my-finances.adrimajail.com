@@ -7,6 +7,7 @@
 const { app } = require('@azure/functions');
 const container = require('../application/di/container');
 const { ok, fail, mapError } = require('./_shared');
+const OrderExecutionMatcher = require('../domain/services/OrderExecutionMatcher');
 
 app.http('getWeeklyAnalysis', {
   methods: ['GET'],
@@ -57,18 +58,34 @@ app.http('getWeeklyAnalysis', {
         body.markdownBody = analysis.markdownBody;
         body.riesgoPaisBp = analysis.riesgoPaisBp;
         body.riesgoPaisAsOf = analysis.riesgoPaisAsOf;
-        body.orders = orders.map((o) => ({
-          index: o.index,
-          broker: o.broker,
-          symbol: o.symbol,
-          side: o.side,
-          quantity: o.quantity,
-          rationale: o.rationale,
-          conviction: o.conviction,
-        }));
+        // Feature 007: each order carries its execution status; pending orders
+        // get a read-time proposal from the week's position changes (FR-006/8).
+        const changes = analysis.positionChanges; // null|[]|[...] (feature 006)
+        body.orders = orders.map((o) => {
+          const out = {
+            index: o.index,
+            broker: o.broker,
+            symbol: o.symbol,
+            side: o.side,
+            quantity: o.quantity,
+            rationale: o.rationale,
+            conviction: o.conviction,
+            executionStatus: o.executionStatus || 'pending',
+            executionNote: o.executionNote || null,
+            executionUpdatedAt: o.executionUpdatedAt || null,
+          };
+          if (out.executionStatus === 'pending') {
+            const proposed = OrderExecutionMatcher.propose(o, changes);
+            if (proposed) out.proposedStatus = proposed;
+          }
+          return out;
+        });
+        // Feature 007: any non-pending order freezes the week (FR-004).
+        body.frozen = body.orders.some((o) => o.executionStatus !== 'pending');
       } else {
         body.errorMessage = analysis.errorMessage;
         body.orders = [];
+        body.frozen = false;
       }
 
       return ok(body);

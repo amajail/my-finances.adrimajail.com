@@ -1,0 +1,92 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Suggestion scorecard · my-finances" active="scorecard">
+  <header class="mb-6">
+    <span class="eyebrow">Scorecard</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold">Suggestion scorecard</h1>
+    <p class="text-sm text-[var(--color-muted)] mt-1" id="hdr-meta">Loading…</p>
+  </header>
+
+  <section id="insufficient" class="card p-4 mb-6 hidden">
+    <p class="text-sm text-[var(--color-muted)]">
+      Not enough history yet to read rates reliably — counts are shown below.
+    </p>
+  </section>
+
+  <section class="card mb-6 overflow-x-auto">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Execution by conviction</h2>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Group</th>
+          <th class="text-right px-4 py-2">Executed</th>
+          <th class="text-right px-4 py-2">Partial</th>
+          <th class="text-right px-4 py-2">Skipped</th>
+          <th class="text-right px-4 py-2">Pending</th>
+          <th class="text-right px-4 py-2">Total</th>
+          <th class="text-right px-4 py-2">Exec. rate</th>
+        </tr>
+      </thead>
+      <tbody id="scorecard-tbody"></tbody>
+    </table>
+  </section>
+
+  <p id="error-banner" class="card p-4 pos-negative text-sm hidden"></p>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+
+  function show(el) { el.classList.remove('hidden'); }
+
+  function pct(rate) {
+    return typeof rate === 'number' ? `${(rate * 100).toFixed(0)}%` : '—';
+  }
+
+  function row(label, b) {
+    if (!b) return '';
+    const rate = (b.executed + b.partial + b.skipped) > 0 ? pct(b.executionRate) : '—';
+    return `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2">${label}</td>
+        <td class="px-4 py-2 text-right num-mono">${b.executed}</td>
+        <td class="px-4 py-2 text-right num-mono">${b.partial}</td>
+        <td class="px-4 py-2 text-right num-mono">${b.skipped}</td>
+        <td class="px-4 py-2 text-right num-mono">${b.pending}</td>
+        <td class="px-4 py-2 text-right num-mono">${b.total}</td>
+        <td class="px-4 py-2 text-right num-mono">${rate}</td>
+      </tr>`;
+  }
+
+  async function load() {
+    let data;
+    try {
+      data = await api('/analysis/scorecard');
+    } catch (err) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = `Failed to load scorecard: ${err.message}`;
+      show(banner);
+      return;
+    }
+
+    document.getElementById('hdr-meta').textContent =
+      `${data.analysesCount} completed ${data.analysesCount === 1 ? 'analysis' : 'analyses'}` +
+      (data.sufficientData ? '' : ' · insufficient data for reliable rates');
+    if (!data.sufficientData) show(document.getElementById('insufficient'));
+
+    const bc = data.byConviction || {};
+    document.getElementById('scorecard-tbody').innerHTML = [
+      row('<strong>Overall</strong>', data.overall),
+      row('High conviction', bc.high),
+      row('Medium conviction', bc.medium),
+      row('Low conviction', bc.low),
+    ].join('');
+  }
+
+  load();
+</script>

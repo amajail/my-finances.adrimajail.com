@@ -30,7 +30,7 @@ Backend: `src/` at repo root. Dashboard: `dashboard/src/`. Tests: `tests/unit/`,
 
 **Purpose**: Light prep only — no new deps, no new tables.
 
-- [ ] T001 [P] Add a "Scorecard" navigation entry pointing to `/scorecard` in the dashboard shared layout `dashboard/src/layouts/Layout.astro` (the page itself is built in US4; the link is harmless until then)
+- [x] T001 [P] Add a "Scorecard" navigation entry pointing to `/scorecard` in the dashboard shared layout `dashboard/src/layouts/Layout.astro` (the page itself is built in US4; the link is harmless until then)
 
 ---
 
@@ -40,10 +40,10 @@ Backend: `src/` at repo root. Dashboard: `dashboard/src/`. Tests: `tests/unit/`,
 
 **⚠️ CRITICAL**: Blocks all user stories.
 
-- [ ] T002 [P] Extend `SuggestedOrder` in `src/domain/entities/SuggestedOrder.js`: add an `EXECUTION_STATUSES` enum (`pending`|`executed`|`partial`|`skipped`) and optional fields `executionStatus` (default `pending`), `executionNote` (default null, soft length cap), `executionUpdatedAt` (default null); extend validation, `toJSON`, `fromJSON`. Entity stays immutable.
-- [ ] T003 [P] Unit tests in `tests/unit/domain/entities/SuggestedOrder.test.js`: default `pending` when absent, invalid status rejected, note length cap, round-trip via `toJSON`/`fromJSON`.
-- [ ] T004 Extend `AzureAnalysisRepository` `_orderToEntity`/`_orderFromEntity` in `src/infrastructure/repositories/AzureAnalysisRepository.js`: write/read `executionStatus`, `executionNote`, `executionUpdatedAt` columns; missing columns → `pending`/null (pre-feature rows) (depends on T002).
-- [ ] T005 [P] Integration test in `tests/integration/AzureAnalysisRepository.test.js`: order status survives upsert→getByDate round-trip; a pre-feature order row (no columns) reads back as `pending`.
+- [x] T002 [P] Extend `SuggestedOrder` in `src/domain/entities/SuggestedOrder.js`: add an `EXECUTION_STATUSES` enum (`pending`|`executed`|`partial`|`skipped`) and optional fields `executionStatus` (default `pending`), `executionNote` (default null, soft length cap), `executionUpdatedAt` (default null); extend validation, `toJSON`, `fromJSON`. Entity stays immutable.
+- [x] T003 [P] Unit tests in `tests/unit/domain/entities/SuggestedOrder.test.js`: default `pending` when absent, invalid status rejected, note length cap, round-trip via `toJSON`/`fromJSON`.
+- [x] T004 Extend `AzureAnalysisRepository` `_orderToEntity`/`_orderFromEntity` in `src/infrastructure/repositories/AzureAnalysisRepository.js`: write/read `executionStatus`, `executionNote`, `executionUpdatedAt` columns; missing columns → `pending`/null (pre-feature rows) (depends on T002).
+- [x] T005 [P] Integration test in `tests/integration/AzureAnalysisRepository.test.js`: order status survives upsert→getByDate round-trip; a pre-feature order row (no columns) reads back as `pending`.
 
 **Checkpoint**: Orders carry an execution status end to end.
 
@@ -55,18 +55,18 @@ Backend: `src/` at repo root. Dashboard: `dashboard/src/`. Tests: `tests/unit/`,
 
 **Independent Test**: Set an order's status via the API/UI, reload → it persisted; re-trigger that date's analysis → the run is skipped and statuses are intact.
 
-- [ ] T006 [US1] Add `setOrderExecutionStatus(date, index, { status, note })` and `hasMarkedOrders(date)` to `src/application/interfaces/IAnalysisRepository.js`.
-- [ ] T007 [US1] Implement `setOrderExecutionStatus` in `src/infrastructure/repositories/AzureAnalysisRepository.js`: Merge-upsert the three status columns on the one order row (`partitionKey=date`, `rowKey=zero-padded index`), stamp `executionUpdatedAt`; throw if the order row does not exist (depends on T004).
-- [ ] T008 [US1] Implement `hasMarkedOrders(date)` in `src/infrastructure/repositories/AzureAnalysisRepository.js`: true if any order for the date has `executionStatus !== 'pending'` (same file, after T007).
-- [ ] T009 [P] [US1] Integration test in `tests/integration/AzureAnalysisRepository.test.js`: `setOrderExecutionStatus` persists status+note+timestamp; `hasMarkedOrders` flips true after a non-pending mark and false when all pending.
-- [ ] T010 [US1] `SetOrderExecutionStatus` use-case in `src/application/use-cases/analysis/SetOrderExecutionStatus.js`: validate status ∈ enum and note length, call `repo.setOrderExecutionStatus`, return the saved status object.
-- [ ] T011 [P] [US1] Unit test `tests/unit/application/use-cases/analysis/SetOrderExecutionStatus.test.js`: invalid status rejected; repo called with parsed args; setting `pending` clears a prior mark.
-- [ ] T012 [US1] Wire `SetOrderExecutionStatus` into `src/application/di/container.js` (`getSetOrderExecutionStatus()`).
-- [ ] T013 [US1] PATCH function `src/functions/setOrderExecutionStatus.js`: route `analysis/weekly/{date}/orders/{index}`, auth `function`, parse body `{status, note}`, call the use-case, respond per contracts/api.md (400 invalid, 404 missing).
-- [ ] T014 [US1] `src/functions/getWeeklyAnalysis.js`: include `executionStatus`/`executionNote`/`executionUpdatedAt` per order and a top-level `frozen` flag (true when any order is non-pending) in the detail response.
-- [ ] T015 [US1] Freeze guard in `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`: at the start of `execute()` (after resolving `targetDate`), if `analysisRepository.hasMarkedOrders(targetDate)` is true, return the existing analysis (`getByDate`) WITHOUT calling the LLM or `upsert`; emit a metadata-only "frozen, skipped" log.
-- [ ] T016 [P] [US1] Unit test in `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js`: a marked target date → LLM not called, `upsert` not called, existing analysis returned (SC-003).
-- [ ] T017 [US1] `dashboard/src/pages/analysis-detail.astro`: per-order status control (executed/partial/skipped) + note input + Save (PATCH via `api()`), reflect the saved status, and a "frozen" badge once any order is marked.
+- [x] T006 [US1] Add `setOrderExecutionStatus(date, index, { status, note })` and `hasMarkedOrders(date)` to `src/application/interfaces/IAnalysisRepository.js`.
+- [x] T007 [US1] Implement `setOrderExecutionStatus` in `src/infrastructure/repositories/AzureAnalysisRepository.js`: Merge-upsert the three status columns on the one order row (`partitionKey=date`, `rowKey=zero-padded index`), stamp `executionUpdatedAt`; throw if the order row does not exist (depends on T004).
+- [x] T008 [US1] Implement `hasMarkedOrders(date)` in `src/infrastructure/repositories/AzureAnalysisRepository.js`: true if any order for the date has `executionStatus !== 'pending'` (same file, after T007).
+- [x] T009 [P] [US1] Integration test in `tests/integration/AzureAnalysisRepository.test.js`: `setOrderExecutionStatus` persists status+note+timestamp; `hasMarkedOrders` flips true after a non-pending mark and false when all pending.
+- [x] T010 [US1] `SetOrderExecutionStatus` use-case in `src/application/use-cases/analysis/SetOrderExecutionStatus.js`: validate status ∈ enum and note length, call `repo.setOrderExecutionStatus`, return the saved status object.
+- [x] T011 [P] [US1] Unit test `tests/unit/application/use-cases/analysis/SetOrderExecutionStatus.test.js`: invalid status rejected; repo called with parsed args; setting `pending` clears a prior mark.
+- [x] T012 [US1] Wire `SetOrderExecutionStatus` into `src/application/di/container.js` (`getSetOrderExecutionStatus()`).
+- [x] T013 [US1] PATCH function `src/functions/setOrderExecutionStatus.js`: route `analysis/weekly/{date}/orders/{index}`, auth `function`, parse body `{status, note}`, call the use-case, respond per contracts/api.md (400 invalid, 404 missing).
+- [x] T014 [US1] `src/functions/getWeeklyAnalysis.js`: include `executionStatus`/`executionNote`/`executionUpdatedAt` per order and a top-level `frozen` flag (true when any order is non-pending) in the detail response.
+- [x] T015 [US1] Freeze guard in `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`: at the start of `execute()` (after resolving `targetDate`), if `analysisRepository.hasMarkedOrders(targetDate)` is true, return the existing analysis (`getByDate`) WITHOUT calling the LLM or `upsert`; emit a metadata-only "frozen, skipped" log.
+- [x] T016 [P] [US1] Unit test in `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js`: a marked target date → LLM not called, `upsert` not called, existing analysis returned (SC-003).
+- [x] T017 [US1] `dashboard/src/pages/analysis-detail.astro`: per-order status control (executed/partial/skipped) + note input + Save (PATCH via `api()`), reflect the saved status, and a "frozen" badge once any order is marked.
 
 **Checkpoint**: US1 fully functional — the MVP (a durable, freeze-protected execution log).
 
@@ -78,8 +78,8 @@ Backend: `src/` at repo root. Dashboard: `dashboard/src/`. Tests: `tests/unit/`,
 
 **Independent Test**: With a prior analysis whose orders have statuses, run a new analysis → the AI inputs carry each prior order's status.
 
-- [ ] T018 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, extend `_loadPreviousAnalysis` to include each prior order's `executionStatus` in the mapped order objects (they already flow into the `## previousAnalysis` block); add a one-line instruction that the model should use it (serializes after T015 — same file).
-- [ ] T019 [P] [US2] Unit test in `GenerateWeeklyAnalysis.test.js`: prior orders supplied with `executionStatus`; a pre-feature prior (no statuses) is tolerated as `pending`.
+- [x] T018 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, extend `_loadPreviousAnalysis` to include each prior order's `executionStatus` in the mapped order objects (they already flow into the `## previousAnalysis` block); add a one-line instruction that the model should use it (serializes after T015 — same file).
+- [x] T019 [P] [US2] Unit test in `GenerateWeeklyAnalysis.test.js`: prior orders supplied with `executionStatus`; a pre-feature prior (no statuses) is tolerated as `pending`.
 
 **Checkpoint**: The loop is closed — the model reasons over real execution facts.
 
@@ -91,10 +91,10 @@ Backend: `src/` at repo root. Dashboard: `dashboard/src/`. Tests: `tests/unit/`,
 
 **Independent Test**: With known position changes, the detail view proposes sensible statuses; accepting them saves matching values.
 
-- [ ] T020 [P] [US3] `OrderExecutionMatcher` pure service in `src/domain/services/OrderExecutionMatcher.js`: `propose(order, positionChanges)` → `executed|partial|skipped`; direction match (buy↔added/increased, sell↔removed/reduced); `|delta| ≥ qty`→executed, `0<|delta|<qty`→partial, none→skipped; greedy on same-symbol collisions; returns no proposal when `positionChanges` is null.
-- [ ] T021 [P] [US3] Unit test `tests/unit/domain/services/OrderExecutionMatcher.test.js`: full→executed, partial→partial, no-match→skipped, sell↔reduce, null positionChanges→no proposal, same-symbol greedy.
-- [ ] T022 [US3] `src/functions/getWeeklyAnalysis.js`: annotate each PENDING order with `proposedStatus` via `OrderExecutionMatcher` using the analysis's `positionChanges` (omit when null) (serializes after T014 — same file).
-- [ ] T023 [US3] `dashboard/src/pages/analysis-detail.astro`: display each pending order's `proposedStatus` and an "accept" action (per-order and a bulk "accept all proposals") that PATCHes the confirmed values; nothing persists until the owner confirms (serializes after T017 — same file).
+- [x] T020 [P] [US3] `OrderExecutionMatcher` pure service in `src/domain/services/OrderExecutionMatcher.js`: `propose(order, positionChanges)` → `executed|partial|skipped`; direction match (buy↔added/increased, sell↔removed/reduced); `|delta| ≥ qty`→executed, `0<|delta|<qty`→partial, none→skipped; greedy on same-symbol collisions; returns no proposal when `positionChanges` is null.
+- [x] T021 [P] [US3] Unit test `tests/unit/domain/services/OrderExecutionMatcher.test.js`: full→executed, partial→partial, no-match→skipped, sell↔reduce, null positionChanges→no proposal, same-symbol greedy.
+- [x] T022 [US3] `src/functions/getWeeklyAnalysis.js`: annotate each PENDING order with `proposedStatus` via `OrderExecutionMatcher` using the analysis's `positionChanges` (omit when null) (serializes after T014 — same file).
+- [x] T023 [US3] `dashboard/src/pages/analysis-detail.astro`: display each pending order's `proposedStatus` and an "accept" action (per-order and a bulk "accept all proposals") that PATCHes the confirmed values; nothing persists until the owner confirms (serializes after T017 — same file).
 
 **Checkpoint**: Most weeks the owner just confirms proposals.
 
@@ -106,12 +106,12 @@ Backend: `src/` at repo root. Dashboard: `dashboard/src/`. Tests: `tests/unit/`,
 
 **Independent Test**: With several analyses' statuses, the scorecard aggregates correctly by conviction and degrades gracefully when history is short.
 
-- [ ] T024 [US4] Add `listAllOrders()` to `src/application/interfaces/IAnalysisRepository.js` and implement it in `src/infrastructure/repositories/AzureAnalysisRepository.js` (scan `portfolioOrders`, return all `SuggestedOrder`s) (serializes after T008 — same repo file).
-- [ ] T025 [US4] `GetSuggestionScorecard` use-case in `src/application/use-cases/analysis/GetSuggestionScorecard.js`: aggregate by `conviction` × `executionStatus`; compute `executionRate = executed/(executed+partial+skipped)`; `sufficientData = analysesCount >= 3` (FR-013); per data-model.md shape.
-- [ ] T026 [P] [US4] Unit test `tests/unit/application/use-cases/analysis/GetSuggestionScorecard.test.js`: counts + rate (excludes pending) overall and by conviction; `sufficientData:false` when fewer than 3 analyses, true at ≥3; empty → no crash.
-- [ ] T027 [US4] Wire `GetSuggestionScorecard` into `src/application/di/container.js` (`getGetSuggestionScorecard()`).
-- [ ] T028 [US4] `src/functions/getSuggestionScorecard.js`: `GET /api/analysis/scorecard`, auth `function`, call the use-case, respond per contracts/api.md.
-- [ ] T029 [US4] `dashboard/src/pages/scorecard.astro`: fetch `/analysis/scorecard`, render overall + by-conviction execution rates and the executed/partial/skipped mix, with a clear "insufficient data" state.
+- [x] T024 [US4] Add `listAllOrders()` to `src/application/interfaces/IAnalysisRepository.js` and implement it in `src/infrastructure/repositories/AzureAnalysisRepository.js` (scan `portfolioOrders`, return all `SuggestedOrder`s) (serializes after T008 — same repo file).
+- [x] T025 [US4] `GetSuggestionScorecard` use-case in `src/application/use-cases/analysis/GetSuggestionScorecard.js`: aggregate by `conviction` × `executionStatus`; compute `executionRate = executed/(executed+partial+skipped)`; `sufficientData = analysesCount >= 3` (FR-013); per data-model.md shape.
+- [x] T026 [P] [US4] Unit test `tests/unit/application/use-cases/analysis/GetSuggestionScorecard.test.js`: counts + rate (excludes pending) overall and by conviction; `sufficientData:false` when fewer than 3 analyses, true at ≥3; empty → no crash.
+- [x] T027 [US4] Wire `GetSuggestionScorecard` into `src/application/di/container.js` (`getGetSuggestionScorecard()`).
+- [x] T028 [US4] `src/functions/getSuggestionScorecard.js`: `GET /api/analysis/scorecard`, auth `function`, call the use-case, respond per contracts/api.md.
+- [x] T029 [US4] `dashboard/src/pages/scorecard.astro`: fetch `/analysis/scorecard`, render overall + by-conviction execution rates and the executed/partial/skipped mix, with a clear "insufficient data" state.
 
 **Checkpoint**: All four stories independently functional.
 
@@ -119,9 +119,9 @@ Backend: `src/` at repo root. Dashboard: `dashboard/src/`. Tests: `tests/unit/`,
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T030 [P] Privacy scan of the whole diff: no real holdings/secrets; all new fixtures use placeholder symbols/quantities (Constitution I).
-- [ ] T031 [P] Realign any existing analysis tests/fixtures affected by the order-shape change (e.g. `GenerateWeeklyAnalysis.test.js` order mocks now carry `executionStatus`).
-- [ ] T032 Run `quickstart.md` end-to-end locally and verify SC-001…SC-006 (mark persists; freeze skips re-run; prior status fed; proposals; scorecard by conviction).
+- [x] T030 [P] Privacy scan of the whole diff: no real holdings/secrets; all new fixtures use placeholder symbols/quantities (Constitution I).
+- [x] T031 [P] Realign any existing analysis tests/fixtures affected by the order-shape change (e.g. `GenerateWeeklyAnalysis.test.js` order mocks now carry `executionStatus`).
+- [x] T032 Run `quickstart.md` end-to-end locally and verify SC-001…SC-006 (mark persists; freeze skips re-run; prior status fed; proposals; scorecard by conviction).
 
 ---
 
