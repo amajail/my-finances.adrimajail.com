@@ -74,10 +74,11 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/005-editable-metaprompt/plan.md` (Phase 1 complete; tasks pending).
+`specs/006-weekly-context-capture/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/api.md`. This feature supersedes
-004's "Framework" editor by merging the fixed instructions + strategic
-framework into a single editable "Instructions" document used verbatim as the
-AI system prompt.
+`data-model.md`, `quickstart.md`, `contracts/` (`api.md`, `providers.md`,
+`imf-classify-tool.json`). This feature extends the weekly analysis to capture,
+inject, and display a 9-indicator macro panel, portfolio totals, and exact
+week-over-week position changes — persisted immutably per run, with macro
+fetches individually resilient (no single source failure aborts the run).
 <!-- SPECKIT END -->

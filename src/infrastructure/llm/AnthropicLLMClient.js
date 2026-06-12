@@ -163,6 +163,77 @@ class AnthropicLLMClient extends ILLMClient {
   }
 
   /**
+   * Small structured classification call (feature 006). Mirrors submitAnalysis'
+   * tool_use pattern but is generic: forces a single tool, validates the input
+   * against its schema, sanitizes SDK errors, and returns the tool input plus
+   * usage/cost. Used for the IMF status classification (FR-022) — its input
+   * carries ONLY public news text, never holdings data.
+   *
+   * @param {Object} input
+   * @param {string} input.systemPrompt
+   * @param {string} input.userMessage
+   * @param {Object} input.toolSchema - { name, description, input_schema }.
+   * @param {string} input.model
+   * @param {number} input.maxOutputTokens
+   * @returns {Promise<{ result: Object, usage: { inputTokens: number, outputTokens: number, costUsd: number } }>}
+   */
+  async classify({ systemPrompt, userMessage, toolSchema, model, maxOutputTokens }) {
+    if (!systemPrompt || !userMessage || !toolSchema || !model) {
+      throw new Error('classify: missing required input fields');
+    }
+
+    const client = this._client();
+    const toolName = toolSchema.name || 'submit_classification';
+
+    let response;
+    try {
+      response = await client.messages.create({
+        model,
+        max_tokens: maxOutputTokens || 256,
+        system: [{ type: 'text', text: systemPrompt }],
+        tools: [
+          {
+            name: toolName,
+            description: toolSchema.description || 'Submit the classification result.',
+            input_schema: toolSchema.input_schema,
+          },
+        ],
+        tool_choice: { type: 'tool', name: toolName },
+        messages: [{ role: 'user', content: userMessage }],
+      });
+    } catch (err) {
+      const sanitized = LLMLogSanitizer.sanitizeError(err);
+      logger.error('AnthropicLLMClient.classify: SDK request failed', sanitized);
+      throw new LLMRequestError(sanitized);
+    }
+
+    const toolBlock = Array.isArray(response.content)
+      ? response.content.find((b) => b.type === 'tool_use' && b.name === toolName)
+      : null;
+    if (!toolBlock || !toolBlock.input || typeof toolBlock.input !== 'object') {
+      throw new LLMSchemaValidationError(`model did not return a "${toolName}" tool_use block`);
+    }
+
+    this._validateAgainstSchema(toolBlock.input, toolSchema.input_schema);
+
+    const usage = response.usage || { input_tokens: 0, output_tokens: 0 };
+    const rates = MODEL_RATES[model] || DEFAULT_RATES;
+    const costUsd = Number(
+      ((usage.input_tokens / 1_000_000) * rates.input +
+        (usage.output_tokens / 1_000_000) * rates.output).toFixed(6)
+    );
+
+    return {
+      result: toolBlock.input,
+      usage: {
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        costUsd,
+      },
+    };
+  }
+
+  /**
    * Minimal JSON schema validator covering the subset our tool schema uses:
    * required fields, primitive types, enums, array minItems, string minLength.
    * Good enough for defense-in-depth — the model is the primary enforcer.

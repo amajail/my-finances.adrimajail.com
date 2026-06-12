@@ -19,4 +19,26 @@ import Layout from '../layouts/Layout.astro';
       edited via the API or Azure Storage Explorer.
     </p>
   </div>
+
+  <div class="card p-4 mt-4">
+    <h3 class="font-semibold text-sm text-[var(--color-muted)]">Weekly macro context (feature 006)</h3>
+    <p class="text-xs text-[var(--color-muted)] mt-2">
+      The weekly analysis captures a macro panel, portfolio totals, and the week's
+      position changes (shown on each analysis detail page). These are configured via
+      <strong>App Settings / <code>local.settings.json</code></strong> (environment), not the
+      settings table — the FRED key is a secret and MUST live there, never in source control:
+    </p>
+    <ul class="text-xs text-[var(--color-muted)] mt-2 list-disc pl-5 space-y-1">
+      <li><code>analysis.fredApiKey</code> — free FRED API key (US CPI, Fed funds, S&amp;P 500).
+        If absent, those indicators show as <em>unavailable</em>; the run still succeeds.</li>
+      <li><code>analysis.imfModel</code> — model for the IMF news classification call
+        (default <code>claude-haiku-4-5-20251001</code>).</li>
+      <li><code>analysis.imfStalenessWeeks</code> — weeks before a carried-forward IMF status
+        reverts to "unknown" (default <code>8</code>).</li>
+    </ul>
+    <p class="text-xs text-[var(--color-muted)] mt-2">
+      All other macro sources (riesgo país, FX gap, BCRA reserves/policy rate, AR inflation)
+      are keyless and need no configuration.
+    </p>
+  </div>
 </Layout>

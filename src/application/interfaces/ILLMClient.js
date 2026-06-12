@@ -50,6 +50,19 @@ class ILLMClient {
   async submitAnalysis(_input) {
     throw new Error('Method not implemented: submitAnalysis');
   }
+
+  /**
+   * Small structured classification call (feature 006). Forces a single tool
+   * and returns its validated input plus usage/cost. Used for IMF status
+   * classification over PUBLIC news text only.
+   *
+   * @param {Object} input - { systemPrompt, userMessage, toolSchema, model, maxOutputTokens }
+   * @returns {Promise<{ result: Object, usage: LLMUsage }>}
+   * @abstract
+   */
+  async classify(_input) {
+    throw new Error('Method not implemented: classify');
+  }
 }
 
 module.exports = ILLMClient;
