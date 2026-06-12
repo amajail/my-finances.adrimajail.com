@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All items pass. 3 clarifications resolved by owner on 2026-06-12: freeze-week-once-marked re-run survival; execution + hit-rate first (defer outcome P&L); propose-only auto-status (owner confirms).
+- All items pass. 5 clarifications resolved by owner on 2026-06-12: (1) freeze-week-once-marked re-run survival; (2) execution + hit-rate first (defer outcome P&L); (3) propose-only auto-status (owner confirms); (4) permanent freeze, no in-app force path; (5) scorecard = execution rate + executed/partial/skipped mix only (no directional signal).

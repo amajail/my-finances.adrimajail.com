@@ -15,6 +15,8 @@
 - Q: How should a manually-set execution status survive a same-week re-run that replaces the date's orders? → A: **Freeze the week once marked** — once any order for a date has a non-pending status, the system blocks re-running that date's analysis unless the owner explicitly forces it (a forced re-run discards the statuses with a clear warning).
 - Q: How far does the scorecard's performance comparison go this iteration? → A: **Execution + hit-rate tracking first, defer outcome P&L** — ship execution-rate analytics by conviction now; per-suggestion outcome P&L (needs a reference price + mark-to-market) is a documented follow-up.
 - Q: How do auto-proposed statuses (from position changes) apply? → A: **Propose-only** — proposals are displayed but nothing is saved until the owner explicitly confirms (individually or bulk-accept).
+- Q: How is a frozen (marked) week re-run, given analyses run via the timer/operator, not a dashboard button? → A: **Permanent freeze, no force** — once any order is marked, the scheduled/triggered run for that date is skipped and statuses preserved; regenerating that week is not supported in the normal flow (it requires an operator to remove the stored record).
+- Q: With outcome P&L deferred, what does the scorecard show? → A: **Execution rate + mix only** — executed/partial/skipped counts and rates, overall and by conviction; no outcome/directional signal this iteration.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -31,7 +33,7 @@ From the analysis detail page, the owner marks each suggested order with an exec
 1. **Given** a completed analysis with suggested orders, **When** the owner sets an order to "executed", **Then** that status is saved and shown on subsequent views of the analysis.
 2. **Given** an order the owner has not touched, **When** the analysis is viewed, **Then** the order shows status "pending".
 3. **Given** an order marked "partial" or "skipped" with a note, **When** the analysis is reloaded, **Then** the status and the note are both preserved.
-4. **Given** an order's status was set, **When** something attempts to re-run the weekly analysis for that same date, **Then** the re-run is blocked (the recorded statuses are preserved) unless the owner explicitly forces it, in which case the owner is warned that statuses will be discarded.
+4. **Given** an order's status was set, **When** the weekly analysis for that same date is re-triggered, **Then** the run is skipped and the recorded statuses are preserved — a marked week is permanently frozen; regenerating it is not supported in the normal flow (it requires an operator to remove the stored record).
 
 ---
 
@@ -86,7 +88,7 @@ A scorecard view summarizes, across all completed analyses and broken down by co
 
 ### Edge Cases
 
-- **Re-run after marking**: covered by FR-004 / the re-run clarification — must not silently lose owner input.
+- **Re-run after marking**: a marked week is permanently frozen (FR-004) — any re-triggered run for that date is skipped, never silently losing owner input.
 - **Quantity mismatch direction**: a SELL suggestion matched against a *decrease* is "executed"; matched against an *increase* is not a match (→ skipped).
 - **Multiple orders, same symbol**: if two suggestions touch the same symbol, the proposal logic must not double-count one position change (resolved greedily; residual ambiguity acceptable for a single-user tool).
 - **Partial with no number**: "partial" may be recorded as a label without capturing the exact executed quantity unless clarified otherwise.
@@ -103,7 +105,7 @@ A scorecard view summarizes, across all completed analyses and broken down by co
 - **FR-001**: The system MUST let the owner set an execution status on each suggested order of a completed analysis, chosen from: pending (default), executed, partial, skipped.
 - **FR-002**: The system MUST allow an optional free-text note per order alongside its status.
 - **FR-003**: Execution status and note MUST persist and be shown on every later view of that analysis.
-- **FR-004**: Once any order for an analysis date has a non-pending execution status, the system MUST block re-running that date's analysis (which would replace its orders), preserving the recorded statuses — UNLESS the owner explicitly forces the re-run, in which case the system MUST warn that the recorded statuses will be discarded before proceeding.
+- **FR-004**: Once any order for an analysis date has a non-pending execution status, the system MUST permanently block re-running that date's analysis — a re-triggered run for that date is skipped and the recorded statuses are preserved. Regenerating such a week is not supported in the normal flow (it requires an operator to remove the stored analysis record, which discards its statuses). No in-app "force" path exists.
 - **FR-005**: Each saved status MUST record when it was last changed. Saved statuses are owner-confirmed (nothing is auto-saved — see FR-006/FR-007).
 
 #### Auto-proposal from position changes
@@ -120,7 +122,7 @@ A scorecard view summarizes, across all completed analyses and broken down by co
 #### Scorecard
 
 - **FR-011**: The system MUST present a scorecard summarizing, across completed analyses, the execution rate (executed vs total suggestions) overall and broken down by conviction level.
-- **FR-012**: The scorecard MUST show the executed / partial / skipped breakdown by conviction. Per-suggestion outcome P&L is explicitly OUT of scope for this iteration (it requires a reference price captured at suggestion time plus mark-to-market) and is recorded as a follow-up.
+- **FR-012**: The scorecard MUST show the executed / partial / skipped breakdown by conviction. No outcome or directional performance signal is computed in this iteration — per-suggestion outcome P&L (it requires a reference price captured at suggestion time plus mark-to-market) is explicitly OUT of scope and recorded as a follow-up.
 - **FR-013**: The scorecard MUST degrade gracefully when history is too short to compute meaningful rates (show counts; indicate insufficient data).
 
 #### Access & display
@@ -152,6 +154,6 @@ A scorecard view summarizes, across all completed analyses and broken down by co
 - **Conviction is the primary cut**: the scorecard groups by the order's conviction (low/medium/high); per-broker or per-asset-type cuts are out of scope for this iteration.
 - **Matching granularity**: the proposal matches by symbol + side + quantity against the week's position changes; same-symbol multiple-order ambiguity is resolved greedily and is acceptable for a single-user tool.
 - **Partial detail**: "partial" is a label; capturing the exact executed quantity is optional and deferred.
-- **Re-run is rare after marking**: the freeze-once-marked rule assumes the owner marks a week after the run settles; a forced re-run (discarding statuses) is the explicit escape hatch.
+- **Re-run is rare after marking**: the freeze-once-marked rule assumes the owner marks a week after the run settles. There is no in-app force path; regenerating a frozen week is an out-of-flow operator action (delete the record).
 - **Dependency**: builds on feature 006 (suggested orders, persisted position changes, portfolio totals); lands after 006 is in production (it is).
 - **Out of scope**: per-suggestion outcome P&L / returns (deferred follow-up), automated trade execution, broker integration, editing past *suggestions* (only their execution status is mutable), alerting, and backfilling statuses onto historical analyses.
