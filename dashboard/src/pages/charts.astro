@@ -1,0 +1,167 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Charts · my-finances" active="charts">
+  <header class="mb-6">
+    <span class="eyebrow">Charts</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold">Macro &amp; portfolio trends</h1>
+    <p class="text-sm text-[var(--color-muted)] mt-1" id="hdr-meta">Loading…</p>
+  </header>
+
+  <div class="flex flex-wrap items-center gap-3 mb-6">
+    <div class="flex gap-1" id="mode-toggle">
+      <button type="button" data-mode="multiples" class="badge badge-success">Small multiples</button>
+      <button type="button" data-mode="overlay" class="badge badge-pending">Overlay</button>
+    </div>
+    <label class="text-sm text-[var(--color-muted)]">Range
+      <select id="range" class="ml-1 bg-[var(--color-surface-2)] rounded px-1 py-0.5 text-sm">
+        <option value="8">8 wks</option>
+        <option value="26">26 wks</option>
+        <option value="52">52 wks</option>
+        <option value="all" selected>All</option>
+      </select>
+    </label>
+    <div id="overlay-controls" class="hidden flex items-center gap-2 text-sm text-[var(--color-muted)]">
+      <label>Portfolio <select id="ov-left" class="ml-1 bg-[var(--color-surface-2)] rounded px-1 py-0.5"></select></label>
+      <label>Macro <select id="ov-right" class="ml-1 bg-[var(--color-surface-2)] rounded px-1 py-0.5"></select></label>
+    </div>
+  </div>
+
+  <section id="empty" class="card p-6 hidden">
+    <p class="text-sm text-[var(--color-muted)]" id="empty-msg">Not enough history yet — charts appear once weekly analyses accumulate.</p>
+  </section>
+
+  <section id="multiples">
+    <div id="imf-strip-card" class="card mb-6 hidden">
+      <div class="px-4 py-3 border-b border-[var(--color-border)]"><h2 class="font-semibold">IMF review status</h2></div>
+      <div class="p-3" id="imf-strip"></div>
+    </div>
+    <div id="grid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
+  </section>
+
+  <section id="overlay" class="card hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]"><h2 class="font-semibold" id="overlay-title">Overlay</h2></div>
+    <div class="p-3" id="overlay-chart"></div>
+  </section>
+
+  <p id="error-banner" class="card p-4 pos-negative text-sm hidden"></p>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+  // charts.cjs is CommonJS (so the pure helpers are jest-testable). The .cjs
+  // extension makes Vite's commonjs plugin handle it; import the default
+  // (module.exports) and destructure.
+  import charts from '../lib/charts.cjs';
+  const {
+    METRIC_CATALOGUE, PORTFOLIO_KEYS, MACRO_NUMERIC_KEYS,
+    buildSeries, sliceLastN, imfChangePoints,
+    lineChartSvg, dualAxisSvg, eventStripSvg,
+  } = charts;
+
+  function show(el) { el.classList.remove('hidden'); }
+  function hide(el) { el.classList.add('hidden'); }
+  const byKey = Object.fromEntries(METRIC_CATALOGUE.map((m) => [m.key, m]));
+
+  let allPoints = [];
+  let mode = 'multiples';
+
+  function currentPoints() {
+    return sliceLastN(allPoints, document.getElementById('range').value);
+  }
+
+  function renderMultiples(points) {
+    // IMF strip
+    const imfPts = imfChangePoints(points);
+    const imfCard = document.getElementById('imf-strip-card');
+    if (imfPts.length) {
+      document.getElementById('imf-strip').innerHTML = eventStripSvg(points);
+      show(imfCard);
+    } else hide(imfCard);
+
+    document.getElementById('grid').innerHTML = METRIC_CATALOGUE.map((m) => {
+      const series = buildSeries(points, m);
+      return `<div class="card p-3">
+        <div class="flex items-baseline justify-between mb-1">
+          <span class="text-sm font-medium">${m.label}</span>
+          <span class="text-xs text-[var(--color-muted)]">${m.unit}</span>
+        </div>
+        ${lineChartSvg(series, { unit: m.unit })}
+      </div>`;
+    }).join('');
+  }
+
+  function renderOverlay(points) {
+    const leftKey = document.getElementById('ov-left').value;
+    const rightKey = document.getElementById('ov-right').value;
+    const left = buildSeries(points, byKey[leftKey]);
+    const right = buildSeries(points, byKey[rightKey]);
+    document.getElementById('overlay-title').textContent = `${byKey[leftKey].label} vs ${byKey[rightKey].label}`;
+    document.getElementById('overlay-chart').innerHTML =
+      dualAxisSvg(left, right, { leftLabel: `${byKey[leftKey].label} (${byKey[leftKey].unit})`, rightLabel: `${byKey[rightKey].label} (${byKey[rightKey].unit})` });
+  }
+
+  function render() {
+    const points = currentPoints();
+    const empty = document.getElementById('empty');
+    if (points.length < 2) {
+      document.getElementById('empty-msg').textContent = points.length === 0
+        ? 'No analyses with chart data yet.'
+        : 'Only one data point so far — trends appear from the second week.';
+      show(empty);
+    } else hide(empty);
+
+    if (mode === 'overlay') {
+      hide(document.getElementById('multiples'));
+      show(document.getElementById('overlay'));
+      show(document.getElementById('overlay-controls'));
+      renderOverlay(points);
+    } else {
+      show(document.getElementById('multiples'));
+      hide(document.getElementById('overlay'));
+      hide(document.getElementById('overlay-controls'));
+      renderMultiples(points);
+    }
+  }
+
+  function fillOverlaySelects() {
+    const opt = (k) => `<option value="${k}">${byKey[k].label}</option>`;
+    document.getElementById('ov-left').innerHTML = PORTFOLIO_KEYS.map(opt).join('');
+    document.getElementById('ov-right').innerHTML = MACRO_NUMERIC_KEYS.map(opt).join('');
+    document.getElementById('ov-right').value = 'fxGap';
+  }
+
+  async function load() {
+    let data;
+    try {
+      data = await api('/analysis/macro-series?weeks=60');
+    } catch (err) {
+      const b = document.getElementById('error-banner');
+      b.textContent = `Failed to load series: ${err.message}`;
+      show(b);
+      return;
+    }
+    allPoints = data.points || [];
+    document.getElementById('hdr-meta').textContent =
+      `${allPoints.length} weekly ${allPoints.length === 1 ? 'analysis' : 'analyses'}`;
+    fillOverlaySelects();
+    render();
+
+    document.getElementById('range').addEventListener('change', render);
+    document.getElementById('ov-left').addEventListener('change', render);
+    document.getElementById('ov-right').addEventListener('change', render);
+    document.querySelectorAll('#mode-toggle button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        mode = btn.getAttribute('data-mode');
+        document.querySelectorAll('#mode-toggle button').forEach((b) => {
+          b.className = `badge ${b.getAttribute('data-mode') === mode ? 'badge-success' : 'badge-pending'}`;
+        });
+        render();
+      });
+    });
+  }
+
+  load();
+</script>

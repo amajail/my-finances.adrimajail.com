@@ -74,13 +74,13 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/007-suggestion-scorecard/plan.md` (Phase 1 complete; tasks pending).
-Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/api.md`. This feature adds an
-owner-set execution status (executed/partial/skipped) to weekly suggested
-orders — stored on the order row, auto-proposed from feature 006's
-positionChanges (propose-only), fed into the next analysis, and summarized in a
-by-conviction scorecard. Marking any order permanently freezes that week
-(re-runs skipped). Builds on feature 006 (shipped). Prior plan:
-`specs/006-weekly-context-capture/plan.md`.
+`specs/008-macro-charts/plan.md` (Phase 1 complete; tasks pending). Companion
+artifacts in the same folder: `spec.md`, `research.md`, `data-model.md`,
+`quickstart.md`, `contracts/api.md`. This feature adds a read-only "Charts"
+dashboard page that plots the weekly macro panel + portfolio totals over time
+(small-multiples, independent y-axes, gaps not interpolated, IMF as an event
+strip, dual-axis overlay, range selector) — fed by a thin new
+`GET /api/analysis/macro-series` projection over feature 006's persisted data.
+Hand-rolled SVG, zero new deps, no new storage. Builds on features 006 + 007
+(shipped). Prior plan: `specs/007-suggestion-scorecard/plan.md`.
 <!-- SPECKIT END -->

@@ -25,6 +25,7 @@ const { RefreshPrices } = require('./prices');
 const GenerateWeeklyAnalysis = require('./analysis/GenerateWeeklyAnalysis');
 const SetOrderExecutionStatus = require('./analysis/SetOrderExecutionStatus');
 const GetSuggestionScorecard = require('./analysis/GetSuggestionScorecard');
+const GetMacroSeries = require('./analysis/GetMacroSeries');
 
 // Instructions use cases (feature 005)
 const {
@@ -50,6 +51,7 @@ module.exports = {
   GenerateWeeklyAnalysis,
   SetOrderExecutionStatus,
   GetSuggestionScorecard,
+  GetMacroSeries,
   GetActiveInstructions,
   SaveInstructions,
   ListInstructionsHistory,
