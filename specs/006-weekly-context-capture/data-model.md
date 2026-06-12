@@ -59,7 +59,7 @@ Keys (all `MacroReading`). Grouped for display (FR-019) but stored flat:
 | `argInterestRate` | % (number) | Argentina | BCRA v4.0 idVariable 160 |
 | `usaInflation` | % (number) | US | FRED CPIAUCSL units=pc1 |
 | `usaInterestRate` | % (number) | US | FRED DFEDTARU |
-| `sp500Drawdown` | % (number, ≤ 0) | Global | Stooq ^spx |
+| `sp500Drawdown` | % (number, ≤ 0) | Global | FRED `SP500` (Stooq ^spx fallback when no FRED key — Stooq now JS-gated) |
 | `imfReviewStatus` | enum (string) | Program | IMF RSS + AI classify |
 
 `imfReviewStatus.value` ∈ `none | pending | staff-level-agreement | approved | disbursement | unknown`.

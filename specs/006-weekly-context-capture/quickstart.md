@@ -76,3 +76,25 @@ npm run test:unit          # entity validation, PositionChangeCalculator, provid
 npm run test:integration   # provider fixtures, repository round-trip (Azurite)
 ```
 Use clearly-fake holdings data in all fixtures (Constitution I).
+
+## Suggested instructions snippet (owner-controlled)
+
+This feature delivers the macro **data**; how the AI *weights* it stays in your editable
+Instructions document (feature 005). Paste/adapt the following into that document so the
+narrative reasons over the new `## macroContext`, `## portfolioTotals`, and `## positionChanges`
+blocks now present in the user message:
+
+```markdown
+### Using the macro context
+- A `macroContext` block accompanies each run (Argentina, US, global indicators). Treat any
+  reading with `available: false` as missing data, not zero.
+- Weight the signals, e.g.: a wide MEP/official FX gap → caution deploying into ARS; rising US
+  rates or a high Fed funds level → pressure on long-duration / EM exposure; a deep S&P 500
+  drawdown → potential accumulation opportunity; rising riesgo país or a stalled IMF review →
+  de-risk Argentine sovereign exposure. BCRA reserves are reported GROSS (labeled).
+- When the previous week's `macroContext` is present, comment on direction (e.g. "FX gap
+  widened from X% to Y%"), not just levels.
+- A `positionChanges` block lists exactly what was added/removed/increased/reduced since last
+  week (or `unknown` on the first run). Use it instead of inferring trades from the snapshots;
+  for each prior suggested order, state whether the change set is consistent with it executing.
+```

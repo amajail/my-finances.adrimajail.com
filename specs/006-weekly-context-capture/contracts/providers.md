@@ -34,7 +34,7 @@ getLatest({ priorImfReading }) ->
 | `IBcraMonetariasProvider` | `getVariable(idVariable)` | `{ value, asOf }` | BCRA v4.0 /Monetarias/{id} |
 | `IInflationProvider` | `getLatest()` | `{ percent, asOf }` | argentinadatos inflación |
 | `IFredProvider` | `getLatestObservation(seriesId, {units})` | `{ value, asOf }` | FRED observations |
-| `ISp500DrawdownProvider` | `getLatest()` | `{ drawdownPct, asOf }` | Stooq ^spx CSV |
+| `ISp500DrawdownProvider` | `getLatest()` | `{ drawdownPct, asOf }` | FRED `SP500` (`FredSp500DrawdownProvider`); Stooq ^spx CSV fallback when no FRED key |
 | `IImfStatusProvider` | `getLatest({ priorReading })` | `{ status, asOf, usage }` | IMF RSS + AI classify |
 
 Notes:

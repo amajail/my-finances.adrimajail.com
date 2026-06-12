@@ -41,10 +41,21 @@ unknown from the Technical Context. Format per item: Decision / Rationale / Alte
 - **Key storage**: read from setting `analysis.fredApiKey`, sourced from a Function App Application Setting / `local.settings.json` — **never committed** (FR-023, Constitution I). If the key is absent, FRED-backed indicators return `available:false` (graceful) rather than throwing.
 - **Alternatives**: BLS API (US CPI) — viable but second source; FRED covers all three US/global series with one client → preferred.
 
-### 8. S&P 500 drawdown from ATH (%) — Stooq (keyless), new provider
-- **Decision**: New `StooqSp500Provider` fetches `https://stooq.com/q/d/l/?s=%5Espx&i=d` (CSV `Date,Open,High,Low,Close,Volume`), computes `drawdown = (lastClose − max(Close)) / max(Close) × 100` (≤ 0). as-of = last row date.
-- **Rationale**: Keyless, deep history → **true all-time high**. CSV parsed by line-split (no dependency).
-- **Alternatives**: FRED `SP500` (keyed) — only ~10yr window, so ATH not guaranteed true → fallback only. WebFetch can't read the raw CSV (strips non-HTML); implementation must use a real HTTP client (native `fetch`), which is fine at runtime.
+### 8. S&P 500 drawdown from ATH (%) — FRED primary, Stooq keyless fallback
+- **Decision (revised after live testing)**: Primary source is **FRED `SP500`** via
+  `FredSp500DrawdownProvider` (fetches the full daily series, computes
+  `drawdown = (lastClose − max(Close)) / max(Close) × 100`, ≤ 0). The keyless
+  `StooqSp500Provider` is retained as a fallback used only when no FRED key is configured.
+- **Why revised**: Stooq's keyless CSV (`https://stooq.com/q/d/l/?s=%5Espx&i=d`) is now gated
+  behind a JavaScript "verify your browser" proof-of-work challenge — it returns HTML, not CSV,
+  to headless clients. Verified live 2026-06-12 (HTTP 200 + a JS challenge body). The provider
+  correctly degrades to `available:false`, but that leaves the indicator permanently missing, so
+  FRED becomes primary now that a FRED key is required for the US series anyway.
+- **Caveat (accepted)**: FRED `SP500` retains only ~10 years of daily history, so the "high" is
+  a ~10-year high, not guaranteed the true ATH. In practice (index near record levels) it equals
+  the true ATH. Live result: drawdown ≈ −2.83% @ 2026-06-11.
+- **Alternatives**: keep Stooq primary — rejected (unreliable headless). The `StooqSp500Provider`
+  code stays as the no-key fallback path.
 
 ### 9. IMF Argentina review status — RSS filter + AI classify
 - **Decision**: New `ImfStatusProvider`:

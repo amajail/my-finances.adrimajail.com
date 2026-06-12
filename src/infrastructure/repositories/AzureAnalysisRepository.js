@@ -187,6 +187,20 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     if (wa.frameworkHistoryRowKey) {
       entity.frameworkHistoryRowKey = wa.frameworkHistoryRowKey;
     }
+    // Feature 006: macro panel + portfolio totals + position changes, each as a
+    // JSON column. Only written when present (pre-feature rows stay clean).
+    if (wa.macroContext) {
+      entity.macroContextJson = JSON.stringify(wa.macroContext);
+    }
+    if (wa.portfolioTotals) {
+      entity.portfolioTotalsJson = JSON.stringify(wa.portfolioTotals);
+    }
+    // positionChanges: serialize the literal `null` (unknown) vs `[]` (no
+    // change) so the distinction survives a round-trip. A MISSING column also
+    // reads back as null. Only skip when the entity never computed it (null).
+    if (wa.positionChanges !== null && wa.positionChanges !== undefined) {
+      entity.positionChangesJson = JSON.stringify(wa.positionChanges);
+    }
     return entity;
   }
 
@@ -200,6 +214,15 @@ class AzureAnalysisRepository extends IAnalysisRepository {
         portfolioSnapshot = [];
       }
     }
+    // Feature 006: parse the three JSON columns; absent column → null
+    // (pre-feature rows). Malformed JSON → null with a warning.
+    const macroContext = this._parseJsonColumn(entity.macroContextJson, entity.rowKey, 'macroContextJson', null);
+    const portfolioTotals = this._parseJsonColumn(entity.portfolioTotalsJson, entity.rowKey, 'portfolioTotalsJson', null);
+    // positionChanges: a stored literal "null" parses back to null (unknown);
+    // "[]" parses to [] (no change); absent column → null.
+    const positionChanges = entity.positionChangesJson !== undefined
+      ? this._parseJsonColumn(entity.positionChangesJson, entity.rowKey, 'positionChangesJson', null)
+      : null;
     return new WeeklyAnalysis({
       date: entity.rowKey,
       status: entity.status,
@@ -220,7 +243,26 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       instructionsHistoryRowKey: entity.instructionsHistoryRowKey || null,
       // Feature 004 (legacy): absent on pre-004 and post-005 rows → null.
       frameworkHistoryRowKey: entity.frameworkHistoryRowKey || null,
+      // Feature 006: macro/totals/changes (absent on pre-feature rows → null).
+      macroContext,
+      portfolioTotals,
+      positionChanges,
     });
+  }
+
+  /**
+   * Parse a JSON-string column, returning `fallback` when absent and logging a
+   * warning (then returning `fallback`) on malformed JSON. (Feature 006.)
+   * @private
+   */
+  _parseJsonColumn(raw, rowKey, columnName, fallback) {
+    if (raw === undefined || raw === null || raw === '') return fallback;
+    try {
+      return JSON.parse(raw);
+    } catch (parseErr) {
+      logger.warn(`Could not parse ${columnName} for ${rowKey}`, parseErr);
+      return fallback;
+    }
   }
 
   _orderToEntity(order) {

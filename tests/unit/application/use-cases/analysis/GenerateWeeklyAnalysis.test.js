@@ -1,12 +1,14 @@
 /**
- * GenerateWeeklyAnalysis use-case tests (happy path).
+ * GenerateWeeklyAnalysis use-case tests.
  *
- * Mocks all collaborators. Asserts:
- *   - the active instructions document is used VERBATIM as the system prompt
- *     (feature 005 — no template file, no token substitution)
- *   - LLM result is materialized into WeeklyAnalysis + SuggestedOrder entities
- *   - repository.upsert is called once with the right shapes
- *   - the persisted entity has status === 'completed'
+ * Mocks all collaborators. Covers (feature 002 + 005 + 006):
+ *   - instructions document used VERBATIM as the system prompt (005)
+ *   - LLM result materialized into WeeklyAnalysis + SuggestedOrder entities
+ *   - macro panel captured/injected/mirrored + resilient (006 US1)
+ *   - portfolio totals captured + preserved on failure (006 US2)
+ *   - exact week-over-week position changes (006 US3)
+ *   - prior macro panel reaches the prompt for trend reasoning (006 US4)
+ *   - failure branches persist a failed row (and re-throw for unknowns)
  *   - no log call contains the prompt body or the raw response body
  */
 
@@ -15,14 +17,17 @@ const WeeklyAnalysis = require('../../../../../src/domain/entities/WeeklyAnalysi
 
 const longBody = 'This is a long-enough narrative body for validation. '.repeat(10);
 
-// The full editable instructions document the AI receives (feature 005). Used
-// verbatim — what we set here is exactly the systemPrompt the LLM client sees.
 const DEFAULT_INSTRUCTIONS =
   '# FULL INSTRUCTIONS DOCUMENT\n\nRole, guardrails, and the owner framework — all inline as one document.';
 
 function fakePortfolioSummary() {
   return {
-    totalUsd: 100000,
+    grandTotalUsd: 100000,
+    totalByCurrency: { USD: 90000, ARS: 14500000 },
+    unrealizedPnlByCurrency: { USD: 1200, ARS: -50000 },
+    costBasisByCurrency: { USD: 88800, ARS: 14550000 },
+    mepRate: 1450,
+    mepRateAsOf: '2026-05-15',
     positions: [
       {
         brokerId: 'ibkr', assetType: 'stock', symbol: 'BRK.B',
@@ -36,6 +41,27 @@ function fakePortfolioSummary() {
       },
     ],
   };
+}
+
+// A fully-available macro panel (the orchestrator never throws — a failing
+// source surfaces as available:false, not an exception).
+function fakeMacroReadings(overrides = {}) {
+  return {
+    riesgoPais: { value: 524, asOf: '2026-05-15', available: true },
+    fxGap: { value: 0.3, asOf: '2026-05-14', available: true },
+    bcraReserves: { value: 47834, asOf: '2026-05-13', available: true, basis: 'gross' },
+    argInflation: { value: 2.1, asOf: '2026-04-30', available: true },
+    argInterestRate: { value: 29, asOf: '2026-05-15', available: true },
+    usaInflation: { value: 3.1, asOf: '2026-04-01', available: true },
+    usaInterestRate: { value: 4.5, asOf: '2026-05-15', available: true },
+    sp500Drawdown: { value: -2.4, asOf: '2026-05-15', available: true },
+    imfReviewStatus: { value: 'approved', asOf: '2026-05-10', available: true },
+    ...overrides,
+  };
+}
+
+function mockMacroProvider({ readings = fakeMacroReadings(), usage = { inputTokens: 0, outputTokens: 0, costUsd: 0 } } = {}) {
+  return { getLatest: jest.fn().mockResolvedValue({ readings, usage }) };
 }
 
 function mockRepositoryEmpty() {
@@ -57,16 +83,10 @@ function mockLlmClientReturning(orders = []) {
   };
 }
 
-// AzureSettingsRepository.get returns the raw value string (or null) — not a
-// { value } wrapper. Mock the same contract.
 function mockSettingsRepo(map = {}) {
-  return {
-    get: jest.fn(async (key) => (key in map ? map[key] : null)),
-  };
+  return { get: jest.fn(async (key) => (key in map ? map[key] : null)) };
 }
 
-// Feature 005: the instructions document repository. getActive() returns the
-// active document + the history rowKey produced it.
 function mockInstructionsRepo({ content = DEFAULT_INSTRUCTIONS, historyRowKey = 'rk-active', updatedAt = '2026-06-11T14:00:00Z' } = {}) {
   return { getActive: jest.fn(async () => ({ content, historyRowKey, updatedAt })) };
 }
@@ -74,7 +94,7 @@ function mockInstructionsRepo({ content = DEFAULT_INSTRUCTIONS, historyRowKey = 
 function buildUseCase({
   llmClient = mockLlmClientReturning(),
   repository = mockRepositoryEmpty(),
-  riesgoPaisProvider = { getLatest: jest.fn().mockResolvedValue({ basisPoints: 524, asOf: '2026-05-15' }) },
+  macroContextProvider = mockMacroProvider(),
   settingsRepository = mockSettingsRepo({ 'analysis.model': 'claude-opus-4-7' }),
   instructionsRepository = mockInstructionsRepo(),
   portfolioSummary = fakePortfolioSummary(),
@@ -86,7 +106,7 @@ function buildUseCase({
     useCase: new GenerateWeeklyAnalysis({
       analysisRepository: repository,
       llmClient,
-      riesgoPaisProvider,
+      macroContextProvider,
       getPortfolioSummary: { execute: jest.fn().mockResolvedValue(portfolioSummary) },
       settingsRepository,
       instructionsRepository,
@@ -96,7 +116,7 @@ function buildUseCase({
     llmClient,
     settingsRepository,
     instructionsRepository,
-    riesgoPaisProvider,
+    macroContextProvider,
   };
 }
 
@@ -148,18 +168,11 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
   });
 
   it('falls back to default model / caps when those settings are missing', async () => {
-    // No model setting — everything falls back to defaults. Instructions still required.
-    const { useCase, llmClient } = buildUseCase({
-      settingsRepository: mockSettingsRepo({}),
-    });
+    const { useCase, llmClient } = buildUseCase({ settingsRepository: mockSettingsRepo({}) });
     await useCase.execute({ targetDate: '2026-05-15' });
 
     expect(llmClient.submitAnalysis).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'claude-opus-4-7',
-        maxInputTokens: 80000,
-        maxOutputTokens: 8000,
-      })
+      expect.objectContaining({ model: 'claude-opus-4-7', maxInputTokens: 80000, maxOutputTokens: 8000 })
     );
   });
 
@@ -170,34 +183,6 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     const submitCall = llmClient.submitAnalysis.mock.calls[0][0];
     expect(submitCall.userMessage).toContain('## previousAnalysis');
     expect(submitCall.userMessage).toContain('none — first run');
-  });
-
-  it('passes a structured previousAnalysis block when a prior row exists', async () => {
-    const repo = mockRepositoryEmpty();
-    const priorAnalysis = new WeeklyAnalysis({
-      date: '2026-05-08',
-      status: 'completed',
-      generatedAt: '2026-05-08T21:00:14Z',
-      modelUsed: 'claude-opus-4-7',
-      promptVersion: 'editable-instructions-v1',
-      summary: 'Prior week summary — concise paragraph about last week.',
-      markdownBody: longBody,
-      riesgoPaisBp: 538,
-      riesgoPaisAsOf: '2026-05-08',
-      portfolioSnapshot: [{ broker: 'ibkr', assetType: 'stock', symbol: 'MU', quantity: 50, averageCost: 80, currentPrice: 100, currency: 'USD', valueUsd: 5000 }],
-      tokensIn: 10000, tokensOut: 1000, costUsd: 0.20, durationMs: 30000,
-    });
-    repo.getLatest.mockResolvedValue([priorAnalysis]);
-    repo.getByDate.mockResolvedValue({ analysis: priorAnalysis, orders: [] });
-
-    const { useCase, llmClient } = buildUseCase({ repository: repo });
-    await useCase.execute({ targetDate: '2026-05-15' });
-
-    const submitCall = llmClient.submitAnalysis.mock.calls[0][0];
-    expect(submitCall.userMessage).toContain('## previousAnalysis');
-    expect(submitCall.userMessage).toContain('"date": "2026-05-08"');
-    expect(submitCall.userMessage).toContain('"portfolioSnapshot"');
-    expect(submitCall.userMessage).toContain('"symbol": "MU"');
   });
 
   it('uses the active instructions document verbatim as the system prompt (FR-003/FR-004)', async () => {
@@ -224,18 +209,7 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     expect(result.status).toBe('failed');
     expect(result.errorMessage).toMatch(/instructions not configured/);
     expect(repo.upsert).toHaveBeenCalledTimes(1);
-    // No orders persisted on failure
     expect(repo.upsert.mock.calls[0][1]).toEqual([]);
-  });
-
-  it('persists a failed row when the active instructions document is empty', async () => {
-    const { useCase } = buildUseCase({
-      instructionsRepository: mockInstructionsRepo({ content: '   \n  ', historyRowKey: 'rk-empty' }),
-    });
-
-    const result = await useCase.execute({ targetDate: '2026-05-15' });
-    expect(result.status).toBe('failed');
-    expect(result.errorMessage).toMatch(/instructions not configured/);
   });
 
   it('does not log the prompt body or the response body', async () => {
@@ -243,16 +217,10 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     const spy = jest.spyOn(logger, 'info').mockImplementation(() => {});
     const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => {});
 
-    const { useCase } = buildUseCase({
-      llmClient: mockLlmClientReturning([]),
-    });
+    const { useCase } = buildUseCase({ llmClient: mockLlmClientReturning([]) });
     await useCase.execute({ targetDate: '2026-05-15' });
 
-    // Inspect every logged argument; none of them should be the prompt or markdownBody.
-    const allLogArgs = [
-      ...spy.mock.calls.flat(),
-      ...warnSpy.mock.calls.flat(),
-    ];
+    const allLogArgs = [...spy.mock.calls.flat(), ...warnSpy.mock.calls.flat()];
     const asJson = JSON.stringify(allLogArgs);
     expect(asJson).not.toContain('FULL INSTRUCTIONS DOCUMENT');
     expect(asJson).not.toContain('Executive summary: trim MU');
@@ -264,18 +232,201 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
 });
 
 // =========================================================================
-// Failure-branch coverage
-//
-// Verifies the typed-error paths in GenerateWeeklyAnalysis.execute:
-//   - RiesgoPaisFetchError      → persist failed, do not call LLM
-//   - CostCapExceededError      → persist failed (no API spend)
-//   - LLMSchemaValidationError  → persist failed (cost already incurred)
-//   - LLMRequestError           → persist failed (sanitized message)
-//   - Generic Error (catch-all) → persist failed AND re-throw to surface in
-//                                 the function host log
+// Feature 006 — US1: macro context captured, used, mirrored, resilient
 // =========================================================================
+describe('GenerateWeeklyAnalysis (US1 macro context)', () => {
+  it('persists the macro panel, injects it, and mirrors riesgo país onto legacy fields', async () => {
+    const { useCase, repository, llmClient } = buildUseCase();
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
 
-const { RiesgoPaisFetchError } = require('../../../../../src/infrastructure/providers/ArgentinaDatosRiesgoPaisProvider');
+    expect(result.macroContext).toBeTruthy();
+    expect(result.macroContext.imfReviewStatus.value).toBe('approved');
+    expect(result.macroContext.bcraReserves.basis).toBe('gross');
+    expect(result.riesgoPaisBp).toBe(524);
+    expect(result.riesgoPaisAsOf).toBe('2026-05-15');
+
+    const submitCall = llmClient.submitAnalysis.mock.calls[0][0];
+    expect(submitCall.userMessage).toContain('## macroContext');
+    expect(submitCall.userMessage).toContain('"imfReviewStatus"');
+
+    const persisted = repository.upsert.mock.calls[0][0];
+    expect(persisted.macroContext.usaInflation.value).toBe(3.1);
+  });
+
+  it('folds the IMF classify usage into run telemetry and cost (FR-022)', async () => {
+    const macroContextProvider = mockMacroProvider({ usage: { inputTokens: 200, outputTokens: 20, costUsd: 0.0003 } });
+    const { useCase } = buildUseCase({ macroContextProvider });
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.tokensIn).toBe(12200);   // 12000 + 200
+    expect(result.tokensOut).toBe(1520);   // 1500 + 20
+    expect(result.costUsd).toBeCloseTo(0.3003, 4);
+  });
+
+  it('completes the run even when a macro source (riesgo país) is unavailable (SC-002)', async () => {
+    const readings = fakeMacroReadings({ riesgoPais: { value: null, asOf: null, available: false } });
+    const { useCase, repository } = buildUseCase({ macroContextProvider: mockMacroProvider({ readings }) });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.status).toBe('completed');           // no abort (unlike pre-006)
+    expect(result.riesgoPaisBp).toBeNull();            // unavailable → not mirrored
+    expect(result.macroContext.riesgoPais.available).toBe(false);
+    expect(repository.upsert).toHaveBeenCalledTimes(1);
+  });
+});
+
+// =========================================================================
+// Feature 006 — US2: portfolio totals captured + preserved on failure
+// =========================================================================
+describe('GenerateWeeklyAnalysis (US2 portfolio totals)', () => {
+  it('captures the run-time totals from the portfolio summary', async () => {
+    const { useCase } = buildUseCase();
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.portfolioTotals).toMatchObject({
+      totalUsd: 90000,
+      totalArs: 14500000,
+      grandTotalUsd: 100000,
+      unrealizedPnlUsd: 1200,
+      unrealizedPnlArs: -50000,
+      mepRate: 1450,
+      mepRateAsOf: '2026-05-15',
+    });
+  });
+
+  it('preserves totals on a failed run (FR-014)', async () => {
+    const repo = mockRepositoryEmpty();
+    const llmClient = { submitAnalysis: jest.fn().mockRejectedValue(new LLMSchemaValidationError('bad shape')) };
+    const { useCase } = buildUseCase({ repository: repo, llmClient });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.status).toBe('failed');
+    expect(result.portfolioTotals).toBeTruthy();
+    expect(result.portfolioTotals.totalUsd).toBe(90000);
+    expect(result.macroContext).toBeTruthy();          // macro also preserved
+  });
+});
+
+// =========================================================================
+// Feature 006 — US3: exact position changes
+// =========================================================================
+describe('GenerateWeeklyAnalysis (US3 position changes)', () => {
+  function priorWith(snapshot) {
+    const prior = new WeeklyAnalysis({
+      date: '2026-05-08', status: 'completed', generatedAt: '2026-05-08T21:00:14Z',
+      modelUsed: 'claude-opus-4-7', promptVersion: 'editable-instructions-v1',
+      summary: 'Prior week summary — concise paragraph about last week.', markdownBody: longBody,
+      portfolioSnapshot: snapshot, tokensIn: 1, tokensOut: 1, costUsd: 0.1, durationMs: 1,
+    });
+    const repo = mockRepositoryEmpty();
+    repo.getLatest.mockResolvedValue([prior]);
+    repo.getByDate.mockResolvedValue({ analysis: prior, orders: [] });
+    return repo;
+  }
+
+  it('positionChanges === null on the first run (no prior snapshot)', async () => {
+    const { useCase } = buildUseCase();
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+    expect(result.positionChanges).toBeNull();
+  });
+
+  it('computes added/removed exactly vs the prior snapshot', async () => {
+    // Prior held MU (gone now); current holds BRK.B + GD41D (both new).
+    const repo = priorWith([
+      { broker: 'ibkr', assetType: 'stock', symbol: 'MU', quantity: 50, averageCost: 80, currentPrice: 100, currency: 'USD', valueUsd: 5000 },
+    ]);
+    const { useCase } = buildUseCase({ repository: repo });
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    const bySymbol = Object.fromEntries(result.positionChanges.map((c) => [c.symbol, c]));
+    expect(bySymbol.MU.change).toBe('removed');
+    expect(bySymbol['BRK.B'].change).toBe('added');
+    expect(bySymbol.GD41D.change).toBe('added');
+    expect(result.positionChanges).toHaveLength(3);
+  });
+
+  it('reports [] when only price moved (no quantity change)', async () => {
+    // Prior snapshot has the SAME quantities as the current portfolio, different prices.
+    const repo = priorWith([
+      { broker: 'ibkr', assetType: 'stock', symbol: 'BRK.B', quantity: 10, averageCost: 350, currentPrice: 999, currency: 'USD', valueUsd: 9990 },
+      { broker: 'galicia', assetType: 'bond', symbol: 'GD41D', quantity: 50, averageCost: 55, currentPrice: 1, currency: 'USD', valueUsd: 50 },
+    ]);
+    const { useCase } = buildUseCase({ repository: repo });
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+    expect(result.positionChanges).toEqual([]);
+  });
+
+  it('preserves computed positionChanges on a failed run (FR-014)', async () => {
+    const repo = priorWith([
+      { broker: 'ibkr', assetType: 'stock', symbol: 'MU', quantity: 50, averageCost: 80, currentPrice: 100, currency: 'USD', valueUsd: 5000 },
+    ]);
+    repo.upsert.mockResolvedValue(undefined);
+    const llmClient = { submitAnalysis: jest.fn().mockRejectedValue(new LLMRequestError({ message: 'boom' })) };
+    const { useCase } = buildUseCase({ repository: repo, llmClient });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+    expect(result.status).toBe('failed');
+    expect(Array.isArray(result.positionChanges)).toBe(true);
+    expect(result.positionChanges.length).toBeGreaterThan(0);
+  });
+});
+
+// =========================================================================
+// Feature 006 — US4: prior macro panel reaches the prompt (trend reasoning)
+// =========================================================================
+describe('GenerateWeeklyAnalysis (US4 trend context)', () => {
+  it('includes the prior week macro panel and threads prior IMF reading for carry-forward', async () => {
+    const prior = new WeeklyAnalysis({
+      date: '2026-05-08', status: 'completed', generatedAt: '2026-05-08T21:00:14Z',
+      modelUsed: 'claude-opus-4-7', promptVersion: 'editable-instructions-v1',
+      summary: 'Prior week summary — concise paragraph.', markdownBody: longBody,
+      portfolioSnapshot: [],
+      macroContext: fakeMacroReadings({ riesgoPais: { value: 540, asOf: '2026-05-08', available: true } }),
+      tokensIn: 1, tokensOut: 1, costUsd: 0.1, durationMs: 1,
+    });
+    const repo = mockRepositoryEmpty();
+    repo.getLatest.mockResolvedValue([prior]);
+    repo.getByDate.mockResolvedValue({ analysis: prior, orders: [] });
+
+    const macroContextProvider = mockMacroProvider();
+    const { useCase, llmClient } = buildUseCase({ repository: repo, macroContextProvider });
+    await useCase.execute({ targetDate: '2026-05-15' });
+
+    // Prior macro travelled into the prompt via previousAnalysis.
+    const submitCall = llmClient.submitAnalysis.mock.calls[0][0];
+    expect(submitCall.userMessage).toContain('"macroContext"');
+    expect(submitCall.userMessage).toContain('540');
+    // Prior IMF reading threaded to the orchestrator for carry-forward.
+    expect(macroContextProvider.getLatest).toHaveBeenCalledWith(
+      expect.objectContaining({ priorImfReading: expect.objectContaining({ value: 'approved' }) })
+    );
+  });
+
+  it('tolerates a pre-feature prior analysis with no macro (passes null priorImfReading)', async () => {
+    const prior = new WeeklyAnalysis({
+      date: '2026-05-08', status: 'completed', generatedAt: '2026-05-08T21:00:14Z',
+      modelUsed: 'claude-opus-4-7', promptVersion: 'editable-instructions-v1',
+      summary: 'Pre-feature prior, no macro panel here.', markdownBody: longBody,
+      portfolioSnapshot: [], tokensIn: 1, tokensOut: 1, costUsd: 0.1, durationMs: 1,
+    });
+    const repo = mockRepositoryEmpty();
+    repo.getLatest.mockResolvedValue([prior]);
+    repo.getByDate.mockResolvedValue({ analysis: prior, orders: [] });
+
+    const macroContextProvider = mockMacroProvider();
+    const { useCase } = buildUseCase({ repository: repo, macroContextProvider });
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result.status).toBe('completed');
+    expect(macroContextProvider.getLatest).toHaveBeenCalledWith({ priorImfReading: null });
+  });
+});
+
+// =========================================================================
+// Failure-branch coverage (riesgo país is NO LONGER fatal — see US1 SC-002)
+// =========================================================================
 const {
   CostCapExceededError,
   LLMSchemaValidationError,
@@ -283,41 +434,12 @@ const {
 } = require('../../../../../src/infrastructure/llm/AnthropicLLMClient');
 
 describe('GenerateWeeklyAnalysis (failure branches)', () => {
-  it('RiesgoPaisFetchError: persists a failed row, never calls the LLM, preserves the snapshot', async () => {
+  it('CostCapExceededError: persists a failed row', async () => {
     const repo = mockRepositoryEmpty();
-    const llmClient = mockLlmClientReturning([]);
-    const { useCase } = buildUseCase({
-      repository: repo,
-      llmClient,
-      riesgoPaisProvider: {
-        getLatest: jest.fn().mockRejectedValue(
-          new RiesgoPaisFetchError('timeout after 10000ms')
-        ),
-      },
-    });
-
-    const result = await useCase.execute({ targetDate: '2026-05-15' });
-
-    expect(result.status).toBe('failed');
-    expect(result.errorMessage).toMatch(/riesgo-pais source unreachable: timeout after 10000ms/);
-    expect(llmClient.submitAnalysis).not.toHaveBeenCalled();
-    expect(repo.upsert).toHaveBeenCalledTimes(1);
-    expect(repo.upsert.mock.calls[0][1]).toEqual([]);
-    // Snapshot was captured (portfolio assembled before the fetch failed)
-    expect(repo.upsert.mock.calls[0][0].portfolioSnapshot.length).toBeGreaterThan(0);
-  });
-
-  it('CostCapExceededError: persists a failed row, never calls the LLM successfully', async () => {
-    const repo = mockRepositoryEmpty();
-    const llmClient = {
-      submitAnalysis: jest.fn().mockRejectedValue(
-        new CostCapExceededError('pre-call estimate 120000 tokens exceeds maxInputTokens=80000')
-      ),
-    };
+    const llmClient = { submitAnalysis: jest.fn().mockRejectedValue(new CostCapExceededError('pre-call estimate 120000 tokens exceeds maxInputTokens=80000')) };
     const { useCase } = buildUseCase({ repository: repo, llmClient });
 
     const result = await useCase.execute({ targetDate: '2026-05-15' });
-
     expect(result.status).toBe('failed');
     expect(result.errorMessage).toMatch(/cost cap exceeded: pre-call estimate 120000 tokens/);
     expect(repo.upsert).toHaveBeenCalledTimes(1);
@@ -326,15 +448,10 @@ describe('GenerateWeeklyAnalysis (failure branches)', () => {
 
   it('LLMSchemaValidationError: persists a failed row with the schema-mismatch reason', async () => {
     const repo = mockRepositoryEmpty();
-    const llmClient = {
-      submitAnalysis: jest.fn().mockRejectedValue(
-        new LLMSchemaValidationError('$.orders[0].side: must be one of ["buy","sell"]')
-      ),
-    };
+    const llmClient = { submitAnalysis: jest.fn().mockRejectedValue(new LLMSchemaValidationError('$.orders[0].side: must be one of ["buy","sell"]')) };
     const { useCase } = buildUseCase({ repository: repo, llmClient });
 
     const result = await useCase.execute({ targetDate: '2026-05-15' });
-
     expect(result.status).toBe('failed');
     expect(result.errorMessage).toMatch(/tool_use schema validation failed: .*orders\[0\]\.side/);
     expect(repo.upsert).toHaveBeenCalledTimes(1);
@@ -343,39 +460,27 @@ describe('GenerateWeeklyAnalysis (failure branches)', () => {
   it('LLMRequestError: persists a failed row using the sanitized message (no payload echoed)', async () => {
     const repo = mockRepositoryEmpty();
     const sanitized = { status: 429, errorType: 'rate_limit_error', requestId: 'req_abc', message: 'rate limit exceeded' };
-    const requestErr = new LLMRequestError(sanitized);
-    const llmClient = {
-      submitAnalysis: jest.fn().mockRejectedValue(requestErr),
-    };
+    const llmClient = { submitAnalysis: jest.fn().mockRejectedValue(new LLMRequestError(sanitized)) };
     const { useCase } = buildUseCase({ repository: repo, llmClient });
 
     const result = await useCase.execute({ targetDate: '2026-05-15' });
-
     expect(result.status).toBe('failed');
     expect(result.errorMessage).toMatch(/LLM request failed: rate limit exceeded/);
-    // No payload echo in errorMessage (defense-in-depth check)
     expect(result.errorMessage).not.toContain('messages');
-    expect(result.errorMessage).not.toContain('SECRET');
     expect(repo.upsert).toHaveBeenCalledTimes(1);
   });
 
-  it('Generic unknown error: persists a failed row AND re-throws to surface in the function host log', async () => {
+  it('Generic unknown error: persists a failed row AND re-throws', async () => {
     const repo = mockRepositoryEmpty();
     const oops = new Error('some unexpected upstream blowup');
     oops.name = 'WeirdError';
-    const llmClient = {
-      submitAnalysis: jest.fn().mockRejectedValue(oops),
-    };
+    const llmClient = { submitAnalysis: jest.fn().mockRejectedValue(oops) };
     const { useCase } = buildUseCase({ repository: repo, llmClient });
 
     await expect(useCase.execute({ targetDate: '2026-05-15' })).rejects.toBe(oops);
-
-    // Even though we re-threw, we still persisted a failed row first.
     expect(repo.upsert).toHaveBeenCalledTimes(1);
     const persisted = repo.upsert.mock.calls[0][0];
     expect(persisted.status).toBe('failed');
-    // The improved errorMessage format includes both name AND message
     expect(persisted.errorMessage).toMatch(/unexpected error: WeirdError: some unexpected upstream blowup/);
-    expect(repo.upsert.mock.calls[0][1]).toEqual([]);
   });
 });

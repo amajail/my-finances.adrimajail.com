@@ -74,9 +74,23 @@ class WeeklyAnalysis {
     this._errorMessage = data.errorMessage || null;
     this._instructionsHistoryRowKey = data.instructionsHistoryRowKey || null;
     this._frameworkHistoryRowKey = data.frameworkHistoryRowKey || null;
+    // Feature 006: weekly context capture. All three are OPTIONAL — analyses
+    // produced before the feature simply lack them (rendered "not recorded").
+    this._macroContext = data.macroContext && typeof data.macroContext === 'object' && !Array.isArray(data.macroContext)
+      ? data.macroContext
+      : null;
+    this._portfolioTotals = data.portfolioTotals && typeof data.portfolioTotals === 'object' && !Array.isArray(data.portfolioTotals)
+      ? data.portfolioTotals
+      : null;
+    // null === "unknown" (no prior snapshot to diff). [] === "verified no
+    // changes". A populated array === the week's changes. (FR-017.)
+    this._positionChanges = Array.isArray(data.positionChanges) ? data.positionChanges : null;
 
     this._validate();
     Object.freeze(this._portfolioSnapshot);
+    if (this._macroContext) Object.freeze(this._macroContext);
+    if (this._portfolioTotals) Object.freeze(this._portfolioTotals);
+    if (this._positionChanges) Object.freeze(this._positionChanges);
     Object.freeze(this);
   }
 
@@ -124,6 +138,24 @@ class WeeklyAnalysis {
       errors.push('riesgoPaisBp, if present, must be a non-negative integer');
     }
 
+    // Feature 006: light validation — present-but-malformed is rejected; absent is fine.
+    if (this._portfolioTotals !== null) {
+      for (const f of ['totalUsd', 'totalArs', 'grandTotalUsd', 'unrealizedPnlUsd', 'unrealizedPnlArs']) {
+        const v = this._portfolioTotals[f];
+        if (v !== undefined && (typeof v !== 'number' || Number.isNaN(v))) {
+          errors.push(`portfolioTotals.${f}, if present, must be a number`);
+        }
+      }
+    }
+    if (this._positionChanges !== null) {
+      for (const c of this._positionChanges) {
+        if (!c || typeof c !== 'object' || !c.symbol || !['added', 'removed', 'increased', 'reduced'].includes(c.change)) {
+          errors.push('each positionChange must have a symbol and change in added|removed|increased|reduced');
+          break;
+        }
+      }
+    }
+
     if (errors.length > 0) {
       throw new ValidationError(
         errors.join('; '),
@@ -149,6 +181,9 @@ class WeeklyAnalysis {
   get errorMessage() { return this._errorMessage; }
   get instructionsHistoryRowKey() { return this._instructionsHistoryRowKey; }
   get frameworkHistoryRowKey() { return this._frameworkHistoryRowKey; }
+  get macroContext() { return this._macroContext; }
+  get portfolioTotals() { return this._portfolioTotals; }
+  get positionChanges() { return this._positionChanges; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -179,6 +214,9 @@ class WeeklyAnalysis {
       errorMessage: this._errorMessage,
       instructionsHistoryRowKey: this._instructionsHistoryRowKey,
       frameworkHistoryRowKey: this._frameworkHistoryRowKey,
+      macroContext: this._macroContext,
+      portfolioTotals: this._portfolioTotals,
+      positionChanges: this._positionChanges,
     };
   }
 

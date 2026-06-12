@@ -22,8 +22,8 @@
 const UseCase = require('../UseCase');
 const WeeklyAnalysis = require('../../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../../domain/entities/SuggestedOrder');
+const PositionChangeCalculator = require('../../../domain/services/PositionChangeCalculator');
 const logger = require('../../../shared/logging');
-const { RiesgoPaisFetchError } = require('../../../infrastructure/providers/ArgentinaDatosRiesgoPaisProvider');
 const {
   CostCapExceededError,
   LLMSchemaValidationError,
@@ -50,7 +50,8 @@ class GenerateWeeklyAnalysis extends UseCase {
    * @param {Object} deps
    * @param {IAnalysisRepository}     deps.analysisRepository
    * @param {ILLMClient}              deps.llmClient
-   * @param {IRiesgoPaisProvider}     deps.riesgoPaisProvider
+   * @param {IMacroContextProvider}   deps.macroContextProvider - Feature 006.
+   *   Fans out to the 9 macro sources; resilient (riesgo país no longer fatal).
    * @param {Object}                  deps.getPortfolioSummary - GetPortfolioSummary use-case instance
    * @param {ISettingsRepository}     deps.settingsRepository
    * @param {IInstructionsRepository} deps.instructionsRepository - Feature 005.
@@ -64,7 +65,7 @@ class GenerateWeeklyAnalysis extends UseCase {
   constructor({
     analysisRepository,
     llmClient,
-    riesgoPaisProvider,
+    macroContextProvider,
     getPortfolioSummary,
     settingsRepository,
     instructionsRepository,
@@ -74,7 +75,9 @@ class GenerateWeeklyAnalysis extends UseCase {
     super();
     this._analysisRepository = analysisRepository;
     this._llmClient = llmClient;
-    this._riesgoPaisProvider = riesgoPaisProvider;
+    // Feature 006: the macro orchestrator (riesgo país is now one of nine
+    // indicators, and a source failure no longer aborts the run).
+    this._macroContextProvider = macroContextProvider;
     this._getPortfolioSummary = getPortfolioSummary;
     this._settingsRepository = settingsRepository;
     this._instructionsRepository = instructionsRepository;
@@ -102,35 +105,52 @@ class GenerateWeeklyAnalysis extends UseCase {
     // Buffers we may need to persist even on failure paths.
     let portfolioSnapshot = [];
     let portfolioSummary = null;
-    let riesgoReading = null;
+    // Feature 006 capture buffers — preserved on failure paths too (FR-014).
+    let macroContext = null;
+    let macroUsage = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
+    let portfolioTotals = null;
+    let positionChanges = null;
+    let riesgoPaisBp = null;
+    let riesgoPaisAsOf = null;
     // Feature 005: captured at the moment we read the instructions document,
     // then stamped onto every WeeklyAnalysis written by this run
     // (snapshot-at-start, FR-012).
     let instructionsHistoryRowKey = null;
 
     try {
-      // 2. Current portfolio.
+      // 2. Current portfolio + run-time totals (Feature 006, FR-012/FR-013).
       portfolioSummary = await this._getPortfolioSummary.execute({});
       portfolioSnapshot = this._snapshotFromSummary(portfolioSummary);
+      portfolioTotals = this._totalsFromSummary(portfolioSummary);
 
-      // 3. Riesgo país (failure here aborts the run with a failed row).
-      try {
-        riesgoReading = await this._riesgoPaisProvider.getLatest();
-      } catch (err) {
-        if (err instanceof RiesgoPaisFetchError) {
-          return await this._persistFailed({
-            targetDate,
-            startedAt,
-            model,
-            portfolioSnapshot,
-            errorMessage: `riesgo-pais source unreachable: ${err.message}`,
-          });
-        }
-        throw err;
-      }
-
-      // 4. Previous week's analysis (if any).
+      // 3. Previous week's analysis (loaded before macro so we can thread the
+      //    prior IMF reading for carry-forward and the prior snapshot for the
+      //    position diff).
       const previousAnalysis = await this._loadPreviousAnalysis(targetDate);
+
+      // 3b. Exact week-over-week position changes (Feature 006, FR-015..FR-017).
+      //     null when there is no prior snapshot to diff (unknown / first run).
+      const priorSnapshot = previousAnalysis && Array.isArray(previousAnalysis.portfolioSnapshot) && previousAnalysis.portfolioSnapshot.length > 0
+        ? previousAnalysis.portfolioSnapshot
+        : null;
+      positionChanges = PositionChangeCalculator.diff(priorSnapshot, portfolioSnapshot);
+
+      // 4. Macro context panel (Feature 006, FR-001..FR-011). Resilient: a
+      //    failing source becomes available:false and the run proceeds — riesgo
+      //    país included (no longer fatal).
+      const priorImf = previousAnalysis && previousAnalysis.macroContext && previousAnalysis.macroContext.imfReviewStatus
+        ? previousAnalysis.macroContext.imfReviewStatus
+        : null;
+      const priorImfReading = priorImf && priorImf.available
+        ? { value: priorImf.value, asOf: priorImf.asOf }
+        : null;
+      const macroResult = await this._macroContextProvider.getLatest({ priorImfReading });
+      macroContext = macroResult.readings;
+      macroUsage = macroResult.usage || macroUsage;
+      // Mirror riesgo país onto the legacy columns for backward compat (FR-011).
+      const rp = macroContext.riesgoPais;
+      riesgoPaisBp = rp && rp.available && typeof rp.value === 'number' ? rp.value : null;
+      riesgoPaisAsOf = rp && rp.available ? rp.asOf : null;
 
       // 5. Active instructions document (feature 005). This is the COMPLETE AI
       //    system prompt — the former fixed instructions merged with the
@@ -147,7 +167,12 @@ class GenerateWeeklyAnalysis extends UseCase {
           startedAt,
           model,
           portfolioSnapshot,
-          riesgoReading,
+          macroContext,
+          macroUsage,
+          portfolioTotals,
+          positionChanges,
+          riesgoPaisBp,
+          riesgoPaisAsOf,
           instructionsHistoryRowKey,
           errorMessage: 'instructions not configured: save an active instructions document in the dashboard (Instructions) before running the analysis',
         });
@@ -161,7 +186,9 @@ class GenerateWeeklyAnalysis extends UseCase {
         generatedAt: startedAt.toISOString(),
         portfolioSummary,
         previousAnalysis,
-        riesgoPais: riesgoReading,
+        macroContext,
+        portfolioTotals,
+        positionChanges,
       });
 
       // 6. Call the LLM. The privacy boundary lives inside this method.
@@ -176,56 +203,31 @@ class GenerateWeeklyAnalysis extends UseCase {
           maxOutputTokens,
         });
       } catch (err) {
+        // Feature 006: all capture buffers ride onto the failed row (FR-014).
+        const captured = {
+          targetDate, startedAt, model, portfolioSnapshot,
+          macroContext, macroUsage, portfolioTotals, positionChanges,
+          riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
+        };
         if (err instanceof CostCapExceededError) {
-          return await this._persistFailed({
-            targetDate,
-            startedAt,
-            model,
-            portfolioSnapshot,
-            riesgoReading,
-            instructionsHistoryRowKey,
-            errorMessage: `cost cap exceeded: ${err.message}`,
-          });
+          return await this._persistFailed({ ...captured, errorMessage: `cost cap exceeded: ${err.message}` });
         }
         if (err instanceof LLMSchemaValidationError) {
-          return await this._persistFailed({
-            targetDate,
-            startedAt,
-            model,
-            portfolioSnapshot,
-            riesgoReading,
-            instructionsHistoryRowKey,
-            errorMessage: `tool_use schema validation failed: ${err.message}`,
-          });
+          return await this._persistFailed({ ...captured, errorMessage: `tool_use schema validation failed: ${err.message}` });
         }
         if (err instanceof LLMRequestError) {
           const sanitized = err.sanitized || { message: err.message };
-          return await this._persistFailed({
-            targetDate,
-            startedAt,
-            model,
-            portfolioSnapshot,
-            riesgoReading,
-            instructionsHistoryRowKey,
-            errorMessage: `LLM request failed: ${sanitized.message}`,
-          });
+          return await this._persistFailed({ ...captured, errorMessage: `LLM request failed: ${sanitized.message}` });
         }
         // Unknown failure mode — persist failed, then re-throw for surface visibility.
         const errType = err && err.name ? err.name : 'Error';
         const errMsg = err && err.message ? err.message : String(err);
-        await this._persistFailed({
-          targetDate,
-          startedAt,
-          model,
-          portfolioSnapshot,
-          riesgoReading,
-          instructionsHistoryRowKey,
-          errorMessage: `unexpected error: ${errType}: ${errMsg}`,
-        });
+        await this._persistFailed({ ...captured, errorMessage: `unexpected error: ${errType}: ${errMsg}` });
         throw err;
       }
 
-      // 7. Build domain entities from the structured result.
+      // 7. Build domain entities from the structured result. Telemetry folds in
+      //    the IMF classify call's usage (Feature 006, FR-022).
       const analysis = new WeeklyAnalysis({
         date: targetDate,
         status: 'completed',
@@ -234,12 +236,15 @@ class GenerateWeeklyAnalysis extends UseCase {
         promptVersion: INSTRUCTIONS_PROMPT_VERSION,
         summary: llmResult.summary,
         markdownBody: llmResult.markdownBody,
-        riesgoPaisBp: riesgoReading.basisPoints,
-        riesgoPaisAsOf: riesgoReading.asOf,
+        riesgoPaisBp,
+        riesgoPaisAsOf,
         portfolioSnapshot,
-        tokensIn: llmResult.usage.inputTokens,
-        tokensOut: llmResult.usage.outputTokens,
-        costUsd: llmResult.usage.costUsd,
+        macroContext,
+        portfolioTotals,
+        positionChanges,
+        tokensIn: llmResult.usage.inputTokens + macroUsage.inputTokens,
+        tokensOut: llmResult.usage.outputTokens + macroUsage.outputTokens,
+        costUsd: Number((llmResult.usage.costUsd + macroUsage.costUsd).toFixed(4)),
         durationMs: this._clock().getTime() - startedAt.getTime(),
         instructionsHistoryRowKey,
       });
@@ -283,7 +288,16 @@ class GenerateWeeklyAnalysis extends UseCase {
 
   // ==================== Helpers ====================
 
-  async _persistFailed({ targetDate, startedAt, model, portfolioSnapshot, riesgoReading, errorMessage, instructionsHistoryRowKey = null }) {
+  async _persistFailed({
+    targetDate, startedAt, model, portfolioSnapshot, errorMessage,
+    instructionsHistoryRowKey = null,
+    macroContext = null, macroUsage = null, portfolioTotals = null,
+    positionChanges = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
+  }) {
+    // Feature 006: whatever context was gathered before the failure is
+    // preserved on the failed row (macro, totals, position changes) and the
+    // IMF classify cost — if any — is still recorded (FR-014).
+    const usage = macroUsage || { inputTokens: 0, outputTokens: 0, costUsd: 0 };
     const failed = new WeeklyAnalysis({
       date: targetDate,
       status: 'failed',
@@ -291,11 +305,14 @@ class GenerateWeeklyAnalysis extends UseCase {
       modelUsed: model,
       promptVersion: INSTRUCTIONS_PROMPT_VERSION,
       portfolioSnapshot,
-      riesgoPaisBp: riesgoReading ? riesgoReading.basisPoints : null,
-      riesgoPaisAsOf: riesgoReading ? riesgoReading.asOf : null,
-      tokensIn: 0,
-      tokensOut: 0,
-      costUsd: 0,
+      macroContext,
+      portfolioTotals,
+      positionChanges,
+      riesgoPaisBp,
+      riesgoPaisAsOf,
+      tokensIn: usage.inputTokens || 0,
+      tokensOut: usage.outputTokens || 0,
+      costUsd: usage.costUsd || 0,
       durationMs: this._clock().getTime() - startedAt.getTime(),
       errorMessage,
       instructionsHistoryRowKey,
@@ -323,6 +340,9 @@ class GenerateWeeklyAnalysis extends UseCase {
         summary: withOrders.analysis.summary,
         markdownBody: withOrders.analysis.markdownBody,
         portfolioSnapshot: withOrders.analysis.portfolioSnapshot,
+        // Feature 006: prior macro panel for trend reasoning (FR-010) and the
+        // prior IMF reading for carry-forward (FR-007). Null on pre-feature rows.
+        macroContext: withOrders.analysis.macroContext || null,
         orders: withOrders.orders.map((o) => ({
           broker: o.broker,
           symbol: o.symbol,
@@ -354,7 +374,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       }));
   }
 
-  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, riesgoPais }) {
+  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges }) {
     const parts = [
       '## generatedAt',
       generatedAt,
@@ -364,20 +384,61 @@ class GenerateWeeklyAnalysis extends UseCase {
       JSON.stringify(portfolioSummary, null, 2),
       '```',
       '',
-      '## previousAnalysis',
+      '## portfolioTotals',
+      '```json',
+      JSON.stringify(portfolioTotals, null, 2),
+      '```',
+      '',
+      // Feature 006: precomputed week-over-week position changes. null = unknown
+      // (no prior snapshot); [] = no changes; otherwise the exact deltas.
+      '## positionChanges',
     ];
+    if (positionChanges === null) {
+      parts.push('unknown — no prior snapshot to compare');
+    } else if (positionChanges.length === 0) {
+      parts.push('none — no positions changed this week');
+    } else {
+      parts.push('```json', JSON.stringify(positionChanges, null, 2), '```');
+    }
+    // The previousAnalysis block carries the prior macro panel (when present),
+    // so the model can reason about week-over-week direction (FR-010).
+    parts.push('', '## previousAnalysis');
     if (previousAnalysis) {
       parts.push('```json', JSON.stringify(previousAnalysis, null, 2), '```');
     } else {
       parts.push('none — first run');
     }
-    parts.push('', '## riesgoPais');
-    if (riesgoPais) {
-      parts.push('```json', JSON.stringify(riesgoPais), '```');
+    parts.push('', '## macroContext');
+    if (macroContext) {
+      parts.push('```json', JSON.stringify(macroContext, null, 2), '```');
     } else {
       parts.push('unavailable');
     }
     return parts.join('\n');
+  }
+
+  /**
+   * Map the portfolio summary's aggregates onto the persisted PortfolioTotals
+   * shape (Feature 006, FR-012). Captured once per run, never recomputed.
+   * @private
+   */
+  _totalsFromSummary(summary) {
+    if (!summary) return null;
+    const byCur = summary.totalByCurrency || {};
+    const pnl = summary.unrealizedPnlByCurrency || {};
+    const cost = summary.costBasisByCurrency || {};
+    const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+    return {
+      totalUsd: num(byCur.USD),
+      totalArs: num(byCur.ARS),
+      grandTotalUsd: num(summary.grandTotalUsd),
+      unrealizedPnlUsd: num(pnl.USD),
+      unrealizedPnlArs: num(pnl.ARS),
+      costBasisUsd: num(cost.USD),
+      costBasisArs: num(cost.ARS),
+      mepRate: num(summary.mepRate),
+      mepRateAsOf: summary.mepRateAsOf || null,
+    };
   }
 
   async _getSetting(key, defaultValue) {

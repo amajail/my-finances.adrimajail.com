@@ -50,8 +50,23 @@ function mockSettingsRepo(map = {}) {
   return { get: jest.fn(async (key) => (key in final ? final[key] : null)) };
 }
 
-function mockRiesgoPais() {
-  return { getLatest: jest.fn().mockResolvedValue({ basisPoints: 500, asOf: '2026-05-15' }) };
+function mockMacroProvider() {
+  return {
+    getLatest: jest.fn().mockResolvedValue({
+      readings: {
+        riesgoPais: { value: 500, asOf: '2026-05-15', available: true },
+        fxGap: { value: 0.3, asOf: '2026-05-15', available: true },
+        bcraReserves: { value: 47834, asOf: '2026-05-13', available: true, basis: 'gross' },
+        argInflation: { value: 2.1, asOf: '2026-04-30', available: true },
+        argInterestRate: { value: 29, asOf: '2026-05-15', available: true },
+        usaInflation: { value: 3.1, asOf: '2026-04-01', available: true },
+        usaInterestRate: { value: 4.5, asOf: '2026-05-15', available: true },
+        sp500Drawdown: { value: -2.4, asOf: '2026-05-15', available: true },
+        imfReviewStatus: { value: 'approved', asOf: '2026-05-10', available: true },
+      },
+      usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 },
+    }),
+  };
 }
 
 function build({
@@ -69,7 +84,7 @@ function build({
   const useCase = new GenerateWeeklyAnalysis({
     analysisRepository: repository,
     llmClient,
-    riesgoPaisProvider: mockRiesgoPais(),
+    macroContextProvider: mockMacroProvider(),
     getPortfolioSummary: mockGetPortfolioSummary(),
     settingsRepository: mockSettingsRepo(),
     instructionsRepository,
@@ -135,7 +150,7 @@ describe('GenerateWeeklyAnalysis — instructions version link (FR-012, FR-013)'
     const useCase = new GenerateWeeklyAnalysis({
       analysisRepository: repository,
       llmClient: mockLlmClient(),
-      riesgoPaisProvider: mockRiesgoPais(),
+      macroContextProvider: mockMacroProvider(),
       getPortfolioSummary: mockGetPortfolioSummary(),
       settingsRepository: mockSettingsRepo(),
       instructionsRepository,
@@ -161,7 +176,7 @@ describe('GenerateWeeklyAnalysis — instructions version link (FR-012, FR-013)'
     const useCase = new GenerateWeeklyAnalysis({
       analysisRepository: repository,
       llmClient: mockLlmClient(),
-      riesgoPaisProvider: mockRiesgoPais(),
+      macroContextProvider: mockMacroProvider(),
       getPortfolioSummary: mockGetPortfolioSummary(),
       settingsRepository: mockSettingsRepo(),
       instructionsRepository,

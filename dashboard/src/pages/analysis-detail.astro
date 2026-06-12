@@ -18,6 +18,40 @@ import Layout from '../layouts/Layout.astro';
     </div>
   </section>
 
+  <section id="macro-section" class="card mb-6 hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Macro context</h2>
+    </div>
+    <div class="p-4 grid gap-6 sm:grid-cols-3" id="macro-groups"></div>
+  </section>
+
+  <section id="totals-section" class="card mb-6 hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Portfolio totals</h2>
+    </div>
+    <div class="p-4 grid gap-4 sm:grid-cols-3" id="totals-grid"></div>
+  </section>
+
+  <section id="changes-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-baseline justify-between">
+      <h2 class="font-semibold">Changes this week</h2>
+      <span class="text-xs text-[var(--color-muted)]" id="changes-note"></span>
+    </div>
+    <table class="w-full text-sm" id="changes-table">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Broker</th>
+          <th class="text-left px-4 py-2">Symbol</th>
+          <th class="text-left px-4 py-2">Change</th>
+          <th class="text-right px-4 py-2">Before</th>
+          <th class="text-right px-4 py-2">After</th>
+          <th class="text-right px-4 py-2">Δ</th>
+        </tr>
+      </thead>
+      <tbody id="changes-tbody"></tbody>
+    </table>
+  </section>
+
   <section id="orders-section" class="card mb-6 overflow-x-auto hidden">
     <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-baseline justify-between">
       <h2 class="font-semibold">Suggested orders</h2>
@@ -63,6 +97,105 @@ import Layout from '../layouts/Layout.astro';
   }
 
   function show(el) { el.classList.remove('hidden'); }
+
+  // ---- Feature 006: macro / totals / changes rendering ----
+
+  const MACRO_GROUPS = [
+    { title: 'Argentina', items: [
+      { key: 'riesgoPais', label: 'Riesgo país', unit: 'bp' },
+      { key: 'fxGap', label: 'MEP/official gap', unit: '%' },
+      { key: 'bcraReserves', label: 'BCRA reserves', unit: 'USD M' },
+      { key: 'argInflation', label: 'Monthly inflation', unit: '%' },
+      { key: 'argInterestRate', label: 'Policy rate', unit: '%' },
+    ] },
+    { title: 'United States', items: [
+      { key: 'usaInflation', label: 'CPI (YoY)', unit: '%' },
+      { key: 'usaInterestRate', label: 'Fed funds (upper)', unit: '%' },
+    ] },
+    { title: 'Global / program', items: [
+      { key: 'sp500Drawdown', label: 'S&P 500 drawdown', unit: '%' },
+      { key: 'imfReviewStatus', label: 'IMF review', unit: '' },
+    ] },
+  ];
+
+  function fmtReading(r, unit) {
+    if (!r || r.available === false || r.value === null || r.value === undefined) {
+      return '<span class="text-[var(--color-muted)]">unavailable</span>';
+    }
+    const val = typeof r.value === 'number' ? r.value.toLocaleString() : escapeHtml(String(r.value));
+    const basis = r.basis ? ` <span class="text-[var(--color-muted)]">(${escapeHtml(r.basis)})</span>` : '';
+    const unitStr = unit ? ` ${escapeHtml(unit)}` : '';
+    const asOf = r.asOf ? `<span class="text-xs text-[var(--color-muted)]"> · ${escapeHtml(r.asOf)}</span>` : '';
+    return `<span class="num-mono">${val}${unitStr}</span>${basis}${asOf}`;
+  }
+
+  function renderMacro(macro) {
+    if (!macro) return;
+    const container = document.getElementById('macro-groups');
+    container.innerHTML = MACRO_GROUPS.map((g) => `
+      <div>
+        <h3 class="text-xs uppercase text-[var(--color-muted)] mb-2">${escapeHtml(g.title)}</h3>
+        <dl class="space-y-1">
+          ${g.items.map((it) => `
+            <div class="flex justify-between gap-3 text-sm">
+              <dt class="text-[var(--color-muted)]">${escapeHtml(it.label)}</dt>
+              <dd class="text-right">${fmtReading(macro[it.key], it.unit)}</dd>
+            </div>
+          `).join('')}
+        </dl>
+      </div>
+    `).join('');
+    show(document.getElementById('macro-section'));
+  }
+
+  function money(v) {
+    return typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—';
+  }
+
+  function renderTotals(t) {
+    if (!t) return;
+    const rows = [
+      { label: 'Total USD', val: `USD ${money(t.totalUsd)}` },
+      { label: 'Total ARS', val: `ARS ${money(t.totalArs)}` },
+      { label: 'Grand total (USD)', val: `USD ${money(t.grandTotalUsd)}` },
+      { label: 'Unrealized P&L USD', val: `USD ${money(t.unrealizedPnlUsd)}` },
+      { label: 'Unrealized P&L ARS', val: `ARS ${money(t.unrealizedPnlArs)}` },
+      { label: 'MEP rate', val: `${money(t.mepRate)}${t.mepRateAsOf ? ' · ' + escapeHtml(t.mepRateAsOf) : ''}` },
+    ];
+    document.getElementById('totals-grid').innerHTML = rows.map((r) => `
+      <div>
+        <div class="text-xs uppercase text-[var(--color-muted)]">${escapeHtml(r.label)}</div>
+        <div class="num-mono">${r.val}</div>
+      </div>
+    `).join('');
+    show(document.getElementById('totals-section'));
+  }
+
+  function renderChanges(changes) {
+    // null = unknown (no prior snapshot); [] = no changes; array = the deltas.
+    if (changes === undefined) return;
+    const note = document.getElementById('changes-note');
+    const tbody = document.getElementById('changes-tbody');
+    if (changes === null) {
+      note.textContent = 'not available (no prior week to compare)';
+    } else if (changes.length === 0) {
+      note.textContent = 'no positions changed this week';
+    } else {
+      note.textContent = `${changes.length} changed`;
+      const badge = (c) => (c === 'added' || c === 'increased') ? 'badge-success' : 'badge-pending';
+      tbody.innerHTML = changes.map((c) => `
+        <tr class="border-t border-[var(--color-border)]">
+          <td class="px-4 py-2">${escapeHtml(c.broker)}</td>
+          <td class="px-4 py-2 num-mono">${escapeHtml(c.symbol)}</td>
+          <td class="px-4 py-2"><span class="badge ${badge(c.change)}">${escapeHtml(c.change)}</span></td>
+          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(c.quantityBefore))}</td>
+          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(c.quantityAfter))}</td>
+          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(c.deltaQuantity))}</td>
+        </tr>
+      `).join('');
+    }
+    show(document.getElementById('changes-section'));
+  }
 
   function getDateFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -113,6 +246,13 @@ import Layout from '../layouts/Layout.astro';
         fwBadge.textContent = 'Instructions version: (pre-history seed)';
       }
     }
+
+    // Feature 006: macro panel, portfolio totals, and position changes — shown
+    // for completed AND failed runs (they may have been captured before a
+    // failure). Absent on pre-feature analyses.
+    renderMacro(detail.macroContext);
+    renderTotals(detail.portfolioTotals);
+    renderChanges(detail.positionChanges);
 
     if (detail.status === 'failed') {
       document.getElementById('failed-reason').textContent = detail.errorMessage || 'No reason recorded.';

@@ -43,6 +43,13 @@ app.http('getWeeklyAnalysis', {
         instructionsHistoryRowKey: analysis.instructionsHistoryRowKey || null,
         // Feature 004 (legacy): framework reference for pre-005 analyses.
         frameworkHistoryRowKey: analysis.frameworkHistoryRowKey || null,
+        // Feature 006 (FR-019/FR-021): macro panel, portfolio totals, and the
+        // week's position changes — present on completed AND failed rows when
+        // captured; null on pre-feature rows. positionChanges: null = unknown,
+        // [] = no changes. The internal per-position snapshot stays internal.
+        macroContext: analysis.macroContext || null,
+        portfolioTotals: analysis.portfolioTotals || null,
+        positionChanges: analysis.positionChanges,
       };
 
       if (analysis.isCompleted()) {

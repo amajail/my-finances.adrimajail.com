@@ -18,6 +18,15 @@ const AzureInstructionsRepository = require('../../infrastructure/repositories/A
 const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
 const ArgentinaDatosRiesgoPaisProvider = require('../../infrastructure/providers/ArgentinaDatosRiesgoPaisProvider');
 const ArgentinaDatosMepProvider = require('../../infrastructure/providers/ArgentinaDatosMepProvider');
+// Feature 006 macro providers.
+const DolarApiFxGapProvider = require('../../infrastructure/providers/DolarApiFxGapProvider');
+const BcraMonetariasProvider = require('../../infrastructure/providers/BcraMonetariasProvider');
+const ArgentinaDatosInflationProvider = require('../../infrastructure/providers/ArgentinaDatosInflationProvider');
+const FredProvider = require('../../infrastructure/providers/FredProvider');
+const StooqSp500Provider = require('../../infrastructure/providers/StooqSp500Provider'); // keyless fallback (Stooq now JS-gated)
+const FredSp500DrawdownProvider = require('../../infrastructure/providers/FredSp500DrawdownProvider');
+const ImfStatusProvider = require('../../infrastructure/providers/ImfStatusProvider');
+const MacroContextProvider = require('../../infrastructure/providers/MacroContextProvider');
 
 // Infrastructure LLM
 const AnthropicLLMClient = require('../../infrastructure/llm/AnthropicLLMClient');
@@ -205,6 +214,42 @@ class Container {
     return this._singletons.get('mepProvider');
   }
 
+  /**
+   * Get MacroContextProvider orchestrator (feature 006). Fans out to the
+   * per-source macro providers. Config (FRED key, IMF model, staleness cap)
+   * comes from App Settings / local.settings.json (environment) — the FRED key
+   * is a secret and MUST live there, never in source control (FR-023).
+   * @returns {IMacroContextProvider}
+   */
+  getMacroContextProvider() {
+    if (!this._singletons.has('macroContextProvider')) {
+      const fredApiKey = process.env['analysis.fredApiKey'] || process.env.FRED_API_KEY || null;
+      const imfModel = process.env['analysis.imfModel'] || undefined;
+      const stalenessRaw = process.env['analysis.imfStalenessWeeks'];
+      const stalenessWeeks = stalenessRaw && Number.isFinite(parseInt(stalenessRaw, 10))
+        ? parseInt(stalenessRaw, 10)
+        : undefined;
+      const provider = new MacroContextProvider({
+        riesgoPaisProvider: this.getRiesgoPaisProvider(),
+        fxGapProvider: new DolarApiFxGapProvider(),
+        bcraProvider: new BcraMonetariasProvider(),
+        inflationProvider: new ArgentinaDatosInflationProvider(),
+        fredProvider: new FredProvider({ apiKey: fredApiKey }),
+        // S&P 500 drawdown: FRED SP500 (Stooq's keyless CSV is now behind a
+        // browser challenge). Needs the FRED key; ~10yr window per research.md.
+        // Falls back to the keyless StooqSp500Provider when no FRED key is set.
+        sp500Provider: fredApiKey ? new FredSp500DrawdownProvider({ apiKey: fredApiKey }) : new StooqSp500Provider(),
+        imfStatusProvider: new ImfStatusProvider({
+          llmClient: this.getLLMClient(),
+          model: imfModel,
+          stalenessWeeks,
+        }),
+      });
+      this._singletons.set('macroContextProvider', provider);
+    }
+    return this._singletons.get('macroContextProvider');
+  }
+
   // ==================== LLM ====================
 
   /**
@@ -345,7 +390,9 @@ class Container {
     return new GenerateWeeklyAnalysis({
       analysisRepository: this.getAnalysisRepository(),
       llmClient: this.getLLMClient(),
-      riesgoPaisProvider: this.getRiesgoPaisProvider(),
+      // Feature 006: the macro orchestrator replaces the single riesgo-país
+      // fetch. Riesgo país is now one resilient indicator among nine.
+      macroContextProvider: this.getMacroContextProvider(),
       getPortfolioSummary: this.getGetPortfolioSummary(),
       settingsRepository: this.getSettingsRepository(),
       // Feature 005: the active instructions document is the AI system prompt
