@@ -82,7 +82,7 @@ A scorecard view summarizes, across all completed analyses and broken down by co
 
 1. **Given** multiple analyses with recorded statuses, **When** the owner opens the scorecard, **Then** it shows the execution rate (executed / total suggestions) overall and by conviction.
 2. **Given** executed and skipped suggestions across weeks, **When** the owner opens the scorecard, **Then** it shows the executed / partial / skipped breakdown by conviction (outcome P&L per suggestion is a documented later iteration, not computed here).
-3. **Given** there are too few data points (e.g. first week), **When** the owner opens the scorecard, **Then** it degrades gracefully (shows counts, indicates insufficient history for rates).
+3. **Given** fewer than 3 completed analyses exist, **When** the owner opens the scorecard, **Then** it flags insufficient data (`sufficientData: false`), shows raw counts, and does not present rates as reliable.
 
 ---
 
@@ -103,7 +103,7 @@ A scorecard view summarizes, across all completed analyses and broken down by co
 #### Recording execution status
 
 - **FR-001**: The system MUST let the owner set an execution status on each suggested order of a completed analysis, chosen from: pending (default), executed, partial, skipped.
-- **FR-002**: The system MUST allow an optional free-text note per order alongside its status.
+- **FR-002**: The system MUST allow an optional free-text note (up to 500 characters) per order alongside its status.
 - **FR-003**: Execution status and note MUST persist and be shown on every later view of that analysis.
 - **FR-004**: Once any order for an analysis date has a non-pending execution status, the system MUST permanently block re-running that date's analysis — a re-triggered run for that date is skipped and the recorded statuses are preserved. Regenerating such a week is not supported in the normal flow (it requires an operator to remove the stored analysis record, which discards its statuses). No in-app "force" path exists.
 - **FR-005**: Each saved status MUST record when it was last changed. Saved statuses are owner-confirmed (nothing is auto-saved — see FR-006/FR-007).
@@ -123,7 +123,7 @@ A scorecard view summarizes, across all completed analyses and broken down by co
 
 - **FR-011**: The system MUST present a scorecard summarizing, across completed analyses, the execution rate (executed vs total suggestions) overall and broken down by conviction level.
 - **FR-012**: The scorecard MUST show the executed / partial / skipped breakdown by conviction. No outcome or directional performance signal is computed in this iteration — per-suggestion outcome P&L (it requires a reference price captured at suggestion time plus mark-to-market) is explicitly OUT of scope and recorded as a follow-up.
-- **FR-013**: The scorecard MUST degrade gracefully when history is too short to compute meaningful rates (show counts; indicate insufficient data).
+- **FR-013**: The scorecard MUST degrade gracefully when history is too short to compute meaningful rates: when fewer than 3 completed analyses contribute, it MUST flag the data as insufficient (`sufficientData: false`) and still show raw counts without implying reliable rates.
 
 #### Access & display
 

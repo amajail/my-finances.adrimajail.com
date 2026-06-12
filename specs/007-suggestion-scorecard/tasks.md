@@ -107,8 +107,8 @@ Backend: `src/` at repo root. Dashboard: `dashboard/src/`. Tests: `tests/unit/`,
 **Independent Test**: With several analyses' statuses, the scorecard aggregates correctly by conviction and degrades gracefully when history is short.
 
 - [ ] T024 [US4] Add `listAllOrders()` to `src/application/interfaces/IAnalysisRepository.js` and implement it in `src/infrastructure/repositories/AzureAnalysisRepository.js` (scan `portfolioOrders`, return all `SuggestedOrder`s) (serializes after T008 — same repo file).
-- [ ] T025 [US4] `GetSuggestionScorecard` use-case in `src/application/use-cases/analysis/GetSuggestionScorecard.js`: aggregate by `conviction` × `executionStatus`; compute `executionRate = executed/(executed+partial+skipped)`; `sufficientData` flag; per data-model.md shape.
-- [ ] T026 [P] [US4] Unit test `tests/unit/application/use-cases/analysis/GetSuggestionScorecard.test.js`: counts + rate (excludes pending) overall and by conviction; `sufficientData:false` on short history; empty → no crash.
+- [ ] T025 [US4] `GetSuggestionScorecard` use-case in `src/application/use-cases/analysis/GetSuggestionScorecard.js`: aggregate by `conviction` × `executionStatus`; compute `executionRate = executed/(executed+partial+skipped)`; `sufficientData = analysesCount >= 3` (FR-013); per data-model.md shape.
+- [ ] T026 [P] [US4] Unit test `tests/unit/application/use-cases/analysis/GetSuggestionScorecard.test.js`: counts + rate (excludes pending) overall and by conviction; `sufficientData:false` when fewer than 3 analyses, true at ≥3; empty → no crash.
 - [ ] T027 [US4] Wire `GetSuggestionScorecard` into `src/application/di/container.js` (`getGetSuggestionScorecard()`).
 - [ ] T028 [US4] `src/functions/getSuggestionScorecard.js`: `GET /api/analysis/scorecard`, auth `function`, call the use-case, respond per contracts/api.md.
 - [ ] T029 [US4] `dashboard/src/pages/scorecard.astro`: fetch `/analysis/scorecard`, render overall + by-conviction execution rates and the executed/partial/skipped mix, with a clear "insufficient data" state.

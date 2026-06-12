@@ -14,7 +14,7 @@ immutable (the write is a row-level Merge, not an entity mutation — see reposi
 | New field | Type | Default | Notes |
 |---|---|---|---|
 | `executionStatus` | enum | `"pending"` | `pending` \| `executed` \| `partial` \| `skipped` |
-| `executionNote` | string \| null | `null` | Optional owner note; soft cap (e.g. ≤ 500 chars) |
+| `executionNote` | string \| null | `null` | Optional owner note; max 500 chars (FR-002) |
 | `executionUpdatedAt` | ISO string \| null | `null` | When the status was last changed |
 
 ### Validation (additions)
@@ -57,7 +57,7 @@ Produced by `GetSuggestionScorecard`; not stored.
     low:    { ... }
   },
   analysesCount,                 // number of completed analyses contributing
-  sufficientData: true|false     // false when too few data points (FR-013)
+  sufficientData: true|false     // false when analysesCount < 3 (FR-013)
 }
 ```
 - `executionRate = executed / (executed + partial + skipped)` (excludes `pending`; 0 when denominator 0).
