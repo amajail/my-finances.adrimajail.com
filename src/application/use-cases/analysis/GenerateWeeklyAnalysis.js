@@ -94,6 +94,28 @@ class GenerateWeeklyAnalysis extends UseCase {
     const startedAt = this._clock();
     const targetDate = input.targetDate || this._toIsoDate(startedAt);
 
+    // 0. Freeze guard (feature 007, FR-004): if any order for this date has been
+    //    marked with an execution status, the week is frozen — skip the run
+    //    entirely (no LLM, no overwrite) and return the existing analysis so the
+    //    recorded statuses are preserved. Normal weekly cadence is unaffected
+    //    (each Friday is a new, unmarked date).
+    try {
+      if (await this._analysisRepository.hasMarkedOrders(targetDate)) {
+        const existing = await this._analysisRepository.getByDate(targetDate);
+        if (existing && existing.analysis) {
+          logger.info('GenerateWeeklyAnalysis: skipped — week is frozen (orders marked)', {
+            date: targetDate,
+          });
+          return existing.analysis;
+        }
+      }
+    } catch (err) {
+      // A guard failure must not block the run; fall through and proceed.
+      logger.warn('GenerateWeeklyAnalysis: freeze-guard check failed; proceeding', {
+        date: targetDate, errorType: err && err.name,
+      });
+    }
+
     // 1. Load settings (with defaults if missing). promptVersion is retired
     //    (feature 005, FR-019) — the instructions document is the system prompt.
     const [model, maxInputTokens, maxOutputTokens] = await Promise.all([
@@ -350,6 +372,9 @@ class GenerateWeeklyAnalysis extends UseCase {
           quantity: o.quantity,
           rationale: o.rationale,
           conviction: o.conviction,
+          // Feature 007: tell the model what was actually done with each prior
+          // suggestion (pending = not yet recorded) so it stops inferring (FR-009).
+          executionStatus: o.executionStatus || 'pending',
         })),
       };
     } catch (err) {

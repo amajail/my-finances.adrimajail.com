@@ -69,6 +69,8 @@ function mockRepositoryEmpty() {
     getLatest: jest.fn().mockResolvedValue([]),
     getByDate: jest.fn().mockResolvedValue(null),
     upsert: jest.fn().mockResolvedValue(undefined),
+    // Feature 007: freeze guard — default unmarked.
+    hasMarkedOrders: jest.fn().mockResolvedValue(false),
   };
 }
 
@@ -432,6 +434,51 @@ const {
   LLMSchemaValidationError,
   LLMRequestError,
 } = require('../../../../../src/infrastructure/llm/AnthropicLLMClient');
+
+// =========================================================================
+// Feature 007 — freeze guard (US1) + execution-status feed (US2)
+// =========================================================================
+describe('GenerateWeeklyAnalysis (007 freeze guard + status feed)', () => {
+  it('skips the run and returns the existing analysis when the week is frozen (FR-004)', async () => {
+    const repo = mockRepositoryEmpty();
+    repo.hasMarkedOrders.mockResolvedValue(true);
+    const existing = new WeeklyAnalysis({
+      date: '2026-05-15', status: 'completed', generatedAt: '2026-05-15T21:00:00Z',
+      modelUsed: 'claude-opus-4-7', promptVersion: 'editable-instructions-v1',
+      summary: 'Existing analysis that must be preserved, untouched, intact ok.',
+      markdownBody: longBody, tokensIn: 1, tokensOut: 1, costUsd: 0.1, durationMs: 1,
+    });
+    repo.getByDate.mockResolvedValue({ analysis: existing, orders: [] });
+
+    const { useCase, llmClient } = buildUseCase({ repository: repo });
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+
+    expect(result).toBe(existing);
+    expect(llmClient.submitAnalysis).not.toHaveBeenCalled();
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it("feeds each prior order's execution status to the model (FR-009)", async () => {
+    const repo = mockRepositoryEmpty();
+    const prior = new WeeklyAnalysis({
+      date: '2026-05-08', status: 'completed', generatedAt: '2026-05-08T21:00:00Z',
+      modelUsed: 'claude-opus-4-7', promptVersion: 'editable-instructions-v1',
+      summary: 'Prior week summary paragraph that is long enough to validate ok.',
+      markdownBody: longBody, portfolioSnapshot: [], tokensIn: 1, tokensOut: 1, costUsd: 0.1, durationMs: 1,
+    });
+    repo.getLatest.mockResolvedValue([prior]);
+    repo.getByDate.mockResolvedValue({
+      analysis: prior,
+      orders: [{ broker: 'ibkr', symbol: 'MU', side: 'sell', quantity: 25, rationale: 'trim chip concentration per directive', conviction: 'medium', executionStatus: 'skipped' }],
+    });
+
+    const { useCase, llmClient } = buildUseCase({ repository: repo });
+    await useCase.execute({ targetDate: '2026-05-15' });
+
+    const userMessage = llmClient.submitAnalysis.mock.calls[0][0].userMessage;
+    expect(userMessage).toContain('"executionStatus": "skipped"');
+  });
+});
 
 describe('GenerateWeeklyAnalysis (failure branches)', () => {
   it('CostCapExceededError: persists a failed row', async () => {

@@ -16,6 +16,7 @@ const IAnalysisRepository = require('../../application/interfaces/IAnalysisRepos
 const WeeklyAnalysis = require('../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../domain/entities/SuggestedOrder');
 const logger = require('../../shared/logging');
+const { NotFoundError } = require('../../shared/errors');
 
 class AzureAnalysisRepository extends IAnalysisRepository {
   /**
@@ -156,6 +157,79 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     logger.debug(`Persisted weekly analysis ${weeklyAnalysis.date} with ${suggestedOrders.length} orders`);
   }
 
+  /**
+   * Feature 007: Merge-patch the execution status columns on one order row.
+   * @param {string} date
+   * @param {number} index
+   * @param {{ status: string, note?: string|null, updatedAt: string }} patch
+   */
+  async setOrderExecutionStatus(date, index, { status, note, updatedAt }) {
+    await this._ensureInitialized();
+    const id = SuggestedOrder.id(date, index);
+
+    // Confirm the order exists (404 → NotFoundError).
+    try {
+      await this._database.ordersClient.getEntity(id.partitionKey, id.rowKey);
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw new NotFoundError(`No suggested order ${index} for analysis ${date}`);
+      }
+      throw error;
+    }
+
+    // Merge: only the status columns change; immutable order fields untouched.
+    // Empty-string clears the note (Merge leaves omitted properties unchanged).
+    await this._database.ordersClient.updateEntity(
+      {
+        partitionKey: id.partitionKey,
+        rowKey: id.rowKey,
+        executionStatus: status,
+        executionNote: note ? String(note) : '',
+        executionUpdatedAt: updatedAt,
+      },
+      'Merge'
+    );
+
+    return {
+      date,
+      index,
+      executionStatus: status,
+      executionNote: note ? String(note) : null,
+      executionUpdatedAt: updatedAt,
+    };
+  }
+
+  /**
+   * Feature 007: true if any order for the date is non-pending (week frozen).
+   * @param {string} date
+   * @returns {Promise<boolean>}
+   */
+  async hasMarkedOrders(date) {
+    await this._ensureInitialized();
+    for await (const entity of this._database.ordersClient.listEntities({
+      queryOptions: { filter: `PartitionKey eq '${date}'` },
+    })) {
+      if (entity.executionStatus && entity.executionStatus !== 'pending') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Feature 007: all orders across every analysis (for the scorecard). The
+   * orders table is tiny (a handful per week), so a full scan is fine.
+   * @returns {Promise<SuggestedOrder[]>}
+   */
+  async listAllOrders() {
+    await this._ensureInitialized();
+    const orders = [];
+    for await (const entity of this._database.ordersClient.listEntities()) {
+      orders.push(this._orderFromEntity(entity));
+    }
+    return orders;
+  }
+
   // ==================== Mappers ====================
 
   _analysisToEntity(wa) {
@@ -267,7 +341,7 @@ class AzureAnalysisRepository extends IAnalysisRepository {
 
   _orderToEntity(order) {
     const id = SuggestedOrder.id(order.analysisDate, order.index);
-    return {
+    const entity = {
       partitionKey: id.partitionKey,
       rowKey: id.rowKey,
       indexNum: order.index,
@@ -278,6 +352,13 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       rationale: order.rationale,
       conviction: order.conviction,
     };
+    // Feature 007: execution status columns (only when set, to keep new rows clean).
+    if (order.executionStatus && order.executionStatus !== 'pending') {
+      entity.executionStatus = order.executionStatus;
+    }
+    if (order.executionNote) entity.executionNote = order.executionNote;
+    if (order.executionUpdatedAt) entity.executionUpdatedAt = order.executionUpdatedAt;
+    return entity;
   }
 
   _orderFromEntity(entity) {
@@ -290,6 +371,10 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       quantity: entity.quantity,
       rationale: entity.rationale,
       conviction: entity.conviction,
+      // Feature 007: absent on pre-feature rows → 'pending'/null.
+      executionStatus: entity.executionStatus || 'pending',
+      executionNote: entity.executionNote || null,
+      executionUpdatedAt: entity.executionUpdatedAt || null,
     });
   }
 }

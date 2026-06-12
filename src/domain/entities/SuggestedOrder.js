@@ -21,6 +21,9 @@ const { ValidationError } = require('../../shared/errors');
 const SIDES = ['buy', 'sell'];
 const CONVICTIONS = ['low', 'medium', 'high'];
 const KNOWN_BROKERS = ['galicia', 'iol', 'ibkr', 'bullmarket', 'cash'];
+// Feature 007: owner-set execution outcome for a suggestion. Default 'pending'.
+const EXECUTION_STATUSES = ['pending', 'executed', 'partial', 'skipped'];
+const NOTE_MAX = 500;
 
 class SuggestedOrder {
   /**
@@ -45,6 +48,14 @@ class SuggestedOrder {
       : NaN;
     this._rationale = String(data.rationale || '');
     this._conviction = String(data.conviction || '').trim();
+    // Feature 007: execution tracking. Optional; default 'pending'.
+    this._executionStatus = data.executionStatus
+      ? String(data.executionStatus).trim()
+      : 'pending';
+    this._executionNote = data.executionNote !== undefined && data.executionNote !== null
+      ? String(data.executionNote)
+      : null;
+    this._executionUpdatedAt = data.executionUpdatedAt || null;
 
     this._validate();
     Object.freeze(this);
@@ -77,6 +88,12 @@ class SuggestedOrder {
     if (!CONVICTIONS.includes(this._conviction)) {
       errors.push(`conviction must be one of: ${CONVICTIONS.join(', ')}`);
     }
+    if (!EXECUTION_STATUSES.includes(this._executionStatus)) {
+      errors.push(`executionStatus must be one of: ${EXECUTION_STATUSES.join(', ')}`);
+    }
+    if (this._executionNote !== null && this._executionNote.length > NOTE_MAX) {
+      errors.push(`executionNote must be at most ${NOTE_MAX} characters`);
+    }
 
     if (errors.length > 0) {
       throw new ValidationError(
@@ -94,6 +111,10 @@ class SuggestedOrder {
   get quantity() { return this._quantity; }
   get rationale() { return this._rationale; }
   get conviction() { return this._conviction; }
+  get executionStatus() { return this._executionStatus; }
+  get executionNote() { return this._executionNote; }
+  get executionUpdatedAt() { return this._executionUpdatedAt; }
+  isMarked() { return this._executionStatus !== 'pending'; }
 
   /**
    * @returns {{ partitionKey: string, rowKey: string }}
@@ -115,6 +136,9 @@ class SuggestedOrder {
       quantity: this._quantity,
       rationale: this._rationale,
       conviction: this._conviction,
+      executionStatus: this._executionStatus,
+      executionNote: this._executionNote,
+      executionUpdatedAt: this._executionUpdatedAt,
     };
   }
 
@@ -124,3 +148,4 @@ class SuggestedOrder {
 }
 
 module.exports = SuggestedOrder;
+module.exports.EXECUTION_STATUSES = EXECUTION_STATUSES;

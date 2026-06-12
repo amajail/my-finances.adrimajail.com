@@ -65,6 +65,7 @@ import Layout from '../layouts/Layout.astro';
           <th class="text-left px-4 py-2">Side</th>
           <th class="text-right px-4 py-2">Qty</th>
           <th class="text-left px-4 py-2">Conviction</th>
+          <th class="text-left px-4 py-2">Execution</th>
           <th class="text-left px-4 py-2">Rationale</th>
         </tr>
       </thead>
@@ -203,6 +204,69 @@ import Layout from '../layouts/Layout.astro';
     return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
   }
 
+  // ---- Feature 007: order execution status controls ----
+
+  const EXEC_STATUSES = ['pending', 'executed', 'partial', 'skipped'];
+
+  function renderOrders(detail, date) {
+    show(document.getElementById('orders-section'));
+    const frozenNote = detail.frozen ? ' · frozen' : '';
+    document.getElementById('orders-count').textContent = `${detail.orders.length} suggested${frozenNote}`;
+
+    document.getElementById('orders-tbody').innerHTML = detail.orders.map((o) => {
+      const sel = EXEC_STATUSES.map((s) =>
+        `<option value="${s}" ${s === o.executionStatus ? 'selected' : ''}>${s}</option>`).join('');
+      const proposal = (o.executionStatus === 'pending' && o.proposedStatus)
+        ? `<div class="text-xs text-[var(--color-muted)] mt-1">proposed: <button type="button" class="underline accept-one" data-index="${o.index}" data-proposed="${o.proposedStatus}">${escapeHtml(o.proposedStatus)}</button></div>`
+        : '';
+      const note = o.executionNote ? escapeHtml(o.executionNote) : '';
+      return `
+        <tr class="border-t border-[var(--color-border)]">
+          <td class="px-4 py-2">${escapeHtml(o.broker)}</td>
+          <td class="px-4 py-2 num-mono">${escapeHtml(o.symbol)}</td>
+          <td class="px-4 py-2"><span class="badge ${o.side === 'buy' ? 'badge-success' : 'badge-pending'}">${escapeHtml(o.side)}</span></td>
+          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(o.quantity))}</td>
+          <td class="px-4 py-2">${escapeHtml(o.conviction)}</td>
+          <td class="px-4 py-2">
+            <select class="exec-status text-sm bg-[var(--color-surface-2)] rounded px-1 py-0.5" data-index="${o.index}">${sel}</select>
+            <input class="exec-note text-sm bg-[var(--color-surface-2)] rounded px-1 py-0.5 ml-1 w-32" data-index="${o.index}" maxlength="500" placeholder="note" value="${note}" />
+            <button type="button" class="exec-save badge badge-pending ml-1" data-index="${o.index}">save</button>
+            ${proposal}
+          </td>
+          <td class="px-4 py-2 text-[var(--color-text-primary)]">${escapeHtml(o.rationale)}</td>
+        </tr>`;
+    }).join('');
+
+    const saveFor = async (index, status, note) => {
+      try {
+        await api(`/analysis/weekly/${encodeURIComponent(date)}/orders/${index}`, {
+          method: 'PATCH', body: { status, note },
+        });
+        load(); // reload to reflect saved status + frozen state authoritatively
+      } catch (err) {
+        const banner = document.getElementById('error-banner');
+        banner.textContent = `Could not save status: ${err.message}`;
+        show(banner);
+      }
+    };
+
+    document.querySelectorAll('.exec-save').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = btn.getAttribute('data-index');
+        const status = document.querySelector(`.exec-status[data-index="${i}"]`).value;
+        const note = document.querySelector(`.exec-note[data-index="${i}"]`).value;
+        saveFor(i, status, note);
+      });
+    });
+    document.querySelectorAll('.accept-one').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = btn.getAttribute('data-index');
+        const note = document.querySelector(`.exec-note[data-index="${i}"]`).value;
+        saveFor(i, btn.getAttribute('data-proposed'), note);
+      });
+    });
+  }
+
   async function load() {
     const date = getDateFromUrl();
     if (!date) {
@@ -261,18 +325,7 @@ import Layout from '../layouts/Layout.astro';
     }
 
     if (Array.isArray(detail.orders) && detail.orders.length > 0) {
-      show(document.getElementById('orders-section'));
-      document.getElementById('orders-count').textContent = `${detail.orders.length} suggested`;
-      document.getElementById('orders-tbody').innerHTML = detail.orders.map((o) => `
-        <tr class="border-t border-[var(--color-border)]">
-          <td class="px-4 py-2">${escapeHtml(o.broker)}</td>
-          <td class="px-4 py-2 num-mono">${escapeHtml(o.symbol)}</td>
-          <td class="px-4 py-2"><span class="badge ${o.side === 'buy' ? 'badge-success' : 'badge-pending'}">${escapeHtml(o.side)}</span></td>
-          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(o.quantity))}</td>
-          <td class="px-4 py-2">${escapeHtml(o.conviction)}</td>
-          <td class="px-4 py-2 text-[var(--color-text-primary)]">${escapeHtml(o.rationale)}</td>
-        </tr>
-      `).join('');
+      renderOrders(detail, date);
     }
 
     if (detail.markdownBody) {

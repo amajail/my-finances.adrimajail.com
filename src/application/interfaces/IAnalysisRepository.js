@@ -47,6 +47,41 @@ class IAnalysisRepository {
   async upsert(_weeklyAnalysis, _suggestedOrders) {
     throw new Error('Method not implemented: upsert');
   }
+
+  /**
+   * Feature 007: set the owner-confirmed execution status on one suggested order
+   * (Merge — does not touch the order's immutable fields). Throws NotFoundError
+   * if the order row does not exist.
+   *
+   * @param {string} date - ISO YYYY-MM-DD (parent analysis date).
+   * @param {number} index - order index.
+   * @param {{ status: string, note?: string|null, updatedAt: string }} patch
+   * @returns {Promise<{ date: string, index: number, executionStatus: string, executionNote: string|null, executionUpdatedAt: string }>}
+   * @abstract
+   */
+  async setOrderExecutionStatus(_date, _index, _patch) {
+    throw new Error('Method not implemented: setOrderExecutionStatus');
+  }
+
+  /**
+   * Feature 007: true if any order for the date has a non-pending execution
+   * status (i.e. the week is frozen).
+   * @param {string} date
+   * @returns {Promise<boolean>}
+   * @abstract
+   */
+  async hasMarkedOrders(_date) {
+    throw new Error('Method not implemented: hasMarkedOrders');
+  }
+
+  /**
+   * Feature 007: all suggested orders across every analysis (for the scorecard).
+   * @returns {Promise<SuggestedOrder[]>}
+   * @abstract
+   */
+  async listAllOrders() {
+    throw new Error('Method not implemented: listAllOrders');
+  }
 }
 
 module.exports = IAnalysisRepository;

@@ -19,6 +19,7 @@ function mockRepository() {
     getLatest: jest.fn().mockResolvedValue([]),
     getByDate: jest.fn().mockResolvedValue(null),
     upsert: jest.fn().mockResolvedValue(undefined),
+    hasMarkedOrders: jest.fn().mockResolvedValue(false),
   };
 }
 
