@@ -234,6 +234,80 @@ class AnthropicLLMClient extends ILLMClient {
   }
 
   /**
+   * Web-search-enabled structured classification (feature 006). Gives the model
+   * Anthropic's server-side `web_search` tool plus a structured-output tool, lets
+   * it research a public question, and returns the structured result. Used for
+   * IMF status — the request carries ONLY a public macro question (no holdings).
+   *
+   * tool_choice is `auto` (the model must be free to search before submitting),
+   * so we parse the structured tool_use block out of the final content.
+   *
+   * @param {Object} input
+   * @param {string} input.systemPrompt
+   * @param {string} input.userMessage
+   * @param {Object} input.toolSchema - { name, description, input_schema }.
+   * @param {string} input.model
+   * @param {number} [input.maxOutputTokens]
+   * @param {number} [input.maxSearches]
+   * @returns {Promise<{ result: Object, usage: { inputTokens: number, outputTokens: number, costUsd: number } }>}
+   */
+  async classifyWithWebSearch({ systemPrompt, userMessage, toolSchema, model, maxOutputTokens, maxSearches }) {
+    if (!systemPrompt || !userMessage || !toolSchema || !model) {
+      throw new Error('classifyWithWebSearch: missing required input fields');
+    }
+
+    const client = this._client();
+    const toolName = toolSchema.name || 'submit_classification';
+
+    let response;
+    try {
+      response = await client.messages.create({
+        model,
+        max_tokens: maxOutputTokens || 1024,
+        system: [{ type: 'text', text: systemPrompt }],
+        tools: [
+          { type: 'web_search_20250305', name: 'web_search', max_uses: maxSearches || 4 },
+          {
+            name: toolName,
+            description: toolSchema.description || 'Submit the classification result.',
+            input_schema: toolSchema.input_schema,
+          },
+        ],
+        // Must be auto: the model has to be able to search before it submits.
+        tool_choice: { type: 'auto' },
+        messages: [{ role: 'user', content: userMessage }],
+      });
+    } catch (err) {
+      const sanitized = LLMLogSanitizer.sanitizeError(err);
+      logger.error('AnthropicLLMClient.classifyWithWebSearch: SDK request failed', sanitized);
+      throw new LLMRequestError(sanitized);
+    }
+
+    const toolBlock = Array.isArray(response.content)
+      ? response.content.find((b) => b.type === 'tool_use' && b.name === toolName)
+      : null;
+    if (!toolBlock || !toolBlock.input || typeof toolBlock.input !== 'object') {
+      throw new LLMSchemaValidationError(`model did not finish by calling "${toolName}"`);
+    }
+
+    this._validateAgainstSchema(toolBlock.input, toolSchema.input_schema);
+
+    const usage = response.usage || { input_tokens: 0, output_tokens: 0 };
+    const rates = MODEL_RATES[model] || DEFAULT_RATES;
+    // Token cost only; the web-search server tool adds a small per-search fee
+    // (~$0.01/search) that is not reflected in token counts.
+    const costUsd = Number(
+      ((usage.input_tokens / 1_000_000) * rates.input +
+        (usage.output_tokens / 1_000_000) * rates.output).toFixed(6)
+    );
+
+    return {
+      result: toolBlock.input,
+      usage: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens, costUsd },
+    };
+  }
+
+  /**
    * Minimal JSON schema validator covering the subset our tool schema uses:
    * required fields, primitive types, enums, array minItems, string minLength.
    * Good enough for defense-in-depth — the model is the primary enforcer.

@@ -63,6 +63,19 @@ class ILLMClient {
   async classify(_input) {
     throw new Error('Method not implemented: classify');
   }
+
+  /**
+   * Web-search-enabled structured classification (feature 006). Like classify(),
+   * but gives the model a server-side web_search tool to research a PUBLIC
+   * question before returning the structured result. No holdings are sent.
+   *
+   * @param {Object} input - { systemPrompt, userMessage, toolSchema, model, maxOutputTokens, maxSearches }
+   * @returns {Promise<{ result: Object, usage: LLMUsage }>}
+   * @abstract
+   */
+  async classifyWithWebSearch(_input) {
+    throw new Error('Method not implemented: classifyWithWebSearch');
+  }
 }
 
 module.exports = ILLMClient;

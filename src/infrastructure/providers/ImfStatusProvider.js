@@ -18,11 +18,14 @@
 const IImfStatusProvider = require('../../application/interfaces/IImfStatusProvider');
 const imfClassifyTool = require('../llm/imfClassifyTool');
 
-const DEFAULT_URL = 'https://www.imf.org/en/news/rss';
+// IMF media-center RSS — a real RSS 2.0 feed (application/rss+xml, <item> blocks).
+// NOTE: https://www.imf.org/en/news/rss is an HTML landing page, NOT a feed, and
+// the imf.org host 403s datacenter IPs without a browser User-Agent; this host
+// serves structured XML and tolerates server-side callers.
+const DEFAULT_URL = 'https://mediacenter.imf.org/Rss';
 const DEFAULT_TIMEOUT_MS = 10000;
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 const DEFAULT_STALENESS_WEEKS = 8;
-const LOOKBACK_DAYS = 7;
 const ZERO_USAGE = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
 
 class ImfStatusFetchError extends Error {
@@ -51,6 +54,11 @@ class ImfStatusProvider extends IImfStatusProvider {
     this._url = url;
     this._model = model;
     this._stalenessWeeks = stalenessWeeks;
+    // News lookback = the staleness window. IMF program reviews are sparse
+    // (~quarterly), so a 7-day window would almost always be empty; matching it
+    // to the carry-forward staleness keeps "found news" and "carried value"
+    // consistent (default 8 weeks ≈ 56 days).
+    this._lookbackDays = stalenessWeeks * 7;
     this._timeoutMs = timeoutMs;
     this._clock = clock;
   }
@@ -103,7 +111,14 @@ class ImfStatusProvider extends IImfStatusProvider {
     const timer = setTimeout(() => controller.abort(), this._timeoutMs);
     let res;
     try {
-      res = await this._fetcher(this._url, { signal: controller.signal });
+      // Browser-like UA + Accept: some IMF hosts 403 datacenter IPs / no-UA requests.
+      res = await this._fetcher(this._url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'my-finances/1.0 (+https://github.com/amajail/my-finances)',
+          Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+        },
+      });
     } catch (err) {
       throw new Error(
         err && err.name === 'AbortError'
@@ -150,7 +165,7 @@ class ImfStatusProvider extends IImfStatusProvider {
   }
 
   _filterRecentArgentina(items) {
-    const cutoff = this._clock().getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    const cutoff = this._clock().getTime() - this._lookbackDays * 24 * 60 * 60 * 1000;
     return items.filter((it) => {
       const hay = `${it.title} ${it.link} ${it.description}`.toLowerCase();
       if (!hay.includes('argentina')) return false;

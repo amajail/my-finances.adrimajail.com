@@ -25,7 +25,8 @@ const ArgentinaDatosInflationProvider = require('../../infrastructure/providers/
 const FredProvider = require('../../infrastructure/providers/FredProvider');
 const StooqSp500Provider = require('../../infrastructure/providers/StooqSp500Provider'); // keyless fallback (Stooq now JS-gated)
 const FredSp500DrawdownProvider = require('../../infrastructure/providers/FredSp500DrawdownProvider');
-const ImfStatusProvider = require('../../infrastructure/providers/ImfStatusProvider');
+const ImfStatusProvider = require('../../infrastructure/providers/ImfStatusProvider'); // RSS-based (kept as fallback)
+const WebSearchImfStatusProvider = require('../../infrastructure/providers/WebSearchImfStatusProvider');
 const MacroContextProvider = require('../../infrastructure/providers/MacroContextProvider');
 
 // Infrastructure LLM
@@ -225,10 +226,6 @@ class Container {
     if (!this._singletons.has('macroContextProvider')) {
       const fredApiKey = process.env['analysis.fredApiKey'] || process.env.FRED_API_KEY || null;
       const imfModel = process.env['analysis.imfModel'] || undefined;
-      const stalenessRaw = process.env['analysis.imfStalenessWeeks'];
-      const stalenessWeeks = stalenessRaw && Number.isFinite(parseInt(stalenessRaw, 10))
-        ? parseInt(stalenessRaw, 10)
-        : undefined;
       const provider = new MacroContextProvider({
         riesgoPaisProvider: this.getRiesgoPaisProvider(),
         fxGapProvider: new DolarApiFxGapProvider(),
@@ -239,10 +236,12 @@ class Container {
         // browser challenge). Needs the FRED key; ~10yr window per research.md.
         // Falls back to the keyless StooqSp500Provider when no FRED key is set.
         sp500Provider: fredApiKey ? new FredSp500DrawdownProvider({ apiKey: fredApiKey }) : new StooqSp500Provider(),
-        imfStatusProvider: new ImfStatusProvider({
+        // IMF status via live web search (no clean per-country IMF feed exists).
+        // `stalenessWeeks` is parsed above and still informs the RSS fallback if
+        // ever swapped back in.
+        imfStatusProvider: new WebSearchImfStatusProvider({
           llmClient: this.getLLMClient(),
           model: imfModel,
-          stalenessWeeks,
         }),
       });
       this._singletons.set('macroContextProvider', provider);
