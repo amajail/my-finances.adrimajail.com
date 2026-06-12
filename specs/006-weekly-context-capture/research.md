@@ -57,7 +57,27 @@ unknown from the Technical Context. Format per item: Decision / Rationale / Alte
 - **Alternatives**: keep Stooq primary — rejected (unreliable headless). The `StooqSp500Provider`
   code stays as the no-key fallback path.
 
-### 9. IMF Argentina review status — RSS filter + AI classify
+### 9. IMF Argentina review status — AI web search (revised) ⚠️ supersedes RSS
+
+- **Decision (revised after prod testing)**: Derive the status via an **AI call with Anthropic's
+  server-side `web_search` tool** (`WebSearchImfStatusProvider` + `AnthropicLLMClient
+  .classifyWithWebSearch`). The model researches the latest Argentina IMF program news live and
+  returns the fixed status enum + as-of date. Privacy: only a public macro question is sent — no
+  holdings — within the authorized Anthropic carve-out.
+- **Why revised**: The RSS approach failed in prod. Root causes found live: (a) `https://www.imf.org/en/news/rss`
+  is an **HTML landing page**, not a feed (0 `<item>` parsed); (b) `imf.org` returns **403 to
+  datacenter IPs** without a browser UA, so the Azure Function *threw* → `unavailable`. The only
+  structured feed found (`https://mediacenter.imf.org/Rss`) is a media/broll feed that mentions
+  Argentina only incidentally (1 item in ~5 months) — useless for program status. There is no
+  clean IMF per-country feed (as originally flagged). A live web search returns an accurate status
+  (e.g. "disbursement @ 2026-05-21") in ~7s.
+- **Resilience**: on web-search/AI failure, carry forward the prior reading; if none, throw →
+  orchestrator marks the indicator `unavailable` (run still completes).
+- **Cost**: token cost + a small per-search fee (~$0.01/search, ≤4 searches/run).
+- **Retained**: the RSS-based `ImfStatusProvider` stays in the codebase (URL corrected to the
+  mediacenter feed + UA header) as a no-AI fallback, but is not wired by default.
+
+#### (Historical) RSS filter + AI classify — superseded, kept for reference
 - **Decision**: New `ImfStatusProvider`:
   1. Fetch IMF global news RSS `https://www.imf.org/en/news/rss`.
   2. Filter items from the trailing ~7 days whose title/link/summary contains "argentina" (the press-release slug reliably contains `argentina`, e.g. `pr26165-argentina-…`).
