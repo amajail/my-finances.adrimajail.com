@@ -400,13 +400,24 @@ class GenerateWeeklyAnalysis extends UseCase {
   }
 
   _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges }) {
+    // The raw per-position list and the prior week's snapshot are captured for
+    // the position-change diff and for persistence — they are not sent to the
+    // model verbatim. The model receives the precomputed `positionChanges`
+    // deltas instead (below), which is the designed signal; keeping the full
+    // arrays out keeps the prompt focused and token usage stable.
+    const summaryForPrompt = portfolioSummary && portfolioSummary.positions
+      ? (() => { const { positions, ...rest } = portfolioSummary; return rest; })()
+      : portfolioSummary;
+    const previousForPrompt = previousAnalysis && previousAnalysis.portfolioSnapshot
+      ? (() => { const { portfolioSnapshot, ...rest } = previousAnalysis; return rest; })()
+      : previousAnalysis;
     const parts = [
       '## generatedAt',
       generatedAt,
       '',
       '## portfolioSummary',
       '```json',
-      JSON.stringify(portfolioSummary, null, 2),
+      JSON.stringify(summaryForPrompt, null, 2),
       '```',
       '',
       '## portfolioTotals',
@@ -428,8 +439,8 @@ class GenerateWeeklyAnalysis extends UseCase {
     // The previousAnalysis block carries the prior macro panel (when present),
     // so the model can reason about week-over-week direction (FR-010).
     parts.push('', '## previousAnalysis');
-    if (previousAnalysis) {
-      parts.push('```json', JSON.stringify(previousAnalysis, null, 2), '```');
+    if (previousForPrompt) {
+      parts.push('```json', JSON.stringify(previousForPrompt, null, 2), '```');
     } else {
       parts.push('none — first run');
     }
