@@ -48,6 +48,7 @@ const {
   SetOrderExecutionStatus,
   GetSuggestionScorecard,
   GetMacroSeries,
+  GetPerformanceSeries,
   GetActiveInstructions,
   SaveInstructions,
   ListInstructionsHistory,
@@ -431,6 +432,20 @@ class Container {
   getGetMacroSeries() {
     return new GetMacroSeries({
       analysisRepository: this.getAnalysisRepository(),
+    });
+  }
+
+  /**
+   * Get GetPerformanceSeries use case (feature 009). Benchmark levels are
+   * fetched server-side; the FRED key comes from env (never the browser).
+   * @returns {GetPerformanceSeries}
+   */
+  getGetPerformanceSeries() {
+    const fredApiKey = process.env['analysis.fredApiKey'] || process.env.FRED_API_KEY || null;
+    return new GetPerformanceSeries({
+      analysisRepository: this.getAnalysisRepository(),
+      fredProvider: new FredProvider({ apiKey: fredApiKey }),
+      inflationProvider: new ArgentinaDatosInflationProvider(),
     });
   }
 

@@ -80,6 +80,47 @@ class ArgentinaDatosInflationProvider extends IInflationProvider {
 
     return { percent, asOf };
   }
+
+  /**
+   * Feature 009: the full monthly CPI series, ascending by date.
+   * @returns {Promise<Array<{ date: string, percent: number }>>}
+   */
+  async getSeries() {
+    if (!this._fetcher) {
+      throw new InflationFetchError('no fetch implementation available (Node 18+ required, or pass fetcher in constructor)');
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
+    let res;
+    try {
+      res = await this._fetcher(this._url, { signal: controller.signal });
+    } catch (err) {
+      throw new InflationFetchError(
+        err && err.name === 'AbortError'
+          ? `timeout after ${this._timeoutMs}ms`
+          : `fetch failed: ${err && err.message ? err.message : String(err)}`,
+        err
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res || typeof res.ok !== 'boolean' || !res.ok) {
+      throw new InflationFetchError(`non-2xx response: ${res && res.status ? res.status : 'unknown'}`);
+    }
+    let body;
+    try {
+      body = await res.json();
+    } catch (err) {
+      throw new InflationFetchError(`response was not valid JSON: ${err.message}`, err);
+    }
+    if (!Array.isArray(body)) {
+      throw new InflationFetchError('response was not an array');
+    }
+    return body
+      .filter((e) => e && typeof e.fecha === 'string' && Number.isFinite(Number(e.valor)))
+      .map((e) => ({ date: e.fecha, percent: Number(e.valor) }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
 }
 
 module.exports = ArgentinaDatosInflationProvider;

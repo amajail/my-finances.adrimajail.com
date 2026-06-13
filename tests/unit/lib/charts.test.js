@@ -7,7 +7,45 @@
 const {
   METRIC_CATALOGUE, buildSeries, niceScale, sliceLastN, imfChangePoints,
   lineChartSvg, dualAxisSvg, eventStripSvg,
+  indexTo100, growthPct, multiLineSvg,
 } = require('../../../dashboard/src/lib/charts.cjs');
+
+describe('indexTo100 (feature 009)', () => {
+  it('rebases the first available value to 100 and keeps gaps null', () => {
+    const out = indexTo100([
+      { date: 'a', value: 50 }, { date: 'b', value: 75 }, { date: 'c', value: null },
+    ]);
+    expect(out.map((d) => d.value)).toEqual([100, 150, null]);
+  });
+  it('uses the first AVAILABLE value as the base (skips leading gaps)', () => {
+    const out = indexTo100([{ date: 'a', value: null }, { date: 'b', value: 200 }, { date: 'c', value: 220 }]);
+    expect(out.map((d) => d.value)).toEqual([null, 100, 110]);
+  });
+  it('returns all null when no base value exists', () => {
+    expect(indexTo100([{ date: 'a', value: null }]).map((d) => d.value)).toEqual([null]);
+  });
+});
+
+describe('growthPct (feature 009)', () => {
+  it('returns last index − 100', () => {
+    expect(growthPct([{ value: 100 }, { value: 108.5 }])).toBe(8.5);
+  });
+  it('returns null for an all-gap series', () => {
+    expect(growthPct([{ value: null }])).toBeNull();
+  });
+});
+
+describe('multiLineSvg (feature 009, smoke)', () => {
+  it('renders multiple indexed series with a 100 baseline', () => {
+    const svg = multiLineSvg([
+      { label: 'Portfolio', color: '#0a0', series: [{ date: 'a', value: 100 }, { date: 'b', value: 110 }] },
+      { label: 'MEP', color: '#00a', series: [{ date: 'a', value: 100 }, { date: 'b', value: 95 }] },
+    ]);
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('Portfolio');
+    expect(svg).toContain('100');
+  });
+});
 
 const macroPoint = (date, over = {}) => ({
   date,

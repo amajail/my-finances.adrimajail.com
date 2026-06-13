@@ -74,13 +74,15 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/008-macro-charts/plan.md` (Phase 1 complete; tasks pending). Companion
-artifacts in the same folder: `spec.md`, `research.md`, `data-model.md`,
-`quickstart.md`, `contracts/api.md`. This feature adds a read-only "Charts"
-dashboard page that plots the weekly macro panel + portfolio totals over time
-(small-multiples, independent y-axes, gaps not interpolated, IMF as an event
-strip, dual-axis overlay, range selector) — fed by a thin new
-`GET /api/analysis/macro-series` projection over feature 006's persisted data.
-Hand-rolled SVG, zero new deps, no new storage. Builds on features 006 + 007
-(shipped). Prior plan: `specs/007-suggestion-scorecard/plan.md`.
+`specs/009-performance-benchmarks/plan.md` (Phase 1 complete; tasks pending).
+Companion artifacts in the same folder: `spec.md`, `research.md`,
+`data-model.md`, `quickstart.md`, `contracts/api.md`. This feature adds a
+read-only "Performance" page: the weekly portfolio total value and benchmarks
+(MEP, S&P 500, US/AR inflation) each indexed to 100 over the window and
+overlaid (no cash-flow log, no time-weighted return — raw value, deposits show
+as steps). Portfolio value + MEP come from feature 006; benchmark levels are
+fetched SERVER-SIDE on-demand (FRED key never reaches the browser) via a new
+`GET /api/analysis/performance`. Hand-rolled SVG (feature 008), zero new deps,
+no new storage. Builds on 006 + 008 (shipped). Prior plan:
+`specs/008-macro-charts/plan.md`.
 <!-- SPECKIT END -->

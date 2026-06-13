@@ -1,0 +1,143 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Performance · my-finances" active="performance">
+  <header class="mb-6">
+    <span class="eyebrow">Performance</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold">Growth vs benchmarks</h1>
+    <p class="text-sm text-[var(--color-muted)] mt-1" id="hdr-meta">Loading…</p>
+    <p class="text-xs text-[var(--color-muted)] mt-1">All series indexed to 100 at the window start. The portfolio line is raw total value — deposits/withdrawals show as steps (not a cash-flow-adjusted return).</p>
+  </header>
+
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <div id="series-toggles" class="flex flex-wrap gap-1 text-sm"></div>
+    <label class="text-sm text-[var(--color-muted)]">Range
+      <select id="range" class="ml-1 bg-[var(--color-surface-2)] rounded px-1 py-0.5 text-sm">
+        <option value="8">8 wks</option>
+        <option value="26">26 wks</option>
+        <option value="52">52 wks</option>
+        <option value="all" selected>All</option>
+      </select>
+    </label>
+  </div>
+
+  <section id="empty" class="card p-6 hidden">
+    <p class="text-sm text-[var(--color-muted)]" id="empty-msg">Not enough history yet.</p>
+  </section>
+
+  <section id="chart-card" class="card mb-6 hidden">
+    <div class="p-3" id="chart"></div>
+  </section>
+
+  <section id="summary-card" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]"><h2 class="font-semibold">Growth over window</h2></div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Series</th>
+          <th class="text-right px-4 py-2">Growth</th>
+          <th class="text-right px-4 py-2">vs portfolio</th>
+        </tr>
+      </thead>
+      <tbody id="summary-tbody"></tbody>
+    </table>
+  </section>
+
+  <p id="error-banner" class="card p-4 pos-negative text-sm hidden"></p>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+  import charts from '../lib/charts.cjs';
+  const { indexTo100, growthPct, sliceLastN, multiLineSvg } = charts;
+
+  function show(el) { el.classList.remove('hidden'); }
+  function hide(el) { el.classList.add('hidden'); }
+
+  const SERIES = [
+    { key: 'portfolio', label: 'Portfolio', color: '#22c55e', always: true, acc: (p) => ({ value: p.portfolioValueUsd, asOf: p.date, available: p.portfolioValueUsd != null }) },
+    { key: 'mep',    label: 'MEP (held USD)', color: '#3b82f6', acc: (p) => p.mep },
+    { key: 'sp500',  label: 'S&P 500',        color: '#f59e0b', acc: (p) => p.sp500 },
+    { key: 'usCpi',  label: 'US inflation',   color: '#a855f7', acc: (p) => p.usCpi },
+    { key: 'arCpi',  label: 'AR inflation',   color: '#ec4899', acc: (p) => p.arCpi },
+  ];
+
+  let allPoints = [];
+  let avail = {};
+  const on = {}; // selected toggles
+
+  function seriesFromPoints(points, acc) {
+    return points.map((p) => {
+      const r = acc(p) || {};
+      return { date: p.date, value: r.value != null && Number.isFinite(Number(r.value)) ? Number(r.value) : null, asOf: r.asOf || null, available: !!r.available };
+    });
+  }
+
+  function render() {
+    const points = sliceLastN(allPoints, document.getElementById('range').value);
+    const empty = document.getElementById('empty');
+    if (points.length < 2) {
+      document.getElementById('empty-msg').textContent = points.length === 0
+        ? 'No analyses with portfolio totals yet.'
+        : 'Only one data point so far — growth appears from the second week.';
+      show(empty); hide(document.getElementById('chart-card')); hide(document.getElementById('summary-card'));
+      return;
+    }
+    hide(empty); show(document.getElementById('chart-card')); show(document.getElementById('summary-card'));
+
+    const selected = SERIES.filter((s) => s.always || on[s.key]);
+    const built = selected.map((s) => ({ def: s, indexed: indexTo100(seriesFromPoints(points, s.acc)) }));
+    document.getElementById('chart').innerHTML = multiLineSvg(built.map((b) => ({ label: b.def.label, color: b.def.color, series: b.indexed })));
+
+    const portfolioGrowth = growthPct(built.find((b) => b.def.key === 'portfolio')?.indexed || []);
+    document.getElementById('summary-tbody').innerHTML = built.map((b) => {
+      const g = growthPct(b.indexed);
+      const gap = (g != null && portfolioGrowth != null && b.def.key !== 'portfolio') ? `${(portfolioGrowth - g) >= 0 ? '+' : ''}${(portfolioGrowth - g).toFixed(2)} pp` : '—';
+      return `<tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2"><span style="color:${b.def.color}">●</span> ${b.def.label}</td>
+        <td class="px-4 py-2 text-right num-mono">${g != null ? (g >= 0 ? '+' : '') + g + '%' : '—'}</td>
+        <td class="px-4 py-2 text-right num-mono">${gap}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function buildToggles() {
+    const wrap = document.getElementById('series-toggles');
+    wrap.innerHTML = SERIES.filter((s) => !s.always).map((s) => {
+      const ok = avail[s.key];
+      on[s.key] = ok && (s.key === 'mep' || ok); // default on when available
+      return `<button type="button" data-key="${s.key}" ${ok ? '' : 'disabled'} class="badge ${on[s.key] ? 'badge-success' : 'badge-pending'}" style="${ok ? '' : 'opacity:.4'}">${s.label}${ok ? '' : ' (n/a)'}</button>`;
+    }).join('');
+    wrap.querySelectorAll('button[data-key]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        const k = btn.getAttribute('data-key');
+        on[k] = !on[k];
+        btn.className = `badge ${on[k] ? 'badge-success' : 'badge-pending'}`;
+        render();
+      });
+    });
+  }
+
+  async function load() {
+    let data;
+    try {
+      data = await api('/analysis/performance?weeks=60');
+    } catch (err) {
+      const b = document.getElementById('error-banner');
+      b.textContent = `Failed to load performance series: ${err.message}`;
+      show(b);
+      return;
+    }
+    allPoints = data.points || [];
+    avail = data.benchmarksAvailable || {};
+    document.getElementById('hdr-meta').textContent = `${allPoints.length} weekly ${allPoints.length === 1 ? 'analysis' : 'analyses'}`;
+    buildToggles();
+    render();
+    document.getElementById('range').addEventListener('change', render);
+  }
+
+  load();
+</script>

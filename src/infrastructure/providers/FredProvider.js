@@ -120,6 +120,71 @@ class FredProvider extends IFredProvider {
 
     return { value, asOf };
   }
+
+  /**
+   * Feature 009: fetch a full observation series over a date range, ascending.
+   * @param {string} seriesId
+   * @param {Object} [opts]
+   * @param {string} [opts.start] - observation_start (YYYY-MM-DD).
+   * @param {string} [opts.end] - observation_end (YYYY-MM-DD).
+   * @param {string} [opts.units] - FRED units transform.
+   * @returns {Promise<Array<{ date: string, value: number }>>}
+   */
+  async getObservations(seriesId, { start, end, units } = {}) {
+    if (!this._apiKey) {
+      throw new FredConfigError('FRED API key not configured (set analysis.fredApiKey)');
+    }
+    if (!this._fetcher) {
+      throw new FredFetchError('no fetch implementation available (Node 18+ required, or pass fetcher in constructor)');
+    }
+
+    const params = new URLSearchParams({
+      series_id: seriesId,
+      api_key: this._apiKey,
+      file_type: 'json',
+      sort_order: 'asc',
+    });
+    if (start) params.set('observation_start', start);
+    if (end) params.set('observation_end', end);
+    if (units) params.set('units', units);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
+    let res;
+    try {
+      res = await this._fetcher(`${this._baseUrl}?${params.toString()}`, { signal: controller.signal });
+    } catch (err) {
+      throw new FredFetchError(
+        err && err.name === 'AbortError'
+          ? `timeout after ${this._timeoutMs}ms`
+          : `fetch failed: ${err && err.message ? err.message : String(err)}`,
+        err
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!res || typeof res.ok !== 'boolean' || !res.ok) {
+      throw new FredFetchError(`non-2xx response: ${res && res.status ? res.status : 'unknown'}`);
+    }
+
+    let body;
+    try {
+      body = await res.json();
+    } catch (err) {
+      throw new FredFetchError(`response was not valid JSON: ${err.message}`, err);
+    }
+
+    const obs = body && Array.isArray(body.observations) ? body.observations : null;
+    if (!obs) {
+      throw new FredFetchError(`no observations for series ${seriesId}`);
+    }
+    // Keep only rows with a real value ("." = FRED missing); ascending by date.
+    return obs
+      .filter((o) => o && o.value !== '.' && o.value !== undefined && typeof o.date === 'string')
+      .map((o) => ({ date: o.date, value: Number(o.value) }))
+      .filter((o) => Number.isFinite(o.value));
+  }
 }
 
 module.exports = FredProvider;

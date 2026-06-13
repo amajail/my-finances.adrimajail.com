@@ -180,8 +180,66 @@ function eventStripSvg(points, opts = {}) {
   return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><line x1="8" y1="22" x2="${w - 8}" y2="22" stroke="#ddd" stroke-width="1" />${marks}</svg>`;
 }
 
+// ==================== Feature 009: indexed growth ====================
+
+/** Rebase a series so its first available value is 100 (v_i / v_0 × 100); gaps stay null. */
+function indexTo100(series) {
+  const arr = Array.isArray(series) ? series : [];
+  const base = arr.find((d) => d && d.value != null && Number.isFinite(d.value));
+  const b = base ? base.value : null;
+  return arr.map((d) => ({
+    ...d,
+    value: (b && d && d.value != null && Number.isFinite(d.value)) ? Number(((d.value / b) * 100).toFixed(3)) : null,
+  }));
+}
+
+/** Total growth % of an indexed-to-100 series = last available value − 100. */
+function growthPct(series) {
+  const arr = (Array.isArray(series) ? series : []).filter((d) => d && d.value != null && Number.isFinite(d.value));
+  if (!arr.length) return null;
+  return Number((arr[arr.length - 1].value - 100).toFixed(2));
+}
+
+/** Multiple series on ONE shared y-axis (all indexed to 100). seriesList: [{label,color,series}]. */
+function multiLineSvg(seriesList, opts = {}) {
+  const w = opts.w || 680, h = opts.h || 300;
+  const padL = 8, padR = 8, padT = 16, padB = 34;
+  const list = (seriesList || []).filter((s) => s && Array.isArray(s.series));
+  const dates = (list.find((s) => s.series.length) || { series: [] }).series.map((d) => d.date);
+  const n = dates.length;
+  const allVals = list.flatMap((s) => s.series.filter((d) => d.value != null).map((d) => d.value));
+  if (!allVals.length) {
+    return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><text x="${w / 2}" y="${h / 2}" text-anchor="middle" font-size="11" fill="#888">no data</text></svg>`;
+  }
+  const sc = niceScale(Math.min(...allVals, 100), Math.max(...allVals, 100));
+  const xs = (i) => (n <= 1 ? w / 2 : padL + (i * (w - padL - padR)) / (n - 1));
+  const ys = (v) => padT + (1 - (v - sc.min) / (sc.max - sc.min || 1)) * (h - padT - padB);
+
+  let body = '';
+  list.forEach((s) => {
+    let d = '', started = false, circles = '';
+    s.series.forEach((pt, i) => {
+      const x = xs(i);
+      if (pt.value == null) { started = false; return; }
+      const y = ys(pt.value);
+      d += `${started ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; started = true;
+      circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="${s.color}"><title>${esc(s.label)}: ${fmt(pt.value)}${pt.asOf ? ' · as of ' + esc(pt.asOf) : ''} (${esc(pt.date)})</title></circle>`;
+    });
+    body += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="1.5" />${circles}`;
+  });
+
+  const y100 = ys(100);
+  const legend = list.map((s, i) => `<g transform="translate(${padL + i * 130}, ${h - 6})"><rect width="8" height="8" y="-8" fill="${s.color}" /><text x="11" font-size="9" fill="#888">${esc(s.label)}</text></g>`).join('');
+  const xlabels = n ? `<text x="${xs(0)}" y="${h - 20}" font-size="8" fill="#888">${esc(dates[0])}</text><text x="${xs(n - 1)}" y="${h - 20}" text-anchor="end" font-size="8" fill="#888">${esc(dates[n - 1])}</text>` : '';
+  return `<svg viewBox="0 0 ${w} ${h}" class="w-full">`
+    + `<line x1="${padL}" y1="${y100.toFixed(1)}" x2="${w - padR}" y2="${y100.toFixed(1)}" stroke="#ddd" stroke-dasharray="3 3" />`
+    + `<text x="${padL}" y="${(y100 - 2).toFixed(1)}" font-size="8" fill="#aaa">100</text>`
+    + body + xlabels + legend + `</svg>`;
+}
+
 module.exports = {
   METRIC_CATALOGUE, PORTFOLIO_KEYS, MACRO_NUMERIC_KEYS,
   buildSeries, niceScale, sliceLastN, imfChangePoints,
   lineChartSvg, dualAxisSvg, eventStripSvg,
+  indexTo100, growthPct, multiLineSvg,
 };
