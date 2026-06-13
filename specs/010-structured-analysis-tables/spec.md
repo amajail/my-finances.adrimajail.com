@@ -24,6 +24,8 @@ This feature targets the sections still trapped in prose and surfaces them as fi
 - Q: How should the trimmed narrative avoid repeating rows promoted to tables (FR-009)? → A: Update the editable analysis instructions/metaprompt (feature 005) so the model stops emitting those sections in prose and writes a genuinely trimmed narrative.
 - Q: When is a bucket/asset-class drift row flagged over- vs under-weight (FR-005)? → A: By the sign of the drift — positive = over-weight, negative = under-weight, zero = on-target (no tolerance band).
 - Q: What is a "capped entity" in the concentration-caps table (FR-006)? → A: Entity-agnostic — render whatever cap rows the framework defines (single-name, issuer, bucket, asset class, …), each carrying a label identifying what it caps.
+- Q: Should this feature add instruction-editing guardrails (given the editable instructions now also drive the trimmed narrative per FR-009)? → A: Yes — prepend a fixed, non-editable guardrail preamble to the owner-edited instructions body, and add a short editing guide.
+- Q: Should the guardrail preamble and editing guide be shown to the owner? → A: Yes — the preamble is displayed read-only (so the owner sees the full effective prompt = preamble ⊕ body) and the editing guide is shown as accessible help. Both are generic text containing no holdings data.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -75,6 +77,23 @@ As the portfolio owner, I want the week-over-week analytical comparisons and any
 
 ---
 
+### User Story 4 - Safely edit the analysis instructions (Priority: P2)
+
+As the portfolio owner, I want a fixed guardrail preamble that always governs the analysis (and that I can see but not break), plus a short guide explaining what is safe to edit, so I can adjust the narrative instructions without producing failed runs or letting the model invent or recompute figures.
+
+**Why this priority**: This feature now relies on the editable instructions to trim the narrative (FR-009), which raises the risk that an edit pushes the model to invent numbers, recompute the code-owned tables, or break the output contract. The guardrail preamble is what keeps the model from undermining the very tables this feature adds, so it ships alongside the risk sections rather than last.
+
+**Independent Test**: Open the instructions editor; confirm a read-only guardrail preamble and an editing guide are visible, that the editable body is separate from the preamble, and that a subsequent analysis run applies the preamble regardless of body content.
+
+**Acceptance Scenarios**:
+
+1. **Given** the instructions editor, **When** I open it, **Then** I see the fixed guardrail preamble rendered read-only above my editable body, and an accessible editing guide.
+2. **Given** I am editing the instructions, **When** I try to alter or remove the preamble, **Then** the editor does not allow it — only the body below the preamble is editable.
+3. **Given** any saved instructions body, **When** the next analysis runs, **Then** the effective system prompt is the preamble followed by my body, so the guardrails apply even if my body omits them.
+4. **Given** an analysis run, **When** the model returns output, **Then** the code-computed drift/asset-class/concentration-cap tables are not recomputed or restated in the prose narrative.
+
+---
+
 ### Edge Cases
 
 - **Pre-feature analyses**: Records generated before this feature lack the new structured fields. The page MUST render them exactly as before (full narrative, no empty table shells, no errors). Backfilling old records is out of scope.
@@ -105,6 +124,12 @@ As the portfolio owner, I want the week-over-week analytical comparisons and any
 - **FR-011**: The structured sections already rendered by features 006 and 007 (macro context, portfolio totals, week-over-week position changes, suggested orders + execution controls) MUST be left intact and unchanged by this feature.
 - **FR-012**: The week-over-week analytical-deltas section MUST be visually and semantically distinct from the existing feature-006 position-changes table (it covers metric/assessment changes, not raw quantity changes).
 - **FR-013**: Re-running an analysis for the same week MUST replace its structured sections wholesale, consistent with the existing whole-record replacement behavior.
+- **FR-014**: A fixed, non-editable **guardrail preamble** MUST be prepended to the owner-edited instructions body to form the effective system prompt (preamble followed by body). This revises the prior model in which the edited document was the entire prompt verbatim.
+- **FR-015**: The guardrail preamble MUST direct the model to: (a) use only the data provided in the request and never invent or estimate figures; (b) treat the code-computed bucket-drift, asset-class-drift, and concentration-cap tables as authoritative and NOT recompute or restate them in prose (supporting FR-009); and (c) return results only via the analysis tool in the required structure.
+- **FR-016**: The instructions editor MUST prevent the owner from editing or removing the preamble; only the body below it is editable.
+- **FR-017**: The instructions editor MUST display the guardrail preamble read-only (so the owner can see the full effective prompt) and MUST make the editing guide accessible from the editor.
+- **FR-018**: A short **editing guide** MUST be provided that covers at minimum: what the editable body controls versus what the preamble and code own, that figures must never be invented, that the code-computed tables must not be recomputed, and that the output shape is enforced by the analysis tool (so malformed instructions cause a clean failed run rather than corrupted or misleading stored data).
+- **FR-019**: The guardrail preamble and editing guide MUST contain only generic instruction text with no real holdings data, so they are safe to commit to the repository and display to the owner.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -116,6 +141,8 @@ As the portfolio owner, I want the week-over-week analytical comparisons and any
 - **Week-over-Week Delta** (LLM-emitted): An analytical metric/assessment with its prior value, current value, and direction of change.
 - **Framework Amendment Suggestion** (LLM-emitted): A proposed change to the strategic framework with its rationale.
 - **Framework Targets** (input): The machine-readable bucket/asset-class target weights and concentration-cap limits the code-computed sections are derived from.
+- **Guardrail Preamble**: A fixed, non-editable block prepended to the owner's instructions body to form the effective system prompt; displayed read-only in the editor.
+- **Editing Guide**: Owner-facing help text explaining what is safe to edit and the invariants the preamble/code enforce; displayed alongside the editor.
 
 ## Success Criteria *(mandatory)*
 
@@ -127,6 +154,8 @@ As the portfolio owner, I want the week-over-week analytical comparisons and any
 - **SC-004**: Every analysis generated before this feature continues to open and display correctly, with zero errors and zero empty table shells.
 - **SC-005**: Opening an analysis detail page surfaces the structured sections from stored data with no need to re-run the analysis.
 - **SC-006**: The previously structured sections (macro, totals, position changes, suggested orders) behave identically to before this feature.
+- **SC-007**: The guardrail preamble is part of the effective system prompt on every run, and no instructions-body edit can remove or alter it.
+- **SC-008**: From the instructions editor, the owner can read the full effective prompt (preamble + body) and reach the editing guide without leaving the page.
 
 ## Assumptions
 
@@ -135,4 +164,6 @@ As the portfolio owner, I want the week-over-week analytical comparisons and any
 - Backfilling or regenerating historical analyses to populate the new structured fields is out of scope; only new runs will contain them, and the page degrades gracefully for old ones.
 - The trimmed narrative still uses the existing markdown rendering path; no new prose-formatting capability is required beyond what already exists.
 - "Position-level HOLD notes" remain in the narrative (they are prose-shaped commentary, not tabular) unless they naturally fit an existing structured section; promoting them is not required by this feature.
-- This is a read-only display + capture change: it introduces no new user actions on the page beyond viewing.
+- The analysis detail page itself remains read-only display + capture; the only new owner action introduced by this feature is editing the instructions body within the existing instructions editor (feature 005), now framed by the fixed guardrail preamble.
+- Adding the guardrail preamble revises feature 005's "the edited document is the entire system prompt verbatim" model to "fixed preamble ⊕ editable body"; the body remains used verbatim below the preamble, and the seeded body is unchanged by this feature.
+- The guardrail preamble and editing guide are generic, holdings-free text, so they are safe to store in the repository and to display to the owner (per FR-019).
