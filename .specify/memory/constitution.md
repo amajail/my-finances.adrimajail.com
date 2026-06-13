@@ -1,17 +1,18 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0
+- Version change: 1.1.0 → 1.1.1
 - Ratification: 2026-05-16
-- Last Amended: 2026-05-16
+- Last Amended: 2026-06-13
 - Principles introduced (1.0.0): I. Privacy First (NON-NEGOTIABLE), II. Clean Architecture / DDD, III. Idempotent Data Operations, IV. Pragmatic Testing, V. Convention-Driven Workflow
 - 1.1.0 amendment: Principle I gains a "Runtime egress to authorized third-party AI services" sub-clause carving out Anthropic API calls for the weekly rebalance analysis (feature 002-weekly-rebalance-analysis). Source-control prohibition unchanged. Driven by spec FR-028.
+- 1.1.1 amendment (PATCH — clarification/wording): Principle V (Convention-Driven Workflow) branch-naming reconciled with actual practice and the owner's 2026-06-13 decision. The single `feature/{kebab-case}` rule is replaced by a documented split — speckit/SDD features (driven by /speckit-specify) use the bare `NNN-kebab` Spec Kit format matching their spec directory (no `feature/` prefix); ad-hoc work uses `feature/{kebab-case}` or `fix/{kebab-case}`. Development Workflow step 1 updated to match. No principle added/removed; all other guidance unchanged.
 - Added sections: Tech Stack & Constraints, Development Workflow, Governance
 - Templates reviewed:
   - ✅ .specify/templates/plan-template.md — Constitution Check section is generic; no edit required (principles are surfaced by reference).
   - ✅ .specify/templates/spec-template.md — no constitution-specific slots; no edit required.
   - ✅ .specify/templates/tasks-template.md — no constitution-specific slots; no edit required.
 - Runtime guidance reviewed:
-  - ✅ CLAUDE.md — Privacy First section is consistent with the amendment (source-control wording unchanged).
+  - ✅ CLAUDE.md — Privacy First section consistent; the `## Conventions` branch-naming block already documents the same split (updated 2026-06-13).
 - Deferred TODOs: none.
 -->
 
@@ -55,7 +56,7 @@ A failing test on `main` MUST be either fixed or deleted in the same PR that sur
 *Rationale: This is a single-user personal project; testing discipline tracks where bugs actually hurt (silent miscalculation, lost data) rather than chasing coverage.*
 
 ### V. Convention-Driven Workflow
-Feature branches: `feature/{kebab-case-description}`. Commit messages: short imperative with conventional prefixes (`feat:`, `fix:`, `refactor:`, `ci:`, `docs:`). Each non-trivial feature is driven through the spec-kit pipeline: `/speckit-constitution` (once) → `/speckit-specify` → `/speckit-clarify` (when ambiguity exists) → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-implement`.
+Branch naming follows the kind of work: **speckit/SDD features** (anything driven by `/speckit-specify`) use the bare `NNN-kebab-description` Spec Kit format, identical to the `specs/NNN-…` directory the command creates (e.g. `010-structured-analysis-tables`) — branch name and spec directory match, and NO `feature/` prefix is added. **Ad-hoc work** (small fixes or chores not driven by a spec) uses `feature/{kebab-case}` or `fix/{kebab-case}`. Commit messages: short imperative with conventional prefixes (`feat:`, `fix:`, `refactor:`, `ci:`, `docs:`). Each non-trivial feature is driven through the spec-kit pipeline: `/speckit-constitution` (once) → `/speckit-specify` → `/speckit-clarify` (when ambiguity exists) → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-implement`.
 
 *Rationale: Consistent branch and commit shape keeps the history scannable; the SDD pipeline forces ambiguity to surface in writing before code is written.*
 
@@ -73,7 +74,7 @@ New runtime dependencies (npm packages, Azure services, third-party APIs) MUST b
 
 ## Development Workflow
 
-1. **Branch.** Cut `feature/{kebab-case}` from `main`. Worktree-based work is allowed and encouraged for parallel features.
+1. **Branch.** Cut from `main`: speckit features use the bare `NNN-kebab` Spec Kit format (matching the spec directory `/speckit-specify` creates); ad-hoc fixes/chores use `feature/{kebab-case}` or `fix/{kebab-case}`. Worktree-based work is allowed and encouraged for parallel features.
 2. **Spec.** Run `/speckit-specify` to draft the user-facing spec under `specs/<NNN>-<slug>/spec.md`. WHAT and WHY only — no tech.
 3. **Clarify.** Run `/speckit-clarify` if the spec has open questions. Answers land in the spec's Clarifications log.
 4. **Plan.** Run `/speckit-plan` to produce `plan.md` (and `research.md`, `data-model.md`, `contracts/` as applicable). HOW only.
@@ -92,4 +93,4 @@ This constitution supersedes ad-hoc conventions in `CLAUDE.md` where they confli
 
 Compliance is verified at `/speckit-plan` time (Constitution Check section) and at PR review. Any deviation MUST be justified in the plan's Complexity Tracking section, not hidden in code.
 
-**Version**: 1.1.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-16
+**Version**: 1.1.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-13

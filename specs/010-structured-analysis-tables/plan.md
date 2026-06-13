@@ -44,9 +44,9 @@ Zero new runtime dependencies; reuses the feature-006 JSON-column persistence pa
 | II. Clean Architecture / DDD | ✅ Pass | New `AllocationDriftCalculator` (pure, `src/application` or `src/domain`); targets read via a repository interface; functions stay thin; rendering stays in the Astro page. |
 | III. Idempotent Data Operations | ✅ Pass | `seed-allocation-targets.js` is skip-if-present (insert-only), matching the framework seeder. |
 | IV. Pragmatic Testing | ✅ Pass | Calculator, entity validation, and repo mappers get unit tests; UI exempt. |
-| V. Convention-Driven Workflow | ⚠️ Deviation (documented) | Branch is `010-structured-analysis-tables` (bare `NNN-kebab`), not `feature/{kebab}`. This follows the owner's 2026-06-13 decision to use the Spec Kit format for spec'd features; the constitution's Principle V still says `feature/`. See Complexity Tracking — recommend a `/speckit-constitution` PATCH amendment to reconcile. Not blocking. |
+| V. Convention-Driven Workflow | ✅ Pass | Branch is `010-structured-analysis-tables` (bare `NNN-kebab`, = spec dir). Reconciled by constitution **v1.1.1** (2026-06-13 PATCH), which now documents that speckit features use the bare `NNN-kebab` format and ad-hoc work uses `feature/`/`fix/`. No longer a deviation. |
 
-No unjustified violations. The single deviation (branch naming) is intentional and tracked.
+No violations. All five principles pass.
 
 ## Project Structure
 
@@ -119,7 +119,7 @@ Each step is independently shippable and degrades gracefully on pre-feature rows
 | New `analysis.allocationTargetsV1` settings artifact + repository | The hybrid clarification (Q1) requires deterministic, code-computed drift/caps, which need machine-readable targets; today targets exist only as prose in `analysis.strategicFrameworkV1`. | Parsing the prose framework is brittle and would silently miscalculate (the exact "misleading numbers" risk the owner flagged). LLM-emitting the targets defeats the determinism the hybrid was chosen for. |
 | `AllocationDriftCalculator` (new use-case/domain unit) | Encapsulates membership assignment + weight/drift/cap math as a pure, unit-tested unit (Principle II/IV). | Inlining the math in `GenerateWeeklyAnalysis` would make it untestable and bury financial arithmetic in an orchestrator. |
 | Guardrail preamble prepended outside the editable body (FR-014) | Gives a non-editable safety harness the owner cannot break, and a transparent read-only view. | Storing the preamble inside the editable instructions row (feature-005 model) would let an edit remove the guardrails — the failure mode this story exists to prevent. |
-| Branch naming deviates from Principle V | Owner's 2026-06-13 decision: spec'd features use the bare `NNN-kebab` Spec Kit format (= spec dir). | Keeping `feature/` would diverge from how 006–009 already branched and from the spec-dir name. Recommend reconciling Principle V via `/speckit-constitution`. |
+| ~~Branch naming deviates from Principle V~~ (RESOLVED) | Was: spec'd features use the bare `NNN-kebab` format. | Reconciled in constitution v1.1.1 (2026-06-13) — Principle V now documents the split. No longer a deviation. |
 
 ## Phase notes
 
