@@ -53,7 +53,9 @@ Slugs: `galicia`, `iol`, `ibkr`, `bullmarket`, `cash` (off-system USD reserve).
 4. Always keep `scripts/positions.json` in sync with the DB so it remains the canonical snapshot.
 
 ## Conventions
-- Feature branches: `feature/{kebab-case-description}` (enforced).
+- Branch naming:
+  - **SDD / speckit features** (anything spec'd via `/speckit-specify`): use the Spec Kit format `NNN-kebab-description`, matching the `specs/NNN-…` directory the command creates (e.g., `009-performance-benchmarks`, `010-structured-analysis-tables`). The branch and its spec directory share the same name. Do **not** add a `feature/` prefix to these.
+  - **Ad-hoc work** (small fixes/chores not driven by a spec): `feature/{kebab-case}` or `fix/{kebab-case}` (e.g., `fix/register-007-functions`).
 - Commit style: short imperative (`fix:`, `feat:`, `ci:` prefixes used recently).
 
 ## Privacy: never commit personal or holdings data
