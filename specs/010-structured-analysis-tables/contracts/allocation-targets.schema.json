@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analysis.allocationTargetsV1",
+  "title": "Allocation Targets (machine-readable)",
+  "description": "Persisted in portfolioSettings row 'analysis.allocationTargetsV1'. Real values are seeded from a gitignored local file; only a placeholder template is committed (Privacy First). Read by AllocationDriftCalculator to compute bucket/asset-class drift and concentration-cap breaches.",
+  "type": "object",
+  "required": ["version", "buckets"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "buckets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "classes"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "classes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["key", "label", "targetPct", "membership"],
+              "additionalProperties": false,
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 60 },
+                "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+                "targetPct": { "type": "number", "minimum": 0, "maximum": 100 },
+                "membership": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "A position matches this class if its symbol is in `symbols`, OR (no symbol match anywhere) its assetType is in `assetTypes` and `brokers` is empty or contains its broker. `symbols` win over `assetTypes`.",
+                  "properties": {
+                    "assetTypes": { "type": "array", "items": { "type": "string", "enum": ["stock", "etf", "cedear", "bond", "bopreal", "lecap", "on", "deposit", "cash"] } },
+                    "symbols": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 32 } },
+                    "brokers": { "type": "array", "items": { "type": "string", "enum": ["galicia", "iol", "ibkr", "bullmarket", "cash"] } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "concentrationCaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "scope", "match"],
+        "additionalProperties": false,
+        "anyOf": [
+          { "required": ["softPct"] },
+          { "required": ["hardPct"] }
+        ],
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "scope": { "type": "string", "enum": ["portfolio", "bucket"] },
+          "bucketKey": { "type": "string", "description": "Required when scope = 'bucket'." },
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Exactly one dimension to measure concentration over.",
+            "minProperties": 1,
+            "maxProperties": 1,
+            "properties": {
+              "symbol": { "type": "string", "minLength": 1, "maxLength": 32 },
+              "assetType": { "type": "string", "enum": ["stock", "etf", "cedear", "bond", "bopreal", "lecap", "on", "deposit", "cash"] },
+              "classKey": { "type": "string" },
+              "bucketKey": { "type": "string" }
+            }
+          },
+          "softPct": { "type": "number", "minimum": 0, "maximum": 100 },
+          "hardPct": { "type": "number", "minimum": 0, "maximum": 100 }
+        }
+      }
+    }
+  }
+}

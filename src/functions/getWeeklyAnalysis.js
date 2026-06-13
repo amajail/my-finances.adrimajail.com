@@ -51,6 +51,17 @@ app.http('getWeeklyAnalysis', {
         macroContext: analysis.macroContext || null,
         portfolioTotals: analysis.portfolioTotals || null,
         positionChanges: analysis.positionChanges,
+        // Feature 010: structured sections. Code-computed (drift/caps) may be
+        // present on completed AND failed rows; LLM-emitted (watchlist/
+        // weekOverWeek/frameworkAmendments) only on completed. Null on
+        // pre-feature rows and when a section was not produced. Consumers omit
+        // any section that is null/empty/malformed (FR-008).
+        driftByBucket: analysis.driftByBucket,
+        driftByAssetClass: analysis.driftByAssetClass,
+        concentrationCaps: analysis.concentrationCaps,
+        watchlist: analysis.watchlist,
+        weekOverWeek: analysis.weekOverWeek,
+        frameworkAmendments: analysis.frameworkAmendments,
       };
 
       if (analysis.isCompleted()) {

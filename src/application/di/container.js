@@ -13,6 +13,7 @@ const AzureSettingsRepository = require('../../infrastructure/repositories/Azure
 const AzurePriceRepository = require('../../infrastructure/repositories/AzurePriceRepository');
 const AzureAnalysisRepository = require('../../infrastructure/repositories/AzureAnalysisRepository');
 const AzureInstructionsRepository = require('../../infrastructure/repositories/AzureInstructionsRepository');
+const AzureAllocationTargetsRepository = require('../../infrastructure/repositories/AzureAllocationTargetsRepository');
 
 // Infrastructure providers
 const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
@@ -138,6 +139,19 @@ class Container {
       this._singletons.set('instructionsRepository', repository);
     }
     return this._singletons.get('instructionsRepository');
+  }
+
+  /**
+   * Get AllocationTargetsRepository instance (feature 010). Reuses the settings
+   * repository for the underlying `analysis.allocationTargetsV1` access.
+   * @returns {IAllocationTargetsRepository}
+   */
+  getAllocationTargetsRepository() {
+    if (!this._singletons.has('allocationTargetsRepository')) {
+      const repository = new AzureAllocationTargetsRepository(this.getSettingsRepository());
+      this._singletons.set('allocationTargetsRepository', repository);
+    }
+    return this._singletons.get('allocationTargetsRepository');
   }
 
   // ==================== Providers ====================
@@ -401,7 +415,10 @@ class Container {
       // Feature 005: the active instructions document is the AI system prompt
       // (used verbatim). Reading content + historyRowKey in one call preserves
       // snapshot-at-start (FR-012) and links each analysis to its source version.
-      instructionsRepository: this.getInstructionsRepository()
+      instructionsRepository: this.getInstructionsRepository(),
+      // Feature 010: machine-readable allocation targets drive the code-computed
+      // drift/cap sections.
+      allocationTargetsRepository: this.getAllocationTargetsRepository()
     });
   }
 

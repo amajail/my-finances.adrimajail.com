@@ -86,11 +86,28 @@ class WeeklyAnalysis {
     // changes". A populated array === the week's changes. (FR-017.)
     this._positionChanges = Array.isArray(data.positionChanges) ? data.positionChanges : null;
 
+    // Feature 010: structured analysis sections. All six are OPTIONAL — absent
+    // (null) on pre-feature analyses and on runs that did not produce them.
+    // Code-computed (from holdings + machine-readable targets):
+    this._driftByBucket = Array.isArray(data.driftByBucket) ? data.driftByBucket : null;
+    this._driftByAssetClass = Array.isArray(data.driftByAssetClass) ? data.driftByAssetClass : null;
+    this._concentrationCaps = Array.isArray(data.concentrationCaps) ? data.concentrationCaps : null;
+    // LLM-emitted (judgment):
+    this._watchlist = Array.isArray(data.watchlist) ? data.watchlist : null;
+    this._weekOverWeek = Array.isArray(data.weekOverWeek) ? data.weekOverWeek : null;
+    this._frameworkAmendments = Array.isArray(data.frameworkAmendments) ? data.frameworkAmendments : null;
+
     this._validate();
     Object.freeze(this._portfolioSnapshot);
     if (this._macroContext) Object.freeze(this._macroContext);
     if (this._portfolioTotals) Object.freeze(this._portfolioTotals);
     if (this._positionChanges) Object.freeze(this._positionChanges);
+    if (this._driftByBucket) Object.freeze(this._driftByBucket);
+    if (this._driftByAssetClass) Object.freeze(this._driftByAssetClass);
+    if (this._concentrationCaps) Object.freeze(this._concentrationCaps);
+    if (this._watchlist) Object.freeze(this._watchlist);
+    if (this._weekOverWeek) Object.freeze(this._weekOverWeek);
+    if (this._frameworkAmendments) Object.freeze(this._frameworkAmendments);
     Object.freeze(this);
   }
 
@@ -156,6 +173,26 @@ class WeeklyAnalysis {
       }
     }
 
+    // Feature 010: light validation — present-but-malformed is rejected; absent
+    // (null) and empty ([]) are both fine. Each entry must be a plain object.
+    for (const [name, arr] of Object.entries({
+      driftByBucket: this._driftByBucket,
+      driftByAssetClass: this._driftByAssetClass,
+      concentrationCaps: this._concentrationCaps,
+      watchlist: this._watchlist,
+      weekOverWeek: this._weekOverWeek,
+      frameworkAmendments: this._frameworkAmendments,
+    })) {
+      if (arr !== null) {
+        for (const item of arr) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            errors.push(`each ${name} entry must be an object`);
+            break;
+          }
+        }
+      }
+    }
+
     if (errors.length > 0) {
       throw new ValidationError(
         errors.join('; '),
@@ -184,6 +221,12 @@ class WeeklyAnalysis {
   get macroContext() { return this._macroContext; }
   get portfolioTotals() { return this._portfolioTotals; }
   get positionChanges() { return this._positionChanges; }
+  get driftByBucket() { return this._driftByBucket; }
+  get driftByAssetClass() { return this._driftByAssetClass; }
+  get concentrationCaps() { return this._concentrationCaps; }
+  get watchlist() { return this._watchlist; }
+  get weekOverWeek() { return this._weekOverWeek; }
+  get frameworkAmendments() { return this._frameworkAmendments; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -217,6 +260,12 @@ class WeeklyAnalysis {
       macroContext: this._macroContext,
       portfolioTotals: this._portfolioTotals,
       positionChanges: this._positionChanges,
+      driftByBucket: this._driftByBucket,
+      driftByAssetClass: this._driftByAssetClass,
+      concentrationCaps: this._concentrationCaps,
+      watchlist: this._watchlist,
+      weekOverWeek: this._weekOverWeek,
+      frameworkAmendments: this._frameworkAmendments,
     };
   }
 

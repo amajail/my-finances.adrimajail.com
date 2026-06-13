@@ -9,6 +9,7 @@
 
 const UseCase = require('../UseCase');
 const InstructionsHistoryEntry = require('../../../domain/entities/InstructionsHistoryEntry');
+const { GUARDRAIL_PREAMBLE, EDITING_GUIDE } = require('../analysis/prompts/guardrails');
 const { NotFoundError } = require('../../../shared/errors');
 const logger = require('../../../shared/logging');
 
@@ -23,7 +24,7 @@ class GetActiveInstructions extends UseCase {
   }
 
   /**
-   * @returns {Promise<{ content: string, historyRowKey: string|null, updatedAt: string|null, maxBytes: number }>}
+   * @returns {Promise<{ content: string, historyRowKey: string|null, updatedAt: string|null, maxBytes: number, preamble: string, editingGuide: string }>}
    */
   async execute() {
     logger.debug('GetActiveInstructions: executing');
@@ -38,6 +39,11 @@ class GetActiveInstructions extends UseCase {
       historyRowKey: active.historyRowKey,
       updatedAt: active.updatedAt,
       maxBytes: InstructionsHistoryEntry.MAX_BYTES,
+      // Feature 010 (FR-017): the fixed guardrail preamble (read-only — it is
+      // prepended to `content` at run time to form the effective system prompt)
+      // and the owner-facing editing guide. Both are committed, generic text.
+      preamble: GUARDRAIL_PREAMBLE,
+      editingGuide: EDITING_GUIDE,
     };
   }
 }

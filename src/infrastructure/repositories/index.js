@@ -9,11 +9,13 @@ const AzurePositionRepository = require('./AzurePositionRepository');
 const AzureSettingsRepository = require('./AzureSettingsRepository');
 const AzurePriceRepository = require('./AzurePriceRepository');
 const AzureInstructionsRepository = require('./AzureInstructionsRepository');
+const AzureAllocationTargetsRepository = require('./AzureAllocationTargetsRepository');
 
 module.exports = {
   AzureBrokerRepository,
   AzurePositionRepository,
   AzureSettingsRepository,
   AzurePriceRepository,
-  AzureInstructionsRepository
+  AzureInstructionsRepository,
+  AzureAllocationTargetsRepository
 };

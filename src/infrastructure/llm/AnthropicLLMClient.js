@@ -80,7 +80,7 @@ class AnthropicLLMClient extends ILLMClient {
 
   /**
    * @param {Object} input - See ILLMClient.submitAnalysis JSDoc.
-   * @returns {Promise<{ summary: string, markdownBody: string, orders: Array, usage: { inputTokens: number, outputTokens: number, costUsd: number } }>}
+   * @returns {Promise<{ summary: string, markdownBody: string, orders: Array, watchlist: Array|null, weekOverWeek: Array|null, frameworkAmendments: Array|null, usage: { inputTokens: number, outputTokens: number, costUsd: number } }>}
    */
   async submitAnalysis({ systemPrompt, userMessage, toolSchema, model, maxInputTokens, maxOutputTokens }) {
     if (!systemPrompt || !userMessage || !toolSchema || !model) {
@@ -154,6 +154,11 @@ class AnthropicLLMClient extends ILLMClient {
       summary: toolBlock.input.summary,
       markdownBody: toolBlock.input.markdownBody,
       orders: toolBlock.input.orders || [],
+      // Feature 010: optional LLM-emitted structured sections. Absent → null
+      // (the model omits the field when there is nothing to report → FR-008).
+      watchlist: Array.isArray(toolBlock.input.watchlist) ? toolBlock.input.watchlist : null,
+      weekOverWeek: Array.isArray(toolBlock.input.weekOverWeek) ? toolBlock.input.weekOverWeek : null,
+      frameworkAmendments: Array.isArray(toolBlock.input.frameworkAmendments) ? toolBlock.input.frameworkAmendments : null,
       usage: {
         inputTokens: usage.input_tokens,
         outputTokens: usage.output_tokens,
