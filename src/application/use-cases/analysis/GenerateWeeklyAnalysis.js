@@ -400,20 +400,41 @@ class GenerateWeeklyAnalysis extends UseCase {
   }
 
   _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges }) {
-    // The raw per-position list and the prior week's snapshot are captured for
-    // the position-change diff and for persistence — they are not sent to the
-    // model verbatim. The model receives the precomputed `positionChanges`
-    // deltas instead (below), which is the designed signal; keeping the full
-    // arrays out keeps the prompt focused and token usage stable.
-    const summaryForPrompt = portfolioSummary && portfolioSummary.positions
+    // The full per-position holdings list is delivered separately as an
+    // authoritative `currentHoldings` block (below), so it is pulled out of the
+    // portfolioSummary aggregates to avoid duplicating it in the prompt.
+    const holdings = (portfolioSummary && Array.isArray(portfolioSummary.positions))
+      ? portfolioSummary.positions
+      : null;
+    const summaryForPrompt = holdings
       ? (() => { const { positions, ...rest } = portfolioSummary; return rest; })()
       : portfolioSummary;
-    const previousForPrompt = previousAnalysis && previousAnalysis.portfolioSnapshot
-      ? (() => { const { portfolioSnapshot, ...rest } = previousAnalysis; return rest; })()
+    // The prior week's full narrative (markdownBody) and snapshot are NOT fed
+    // back into the prompt: the narrative is a contamination vector (any
+    // instrument the model once mentioned gets carried forward indefinitely,
+    // even if never held), and the snapshot is redundant with currentHoldings +
+    // positionChanges. We keep the prior summary, orders and macro panel so the
+    // model still has week-over-week continuity (FR-010).
+    const previousForPrompt = previousAnalysis
+      ? (() => { const { markdownBody, portfolioSnapshot, ...rest } = previousAnalysis; return rest; })()
       : previousAnalysis;
     const parts = [
       '## generatedAt',
       generatedAt,
+      '',
+      // Authoritative, complete list of every open position. The model must
+      // treat this as ground truth: do NOT reference, hold, or review any
+      // instrument that is not in this list (prevents carried-forward
+      // hallucinations from the prior narrative).
+      '## currentHoldings',
+      'These are ALL of the open positions currently held. This is the complete and authoritative holdings list — do not reference, recommend holding, or flag for review any instrument that does not appear here.',
+    ];
+    if (holdings) {
+      parts.push('```json', JSON.stringify(holdings, null, 2), '```');
+    } else {
+      parts.push('unavailable');
+    }
+    parts.push(
       '',
       '## portfolioSummary',
       '```json',
@@ -427,8 +448,8 @@ class GenerateWeeklyAnalysis extends UseCase {
       '',
       // Feature 006: precomputed week-over-week position changes. null = unknown
       // (no prior snapshot); [] = no changes; otherwise the exact deltas.
-      '## positionChanges',
-    ];
+      '## positionChanges'
+    );
     if (positionChanges === null) {
       parts.push('unknown — no prior snapshot to compare');
     } else if (positionChanges.length === 0) {
