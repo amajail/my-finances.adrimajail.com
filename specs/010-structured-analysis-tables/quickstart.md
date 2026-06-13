@@ -24,6 +24,13 @@ node scripts/seed-allocation-targets.js
 Keep these targets consistent with the prose `analysis.strategicFrameworkV1`
 (the targets doc drives the computed tables; the prose still guides the LLM).
 
+> **One-time narrative trim (FR-009):** the committed base template no longer
+> asks the model to restate the now-tabular sections, and the fixed guardrail
+> preamble forbids recomputing/restating them — so SC-003 holds at runtime even
+> if you change nothing. For a fully trimmed narrative, also remove the matching
+> prose sections (bucket/class weights, drift, concentration call-outs) from your
+> **active** instructions body via the `/instructions` editor.
+
 ## 2. Start backend + dashboard
 
 ```bash
@@ -43,10 +50,19 @@ cd dashboard && npm run dev     # dashboard on http://localhost:4321
 
 ## 4. Run an analysis and inspect the tables
 
+There is no on-demand HTTP run endpoint — runs happen via the timer
+(`weeklyAnalysisTimer`). Trigger it locally through the Functions admin endpoint
+(this makes a real Anthropic call, so `ANTHROPIC_API_KEY` must be set):
+
 ```bash
-# trigger a run (operator path) or run the timer use-case locally
-curl -s -X POST "http://localhost:7071/api/analysis/weekly/run?date=YYYY-MM-DD" | jq .
+curl -s -X POST "http://localhost:7071/admin/functions/weeklyAnalysisTimer" \
+  -H 'Content-Type: application/json' -d '{}'
 ```
+
+To see the drift/cap tables render **without** spending on the LLM, instead seed
+a fake completed analysis directly into Azurite (a local-only helper that upserts
+a `WeeklyAnalysis` with populated `driftByBucket`/`concentrationCaps`), then open
+the detail page.
 
 Open `/analysis-detail?date=YYYY-MM-DD` and confirm:
 

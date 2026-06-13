@@ -140,7 +140,7 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     expect(result.status).toBe('completed');
     expect(result.date).toBe('2026-05-15');
     expect(result.modelUsed).toBe('claude-opus-4-7');
-    expect(result.promptVersion).toBe('editable-instructions-v1');
+    expect(result.promptVersion).toBe('editable-instructions-v1+guardrail-v1');
     expect(result.instructionsHistoryRowKey).toBe('rk-active');
     expect(result.tokensIn).toBe(12000);
     expect(result.tokensOut).toBe(1500);
@@ -187,7 +187,8 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     expect(submitCall.userMessage).toContain('none — first run');
   });
 
-  it('uses the active instructions document verbatim as the system prompt (FR-003/FR-004)', async () => {
+  it('uses the active instructions body verbatim, prefixed by the fixed guardrail preamble (FR-014)', async () => {
+    const { GUARDRAIL_PREAMBLE } = require('../../../../../src/application/use-cases/analysis/prompts/guardrails');
     const content = '### MY OWNER INSTRUCTIONS\n- bucket-X: [SYMBOL_REDACTED]\n- directive: HOLD [WHATEVER]';
     const { useCase, llmClient, instructionsRepository } = buildUseCase({
       instructionsRepository: mockInstructionsRepo({ content }),
@@ -196,7 +197,10 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
 
     expect(instructionsRepository.getActive).toHaveBeenCalledTimes(1);
     const submitCall = llmClient.submitAnalysis.mock.calls[0][0];
-    expect(submitCall.systemPrompt).toBe(content);
+    // Effective prompt = preamble ⊕ body: preamble first, body verbatim after.
+    expect(submitCall.systemPrompt.startsWith(GUARDRAIL_PREAMBLE)).toBe(true);
+    expect(submitCall.systemPrompt.endsWith(content)).toBe(true);
+    expect(submitCall.systemPrompt).toContain(content);
   });
 
   it('persists a failed row when no active instructions document exists', async () => {

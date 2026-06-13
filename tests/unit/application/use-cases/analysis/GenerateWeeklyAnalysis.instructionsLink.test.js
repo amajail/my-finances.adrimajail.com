@@ -107,7 +107,8 @@ describe('GenerateWeeklyAnalysis — instructions version link (FR-012, FR-013)'
     expect(persistedAnalysis.instructionsHistoryRowKey).toBe('8284000000000-aaaa');
   });
 
-  it('uses the instructions content verbatim as the system prompt (FR-003/FR-004)', async () => {
+  it('uses the instructions body verbatim, prefixed by the fixed guardrail preamble (FR-014)', async () => {
+    const { GUARDRAIL_PREAMBLE } = require('../../../../../src/application/use-cases/analysis/prompts/guardrails');
     const content = '# Verbatim doc\n\nNo {{tokens}} are substituted here.';
     const { useCase, llmClient } = build({
       instructionsActive: { content, historyRowKey: 'r1', updatedAt: 't' },
@@ -116,7 +117,9 @@ describe('GenerateWeeklyAnalysis — instructions version link (FR-012, FR-013)'
     await useCase.execute({ targetDate: '2026-06-12' });
 
     expect(llmClient.submitAnalysis).toHaveBeenCalledTimes(1);
-    expect(llmClient.submitAnalysis.mock.calls[0][0].systemPrompt).toBe(content);
+    const systemPrompt = llmClient.submitAnalysis.mock.calls[0][0].systemPrompt;
+    expect(systemPrompt.startsWith(GUARDRAIL_PREAMBLE)).toBe(true);
+    expect(systemPrompt.endsWith(content)).toBe(true);
   });
 
   it('persists instructionsHistoryRowKey: null for content seeded without history', async () => {

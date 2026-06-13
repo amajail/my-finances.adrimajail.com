@@ -107,3 +107,51 @@ describe('AllocationDriftCalculator.computeDrift', () => {
     for (const r of driftByAssetClass) expect(r.currentPct).toBe(0);
   });
 });
+
+describe('AllocationDriftCalculator.computeConcentrationCaps', () => {
+  const withCaps = (caps) => ({ ...targets(), concentrationCaps: caps });
+
+  it('returns null when no caps are defined or targets absent', () => {
+    expect(AllocationDriftCalculator.computeConcentrationCaps([], targets())).toBeNull();
+    expect(AllocationDriftCalculator.computeConcentrationCaps([], null)).toBeNull();
+  });
+
+  it('portfolio scope: measures the matched dimension over the grand total', () => {
+    // 40 cedear of 100 total = 40% → exceeds soft 25 (no hard) → 'soft'.
+    const positions = [pos('ibkr', 'etf', 'VOO', 60), pos('iol', 'cedear', 'AAPL', 40)];
+    const caps = [{ label: 'CEDEARs', scope: 'portfolio', match: { assetType: 'cedear' }, softPct: 25 }];
+    const [row] = AllocationDriftCalculator.computeConcentrationCaps(positions, withCaps(caps));
+    expect(row.currentPct).toBe(40);
+    expect(row.breach).toBe('soft');
+  });
+
+  it('flags hard breach when the hard limit is exceeded', () => {
+    const positions = [pos('iol', 'cedear', 'AAPL', 60), pos('ibkr', 'etf', 'VOO', 40)];
+    const caps = [{ label: 'CEDEARs', scope: 'portfolio', match: { assetType: 'cedear' }, softPct: 25, hardPct: 50 }];
+    const [row] = AllocationDriftCalculator.computeConcentrationCaps(positions, withCaps(caps));
+    expect(row.currentPct).toBe(60);
+    expect(row.breach).toBe('hard');
+  });
+
+  it('bucket scope: uses the bucket total as the denominator', () => {
+    // US bucket = 50 etf + 50 stock = 100. SYM 'VOO' is 50 → 50% of the US bucket.
+    const positions = [
+      pos('ibkr', 'etf', 'VOO', 50),
+      pos('ibkr', 'stock', 'BRK.B', 50),
+      pos('iol', 'cedear', 'AAPL', 100), // not in US bucket → excluded from denom
+    ];
+    const caps = [{ label: 'VOO in US', scope: 'bucket', bucketKey: 'us', match: { symbol: 'VOO' }, softPct: 40 }];
+    const [row] = AllocationDriftCalculator.computeConcentrationCaps(positions, withCaps(caps));
+    expect(row.currentPct).toBe(50); // 50 / 100 (US bucket), not 50/200
+    expect(row.breach).toBe('soft');
+    expect(row.bucketKey).toBe('us');
+  });
+
+  it('reports breach "none" when under all limits', () => {
+    const positions = [pos('iol', 'cedear', 'AAPL', 10), pos('ibkr', 'etf', 'VOO', 90)];
+    const caps = [{ label: 'CEDEARs', scope: 'portfolio', match: { assetType: 'cedear' }, softPct: 25, hardPct: 50 }];
+    const [row] = AllocationDriftCalculator.computeConcentrationCaps(positions, withCaps(caps));
+    expect(row.currentPct).toBe(10);
+    expect(row.breach).toBe('none');
+  });
+});

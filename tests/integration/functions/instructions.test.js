@@ -89,6 +89,25 @@ describe('GET /api/instructions', () => {
     expect(res.status).toBe(404);
     expect(res.jsonBody.error).toMatch(/instructions not found/);
   });
+
+  it('includes the read-only guardrail preamble + editing guide (feature 010, FR-017)', async () => {
+    // Exercise the REAL use case (only the repository is faked) so the
+    // guardrails module is actually wired through.
+    const GetActiveInstructions = require('../../../src/application/use-cases/instructions/GetActiveInstructions');
+    const { GUARDRAIL_PREAMBLE, EDITING_GUIDE } = require('../../../src/application/use-cases/analysis/prompts/guardrails');
+    const useCase = new GetActiveInstructions({
+      instructionsRepository: { getActive: async () => ({ content: 'body', historyRowKey: 'r', updatedAt: 't' }) },
+    });
+    jest.spyOn(container, 'getGetActiveInstructions').mockReturnValue(useCase);
+
+    const res = await httpHandlers.getInstructions.handler(makeRequest(), makeContext());
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody.preamble).toBe(GUARDRAIL_PREAMBLE);
+    expect(res.jsonBody.editingGuide).toBe(EDITING_GUIDE);
+    expect(res.jsonBody.preamble.length).toBeGreaterThan(0);
+    expect(res.jsonBody.content).toBe('body');
+  });
 });
 
 describe('PUT /api/instructions', () => {

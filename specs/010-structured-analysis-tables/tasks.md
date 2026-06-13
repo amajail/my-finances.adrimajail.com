@@ -80,11 +80,11 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 
 **Independent Test**: Open an analysis whose run produced caps and/or watchlist → "Concentration caps" table (entity label, soft/hard limit, current %, breach badge) and "Watchlist" table render; when none, both are omitted.
 
-- [ ] T016 [US2] Extend `AllocationDriftCalculator` (`src/domain/services/AllocationDriftCalculator.js`) with concentration-cap evaluation: per cap entry resolve `scope` (portfolio|bucket) denominator and `match` dimension (symbol/assetType/classKey/bucketKey), compute `currentPct`, set `breach` = highest of none/soft/hard; returns `concentrationCaps[]`. Return `null` (not `[]`) when the targets document defines no caps or is itself absent, so the caller can distinguish "no caps configured" from "no breaches"
-- [ ] T017 [P] [US2] Unit tests for cap breach logic (none/soft/hard, both scopes, each match dimension) in `tests/unit/domain/services/AllocationDriftCalculator.test.js`
-- [ ] T018 [US2] Extend the `submit_analysis` tool schema with the optional `watchlist[]` array per `contracts/submit-analysis-additions.md` in `src/application/use-cases/analysis/prompts/submit-analysis-tool.json`
-- [ ] T019 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, compute `concentrationCaps` via the calculator and pass the LLM `watchlist[]` through onto the `WeeklyAnalysis`. As with drift (T014), omit `concentrationCaps` (leave null) when targets are absent — the run must not fail or null-deref for a missing targets row (Edge: targets unavailable)
-- [ ] T020 [US2] Render "Concentration caps" and "Watchlist" sections in `dashboard/src/pages/analysis-detail.astro`, each shown only when present and non-empty
+- [X] T016 [US2] Extend `AllocationDriftCalculator` (`src/domain/services/AllocationDriftCalculator.js`) with concentration-cap evaluation: per cap entry resolve `scope` (portfolio|bucket) denominator and `match` dimension (symbol/assetType/classKey/bucketKey), compute `currentPct`, set `breach` = highest of none/soft/hard; returns `concentrationCaps[]`. Return `null` (not `[]`) when the targets document defines no caps or is itself absent, so the caller can distinguish "no caps configured" from "no breaches"
+- [X] T017 [P] [US2] Unit tests for cap breach logic (none/soft/hard, both scopes, each match dimension) in `tests/unit/domain/services/AllocationDriftCalculator.test.js`
+- [X] T018 [US2] Extend the `submit_analysis` tool schema with the optional `watchlist[]` array per `contracts/submit-analysis-additions.md` in `src/application/use-cases/analysis/prompts/submit-analysis-tool.json`
+- [X] T019 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, compute `concentrationCaps` via the calculator and pass the LLM `watchlist[]` through onto the `WeeklyAnalysis`. As with drift (T014), omit `concentrationCaps` (leave null) when targets are absent — the run must not fail or null-deref for a missing targets row (Edge: targets unavailable)
+- [X] T020 [US2] Render "Concentration caps" and "Watchlist" sections in `dashboard/src/pages/analysis-detail.astro`, each shown only when present and non-empty
 
 **Checkpoint**: US1 + US2 both work independently.
 
@@ -96,13 +96,13 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 
 **Independent Test**: Open `/instructions` → a read-only preamble block and an editing guide are visible above the editable body; the preamble cannot be edited/removed; the next run applies it regardless of body content; `GET /api/instructions` returns `preamble` + `editingGuide`.
 
-- [ ] T021 [P] [US4] Create the committed guardrail preamble `src/application/use-cases/analysis/prompts/guardrail-preamble-v1.md` — generic/holdings-free: use only provided data, never invent figures, treat the supplied drift/cap tables as authoritative and do NOT recompute or restate them, return results only via the analysis tool (FR-015)
-- [ ] T022 [P] [US4] Create the committed editing guide `src/application/use-cases/analysis/prompts/editing-guide-v1.md` — what the body controls vs. what the preamble/code own, no inventing figures, no recomputing the tables, output shape enforced by the tool (malformed instructions → clean failed run) (FR-018)
-- [ ] T023 [US4] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, prepend the preamble at assembly (`systemPrompt = preamble + "\n\n---\n\n" + instructionsContent`) and update the `promptVersion` marker to record that a preamble was applied (FR-014)
-- [ ] T024 [US4] Extend `GetActiveInstructions` (`src/application/use-cases/instructions/GetActiveInstructions.js`) to also return `preamble` + `editingGuide` (read from the committed files) and surface them in the `GET /api/instructions` response in `src/functions/instructions.js` (FR-017); `PUT` remains body-only (FR-016)
-- [ ] T025 [P] [US4] Integration test: `GET /api/instructions` returns `preamble` + `editingGuide`, and `PUT /api/instructions` still accepts only `{content, changeNote?}`, in `tests/integration/functions/instructions.test.js`
-- [ ] T026 [US4] Editor: render the preamble in a read-only block above the editable textarea and add a collapsible editing-guide panel; keep the textarea bound to the body only (no preamble editing) in `dashboard/src/pages/instructions.astro`
-- [ ] T027 [US4] Trim the now-tabular sections (bucket/class weights & drift, concentration call-outs) from the required-markdown Output section of the base prompt template `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`, keeping only prose interpretation (FR-009). Also document in quickstart that the owner should trim the matching sections from the *active* `analysis.instructionsV1` body via the editor; until then the guardrail preamble (T021) prevents the model from restating the tables, so SC-003 holds at runtime regardless
+- [X] T021 [P] [US4] Create the committed guardrail preamble `src/application/use-cases/analysis/prompts/guardrail-preamble-v1.md` — generic/holdings-free: use only provided data, never invent figures, treat the supplied drift/cap tables as authoritative and do NOT recompute or restate them, return results only via the analysis tool (FR-015)
+- [X] T022 [P] [US4] Create the committed editing guide `src/application/use-cases/analysis/prompts/editing-guide-v1.md` — what the body controls vs. what the preamble/code own, no inventing figures, no recomputing the tables, output shape enforced by the tool (malformed instructions → clean failed run) (FR-018)
+- [X] T023 [US4] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, prepend the preamble at assembly (`systemPrompt = preamble + "\n\n---\n\n" + instructionsContent`) and update the `promptVersion` marker to record that a preamble was applied (FR-014)
+- [X] T024 [US4] Extend `GetActiveInstructions` (`src/application/use-cases/instructions/GetActiveInstructions.js`) to also return `preamble` + `editingGuide` (read from the committed files) and surface them in the `GET /api/instructions` response in `src/functions/instructions.js` (FR-017); `PUT` remains body-only (FR-016)
+- [X] T025 [P] [US4] Integration test: `GET /api/instructions` returns `preamble` + `editingGuide`, and `PUT /api/instructions` still accepts only `{content, changeNote?}`, in `tests/integration/functions/instructions.test.js`
+- [X] T026 [US4] Editor: render the preamble in a read-only block above the editable textarea and add a collapsible editing-guide panel; keep the textarea bound to the body only (no preamble editing) in `dashboard/src/pages/instructions.astro`
+- [X] T027 [US4] Trim the now-tabular sections (bucket/class weights & drift, concentration call-outs) from the required-markdown Output section of the base prompt template `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`, keeping only prose interpretation (FR-009). Also document in quickstart that the owner should trim the matching sections from the *active* `analysis.instructionsV1` body via the editor; until then the guardrail preamble (T021) prevents the model from restating the tables, so SC-003 holds at runtime regardless
 
 **Checkpoint**: Instruction editing is guarded and transparent; narrative no longer restates the tables.
 
@@ -114,9 +114,9 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 
 **Independent Test**: Open an analysis with analytical deltas and/or amendment suggestions → both render as structured rows, visually distinct from the feature-006 position-changes table; absent on first run / when none reported.
 
-- [ ] T028 [US3] Extend the `submit_analysis` tool schema with the optional `weekOverWeek[]` and `frameworkAmendments[]` arrays per `contracts/submit-analysis-additions.md` in `src/application/use-cases/analysis/prompts/submit-analysis-tool.json`
-- [ ] T029 [US3] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, pass the LLM `weekOverWeek[]` + `frameworkAmendments[]` through onto the `WeeklyAnalysis`
-- [ ] T030 [US3] Render "Week-over-week" (analytical) and "Framework amendments" sections in `dashboard/src/pages/analysis-detail.astro` — the week-over-week section labeled distinctly from the existing position-changes table (FR-012), each shown only when present and non-empty
+- [X] T028 [US3] Extend the `submit_analysis` tool schema with the optional `weekOverWeek[]` and `frameworkAmendments[]` arrays per `contracts/submit-analysis-additions.md` in `src/application/use-cases/analysis/prompts/submit-analysis-tool.json`
+- [X] T029 [US3] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, pass the LLM `weekOverWeek[]` + `frameworkAmendments[]` through onto the `WeeklyAnalysis`
+- [X] T030 [US3] Render "Week-over-week" (analytical) and "Framework amendments" sections in `dashboard/src/pages/analysis-detail.astro` — the week-over-week section labeled distinctly from the existing position-changes table (FR-012), each shown only when present and non-empty
 
 **Checkpoint**: All four stories independently functional.
 
@@ -124,9 +124,9 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T031 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, per Principle IV)
+- [X] T031 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, per Principle IV)
 - [ ] T032 Run `specs/010-structured-analysis-tables/quickstart.md` end-to-end: seed targets → run analysis → verify all six tables + read-only preamble + editing guide → confirm pre-feature analysis and targets-absent degradation (SC-004, Edge cases), and confirm the feature-006/007 sections (macro context, portfolio totals, position-changes, suggested orders + execution controls) render unchanged after the T027 base-template trim (FR-011, SC-006)
-- [ ] T033 [P] Privacy self-review of the diff before any push: confirm `allocation-targets.local.json` is untracked and no real symbols/quantities/PPCs/caps appear in committed files (Principle I)
+- [X] T033 [P] Privacy self-review of the diff before any push: confirm `allocation-targets.local.json` is untracked and no real symbols/quantities/PPCs/caps appear in committed files (Principle I)
 
 ---
 

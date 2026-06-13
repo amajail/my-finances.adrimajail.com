@@ -62,6 +62,51 @@
             }
           }
         }
+      },
+      "watchlist": {
+        "type": "array",
+        "maxItems": 50,
+        "description": "Feature 010: rule-triggered flags — holdings or topics a standing rule or condition surfaced this week. OMIT this field entirely if nothing is flagged. Do NOT restate the bucket/asset-class drift or concentration-cap tables here; those are computed separately and rendered for you.",
+        "items": {
+          "type": "object",
+          "required": ["item", "trigger"],
+          "additionalProperties": false,
+          "properties": {
+            "item": { "type": "string", "minLength": 1, "maxLength": 120, "description": "The flagged holding or topic." },
+            "trigger": { "type": "string", "minLength": 3, "maxLength": 400, "description": "The rule or condition that fired (e.g. 'riesgo país > 600 bp', 'sector concentration directive')." },
+            "severity": { "type": "string", "enum": ["info", "warn", "alert"], "description": "Optional severity." }
+          }
+        }
+      },
+      "weekOverWeek": {
+        "type": "array",
+        "maxItems": 50,
+        "description": "Feature 010: ANALYTICAL changes since last week — metrics/assessments, NOT raw position quantity changes (those are computed and shown separately). OMIT on first run or when nothing material changed.",
+        "items": {
+          "type": "object",
+          "required": ["metric", "prior", "current", "direction"],
+          "additionalProperties": false,
+          "properties": {
+            "metric": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "prior": { "type": "string", "minLength": 1, "maxLength": 120, "description": "Prior value as a short string (allows %, words, or numbers)." },
+            "current": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "direction": { "type": "string", "enum": ["up", "down", "flat"] }
+          }
+        }
+      },
+      "frameworkAmendments": {
+        "type": "array",
+        "maxItems": 25,
+        "description": "Feature 010: suggested changes to the strategic framework, if any. OMIT if none. These are suggestions for the owner to consider — they are not applied automatically.",
+        "items": {
+          "type": "object",
+          "required": ["proposal", "rationale"],
+          "additionalProperties": false,
+          "properties": {
+            "proposal": { "type": "string", "minLength": 5, "maxLength": 500 },
+            "rationale": { "type": "string", "minLength": 5, "maxLength": 800 }
+          }
+        }
       }
     }
   }

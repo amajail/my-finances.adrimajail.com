@@ -13,6 +13,20 @@ import Layout from '../layouts/Layout.astro';
     </p>
   </header>
 
+  <section id="guardrail-card" class="card p-4 mb-6">
+    <details class="mb-3">
+      <summary class="cursor-pointer text-sm font-medium">How to edit these instructions (guide)</summary>
+      <pre id="editing-guide" class="whitespace-pre-wrap text-sm text-[var(--color-muted)] mt-2 font-sans"></pre>
+    </details>
+    <div class="text-xs uppercase tracking-wider text-[var(--color-muted)] mb-1">
+      Fixed guardrail preamble — read-only, always applied above your content
+    </div>
+    <pre id="preamble-block"
+         aria-readonly="true"
+         class="whitespace-pre-wrap text-sm border border-[var(--color-border)] rounded-md px-3 py-2 bg-[var(--color-surface-2)] text-[var(--color-muted)] font-mono"
+         style="max-height: 22vh; overflow:auto;"></pre>
+  </section>
+
   <section id="editor-card" class="card p-4 mb-6">
     <div class="flex items-center justify-between mb-3">
       <h2 class="font-semibold">Active instructions</h2>
@@ -174,6 +188,12 @@ import Layout from '../layouts/Layout.astro';
       const data = await api('/instructions');
       state.maxBytes = data.maxBytes || state.maxBytes;
       ui.byteCap.textContent = state.maxBytes.toLocaleString();
+      // Feature 010 (FR-017): show the fixed preamble (read-only) + editing
+      // guide. textContent keeps them inert — the owner can read but not edit.
+      const preEl = document.getElementById('preamble-block');
+      if (preEl) preEl.textContent = data.preamble || '(no preamble configured)';
+      const guideEl = document.getElementById('editing-guide');
+      if (guideEl) guideEl.textContent = data.editingGuide || '';
       ui.textarea.value = data.content || '';
       ui.textarea.disabled = false;
       ui.note.disabled = false;

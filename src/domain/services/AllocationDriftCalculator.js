@@ -148,6 +148,89 @@ class AllocationDriftCalculator {
 
     return { driftByBucket, driftByAssetClass };
   }
+
+  /**
+   * Build a [{ position, classKey, bucketKey }] assignment list (bucketKey/
+   * classKey null when unclassified).
+   * @private
+   */
+  static _assign(positions, targets) {
+    const classIndex = new Map();
+    for (const bucket of targets.buckets) {
+      for (const cls of bucket.classes || []) {
+        classIndex.set(cls.key, bucket.key);
+      }
+    }
+    const allClasses = targets.buckets.flatMap((b) => b.classes || []);
+    return positions.map((p) => {
+      const classKey = this._classKeyFor(p, allClasses);
+      return { position: p, classKey, bucketKey: classKey ? classIndex.get(classKey) : null };
+    });
+  }
+
+  /**
+   * Does a position match a cap's single `match` dimension?
+   * @private
+   */
+  static _matchesCap(assignment, match) {
+    if (!match || typeof match !== 'object') return false;
+    const p = assignment.position;
+    if (match.symbol !== undefined) return p.symbol === match.symbol;
+    if (match.assetType !== undefined) return p.assetType === match.assetType;
+    if (match.classKey !== undefined) return assignment.classKey === match.classKey;
+    if (match.bucketKey !== undefined) return assignment.bucketKey === match.bucketKey;
+    return false;
+  }
+
+  /**
+   * Evaluate concentration caps from the targets document.
+   *
+   * @param {Position[]} positions
+   * @param {{ buckets: Array, concentrationCaps?: Array }} targets
+   * @returns {Array|null} concentrationCaps rows, or null when no caps are
+   *   defined or targets are absent (caller omits the section). Distinct from
+   *   `[]`, which this never returns.
+   */
+  static computeConcentrationCaps(positions, targets) {
+    if (!targets || !Array.isArray(targets.buckets) || !Array.isArray(targets.concentrationCaps) || targets.concentrationCaps.length === 0) {
+      return null;
+    }
+    const pos = Array.isArray(positions) ? positions : [];
+    const assignments = this._assign(pos, targets);
+    const grandTotal = pos.reduce((s, p) => s + (Number(p.valueUsd) || 0), 0);
+    const usdOf = (a) => Number(a.position.valueUsd) || 0;
+
+    return targets.concentrationCaps.map((cap) => {
+      // Denominator: portfolio grand total, or the bucket's total value.
+      let denom = grandTotal;
+      if (cap.scope === 'bucket') {
+        denom = assignments
+          .filter((a) => a.bucketKey === cap.bucketKey)
+          .reduce((s, a) => s + usdOf(a), 0);
+      }
+      const numer = assignments
+        .filter((a) => this._matchesCap(a, cap.match))
+        .reduce((s, a) => s + usdOf(a), 0);
+      const currentPct = denom > 0 ? round((numer / denom) * 100) : 0;
+
+      let breach = 'none';
+      if (typeof cap.hardPct === 'number' && currentPct > cap.hardPct) {
+        breach = 'hard';
+      } else if (typeof cap.softPct === 'number' && currentPct > cap.softPct) {
+        breach = 'soft';
+      }
+
+      return {
+        label: cap.label,
+        scope: cap.scope,
+        bucketKey: cap.scope === 'bucket' ? (cap.bucketKey || null) : null,
+        softPct: typeof cap.softPct === 'number' ? round(cap.softPct) : null,
+        hardPct: typeof cap.hardPct === 'number' ? round(cap.hardPct) : null,
+        currentPct,
+        breach,
+      };
+    });
+  }
 }
 
 module.exports = AllocationDriftCalculator;

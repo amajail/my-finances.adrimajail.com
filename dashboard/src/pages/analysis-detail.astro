@@ -86,6 +86,73 @@ import Layout from '../layouts/Layout.astro';
     </table>
   </section>
 
+  <section id="caps-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Concentration caps</h2>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Cap</th>
+          <th class="text-left px-4 py-2">Scope</th>
+          <th class="text-right px-4 py-2">Soft %</th>
+          <th class="text-right px-4 py-2">Hard %</th>
+          <th class="text-right px-4 py-2">Current %</th>
+          <th class="text-left px-4 py-2">Breach</th>
+        </tr>
+      </thead>
+      <tbody id="caps-tbody"></tbody>
+    </table>
+  </section>
+
+  <section id="watchlist-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Watchlist</h2>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Item</th>
+          <th class="text-left px-4 py-2">Trigger</th>
+          <th class="text-left px-4 py-2">Severity</th>
+        </tr>
+      </thead>
+      <tbody id="watchlist-tbody"></tbody>
+    </table>
+  </section>
+
+  <section id="wow-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Week-over-week (analytical)</h2>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Metric</th>
+          <th class="text-left px-4 py-2">Prior</th>
+          <th class="text-left px-4 py-2">Current</th>
+          <th class="text-left px-4 py-2">Direction</th>
+        </tr>
+      </thead>
+      <tbody id="wow-tbody"></tbody>
+    </table>
+  </section>
+
+  <section id="amendments-section" class="card mb-6 hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Framework amendment suggestions</h2>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Proposal</th>
+          <th class="text-left px-4 py-2">Rationale</th>
+        </tr>
+      </thead>
+      <tbody id="amendments-tbody"></tbody>
+    </table>
+  </section>
+
   <section id="orders-section" class="card mb-6 overflow-x-auto hidden">
     <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-baseline justify-between">
       <h2 class="font-semibold">Suggested orders</h2>
@@ -254,6 +321,59 @@ import Layout from '../layouts/Layout.astro';
     show(document.getElementById(sectionId));
   }
 
+  function renderCaps(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    const pctCell = (n) => (typeof n === 'number' ? n.toFixed(2) + '%' : '—');
+    const breachBadge = (b) => {
+      if (b === 'hard') return '<span class="badge badge-pending pos-negative">hard</span>';
+      if (b === 'soft') return '<span class="badge badge-pending">soft</span>';
+      return '<span class="badge badge-success">ok</span>';
+    };
+    document.getElementById('caps-tbody').innerHTML = rows.map((c) => `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2">${escapeHtml(c.label)}</td>
+        <td class="px-4 py-2">${escapeHtml(c.scope)}${c.bucketKey ? ' · ' + escapeHtml(c.bucketKey) : ''}</td>
+        <td class="px-4 py-2 text-right num-mono">${pctCell(c.softPct)}</td>
+        <td class="px-4 py-2 text-right num-mono">${pctCell(c.hardPct)}</td>
+        <td class="px-4 py-2 text-right num-mono">${pctCell(c.currentPct)}</td>
+        <td class="px-4 py-2">${breachBadge(c.breach)}</td>
+      </tr>`).join('');
+    show(document.getElementById('caps-section'));
+  }
+
+  function renderWatchlist(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    document.getElementById('watchlist-tbody').innerHTML = rows.map((w) => `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2">${escapeHtml(w.item)}</td>
+        <td class="px-4 py-2">${escapeHtml(w.trigger)}</td>
+        <td class="px-4 py-2">${w.severity ? escapeHtml(w.severity) : '—'}</td>
+      </tr>`).join('');
+    show(document.getElementById('watchlist-section'));
+  }
+
+  function renderWeekOverWeek(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    document.getElementById('wow-tbody').innerHTML = rows.map((d) => `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2">${escapeHtml(d.metric)}</td>
+        <td class="px-4 py-2 num-mono">${escapeHtml(String(d.prior))}</td>
+        <td class="px-4 py-2 num-mono">${escapeHtml(String(d.current))}</td>
+        <td class="px-4 py-2">${escapeHtml(d.direction || '')}</td>
+      </tr>`).join('');
+    show(document.getElementById('wow-section'));
+  }
+
+  function renderAmendments(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    document.getElementById('amendments-tbody').innerHTML = rows.map((a) => `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2 align-top">${escapeHtml(a.proposal)}</td>
+        <td class="px-4 py-2 align-top text-[var(--color-text-primary)]">${escapeHtml(a.rationale)}</td>
+      </tr>`).join('');
+    show(document.getElementById('amendments-section'));
+  }
+
   function getDateFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const date = params.get('date') || '';
@@ -377,6 +497,10 @@ import Layout from '../layouts/Layout.astro';
     // rows when captured; omitted when absent/empty).
     renderDrift(detail.driftByBucket, 'drift-bucket-tbody', 'drift-bucket-section');
     renderDrift(detail.driftByAssetClass, 'drift-class-tbody', 'drift-class-section');
+    renderCaps(detail.concentrationCaps);
+    renderWatchlist(detail.watchlist);
+    renderWeekOverWeek(detail.weekOverWeek);
+    renderAmendments(detail.frameworkAmendments);
 
     if (detail.status === 'failed') {
       document.getElementById('failed-reason').textContent = detail.errorMessage || 'No reason recorded.';

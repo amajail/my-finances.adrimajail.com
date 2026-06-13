@@ -24,6 +24,7 @@ const WeeklyAnalysis = require('../../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../../domain/entities/SuggestedOrder');
 const PositionChangeCalculator = require('../../../domain/services/PositionChangeCalculator');
 const AllocationDriftCalculator = require('../../../domain/services/AllocationDriftCalculator');
+const { buildSystemPrompt } = require('./prompts/guardrails');
 const logger = require('../../../shared/logging');
 const {
   CostCapExceededError,
@@ -38,7 +39,9 @@ const TOOL_SCHEMA = require('../../../../specs/002-weekly-rebalance-analysis/con
 // prompt; analyses are traced by their instructions-version reference. This
 // constant is stamped on every row purely to satisfy WeeklyAnalysis's required
 // `promptVersion` field and to mark which prompt-assembly regime produced it.
-const INSTRUCTIONS_PROMPT_VERSION = 'editable-instructions-v1';
+// Feature 010 (FR-014): the effective prompt is now preamble ⊕ body; the marker
+// records that the fixed guardrail preamble was applied for this run.
+const INSTRUCTIONS_PROMPT_VERSION = 'editable-instructions-v1+guardrail-v1';
 
 const DEFAULTS = {
   model: 'claude-opus-4-7',
@@ -142,6 +145,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     // Feature 010 code-computed sections (null = targets unavailable → omitted).
     let driftByBucket = null;
     let driftByAssetClass = null;
+    let concentrationCaps = null;
     // Feature 005: captured at the moment we read the instructions document,
     // then stamped onto every WeeklyAnalysis written by this run
     // (snapshot-at-start, FR-012).
@@ -165,8 +169,9 @@ class GenerateWeeklyAnalysis extends UseCase {
             driftByBucket = drift.driftByBucket;
             driftByAssetClass = drift.driftByAssetClass;
           }
+          concentrationCaps = AllocationDriftCalculator.computeConcentrationCaps(portfolioSnapshot, targets);
         } catch (driftErr) {
-          logger.warn('Allocation drift computation failed; omitting drift sections', driftErr);
+          logger.warn('Allocation drift/cap computation failed; omitting code-computed sections', driftErr);
         }
       }
 
@@ -225,10 +230,11 @@ class GenerateWeeklyAnalysis extends UseCase {
         });
       }
 
-      // 6. Assemble the prompt. The instructions document IS the system prompt
-      //    verbatim — no token substitution (FR-003, FR-004). Live data is
-      //    delivered separately in the user message, unchanged.
-      const systemPrompt = instructionsContent;
+      // 6. Assemble the prompt. Feature 010 (FR-014): the effective system
+      //    prompt is the fixed guardrail preamble followed by the owner-edited
+      //    instructions body (preamble ⊕ body). The body is still used verbatim;
+      //    live data is delivered separately in the user message, unchanged.
+      const systemPrompt = buildSystemPrompt(instructionsContent);
       const userMessage = this._buildUserMessage({
         generatedAt: startedAt.toISOString(),
         portfolioSummary,
@@ -292,6 +298,11 @@ class GenerateWeeklyAnalysis extends UseCase {
         // Feature 010: code-computed sections (null when targets unavailable).
         driftByBucket,
         driftByAssetClass,
+        concentrationCaps,
+        // Feature 010: LLM-emitted sections (null when the model omitted them).
+        watchlist: llmResult.watchlist || null,
+        weekOverWeek: llmResult.weekOverWeek || null,
+        frameworkAmendments: llmResult.frameworkAmendments || null,
         tokensIn: llmResult.usage.inputTokens + macroUsage.inputTokens,
         tokensOut: llmResult.usage.outputTokens + macroUsage.outputTokens,
         costUsd: Number((llmResult.usage.costUsd + macroUsage.costUsd).toFixed(4)),
