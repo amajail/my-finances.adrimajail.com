@@ -48,7 +48,7 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 - [ ] T003 Add six optional structured fields (`driftByBucket`, `driftByAssetClass`, `concentrationCaps`, `watchlist`, `weekOverWeek`, `frameworkAmendments`) to `src/domain/entities/WeeklyAnalysis.js` — constructor handling, light "absent=ok / present-but-malformed=reject" validation, freeze, and `toJSON`, mirroring the existing `macroContext`/`positionChanges` treatment
 - [ ] T004 [P] Unit tests for the six new fields (absent→null, `[]`→empty, valid array→accepted, malformed→ValidationError) in `tests/unit/domain/entities/WeeklyAnalysis.structuredSections.test.js`
 - [ ] T005 Add six JSON columns (`driftByBucketJson`, `driftByAssetClassJson`, `concentrationCapsJson`, `watchlistJson`, `weekOverWeekJson`, `frameworkAmendmentsJson`) to `_analysisToEntity`/`_analysisFromEntity` in `src/infrastructure/repositories/AzureAnalysisRepository.js` — write only when non-null, parse with the existing `_parseJsonColumn` helper (absent/malformed→null)
-- [ ] T006 [P] Round-trip unit test for the six columns (write→read, absent column→null, malformed→null) in `tests/unit/infrastructure/repositories/AzureAnalysisRepository.test.js`
+- [ ] T006 [P] Round-trip unit test for the six columns (write→read, absent column→null, malformed→null) in `tests/unit/infrastructure/repositories/AzureAnalysisRepository.test.js`, including a re-run/replace case: a section present on the first upsert is cleared/overwritten on a second upsert for the same date (FR-013)
 - [ ] T007 [P] Create `IAllocationTargetsRepository` interface (`getActive(): Promise<targets|null>`) in `src/application/interfaces/IAllocationTargetsRepository.js` and export it from `src/application/interfaces/index.js`
 - [ ] T008 Implement `AzureAllocationTargetsRepository` reading the `portfolioSettings` row `analysis.allocationTargetsV1` (parse JSON; return null when absent/malformed, logged) in `src/infrastructure/repositories/AzureAllocationTargetsRepository.js`
 - [ ] T009 [P] Unit test `AzureAllocationTargetsRepository` (present→parsed, absent→null, malformed→null) in `tests/unit/infrastructure/repositories/AzureAllocationTargetsRepository.test.js`
@@ -80,10 +80,10 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 
 **Independent Test**: Open an analysis whose run produced caps and/or watchlist → "Concentration caps" table (entity label, soft/hard limit, current %, breach badge) and "Watchlist" table render; when none, both are omitted.
 
-- [ ] T016 [US2] Extend `AllocationDriftCalculator` (`src/domain/services/AllocationDriftCalculator.js`) with concentration-cap evaluation: per cap entry resolve `scope` (portfolio|bucket) denominator and `match` dimension (symbol/assetType/classKey/bucketKey), compute `currentPct`, set `breach` = highest of none/soft/hard; returns `concentrationCaps[]`
+- [ ] T016 [US2] Extend `AllocationDriftCalculator` (`src/domain/services/AllocationDriftCalculator.js`) with concentration-cap evaluation: per cap entry resolve `scope` (portfolio|bucket) denominator and `match` dimension (symbol/assetType/classKey/bucketKey), compute `currentPct`, set `breach` = highest of none/soft/hard; returns `concentrationCaps[]`. Return `null` (not `[]`) when the targets document defines no caps or is itself absent, so the caller can distinguish "no caps configured" from "no breaches"
 - [ ] T017 [P] [US2] Unit tests for cap breach logic (none/soft/hard, both scopes, each match dimension) in `tests/unit/domain/services/AllocationDriftCalculator.test.js`
 - [ ] T018 [US2] Extend the `submit_analysis` tool schema with the optional `watchlist[]` array per `contracts/submit-analysis-additions.md` in `src/application/use-cases/analysis/prompts/submit-analysis-tool.json`
-- [ ] T019 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, compute `concentrationCaps` via the calculator and pass the LLM `watchlist[]` through onto the `WeeklyAnalysis`
+- [ ] T019 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, compute `concentrationCaps` via the calculator and pass the LLM `watchlist[]` through onto the `WeeklyAnalysis`. As with drift (T014), omit `concentrationCaps` (leave null) when targets are absent — the run must not fail or null-deref for a missing targets row (Edge: targets unavailable)
 - [ ] T020 [US2] Render "Concentration caps" and "Watchlist" sections in `dashboard/src/pages/analysis-detail.astro`, each shown only when present and non-empty
 
 **Checkpoint**: US1 + US2 both work independently.
@@ -102,7 +102,7 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 - [ ] T024 [US4] Extend `GetActiveInstructions` (`src/application/use-cases/instructions/GetActiveInstructions.js`) to also return `preamble` + `editingGuide` (read from the committed files) and surface them in the `GET /api/instructions` response in `src/functions/instructions.js` (FR-017); `PUT` remains body-only (FR-016)
 - [ ] T025 [P] [US4] Integration test: `GET /api/instructions` returns `preamble` + `editingGuide`, and `PUT /api/instructions` still accepts only `{content, changeNote?}`, in `tests/integration/functions/instructions.test.js`
 - [ ] T026 [US4] Editor: render the preamble in a read-only block above the editable textarea and add a collapsible editing-guide panel; keep the textarea bound to the body only (no preamble editing) in `dashboard/src/pages/instructions.astro`
-- [ ] T027 [US4] Trim the now-tabular sections (bucket/class weights & drift, concentration call-outs) from the required-markdown Output section of the base prompt template `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`, keeping only prose interpretation (FR-009)
+- [ ] T027 [US4] Trim the now-tabular sections (bucket/class weights & drift, concentration call-outs) from the required-markdown Output section of the base prompt template `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md`, keeping only prose interpretation (FR-009). Also document in quickstart that the owner should trim the matching sections from the *active* `analysis.instructionsV1` body via the editor; until then the guardrail preamble (T021) prevents the model from restating the tables, so SC-003 holds at runtime regardless
 
 **Checkpoint**: Instruction editing is guarded and transparent; narrative no longer restates the tables.
 
@@ -125,7 +125,7 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [ ] T031 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, per Principle IV)
-- [ ] T032 Run `specs/010-structured-analysis-tables/quickstart.md` end-to-end: seed targets → run analysis → verify all six tables + read-only preamble + editing guide → confirm pre-feature analysis and targets-absent degradation (SC-004, Edge cases)
+- [ ] T032 Run `specs/010-structured-analysis-tables/quickstart.md` end-to-end: seed targets → run analysis → verify all six tables + read-only preamble + editing guide → confirm pre-feature analysis and targets-absent degradation (SC-004, Edge cases), and confirm the feature-006/007 sections (macro context, portfolio totals, position-changes, suggested orders + execution controls) render unchanged after the T027 base-template trim (FR-011, SC-006)
 - [ ] T033 [P] Privacy self-review of the diff before any push: confirm `allocation-targets.local.json` is untracked and no real symbols/quantities/PPCs/caps appear in committed files (Principle I)
 
 ---

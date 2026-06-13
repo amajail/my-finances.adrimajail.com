@@ -150,7 +150,7 @@ As the portfolio owner, I want a fixed guardrail preamble that always governs th
 
 - **SC-001**: For an analysis that contains all targeted sections, the owner can identify every over-weight and under-weight bucket and asset class without reading any prose paragraph.
 - **SC-002**: 100% of the targeted sections (bucket drift, asset-class drift, concentration caps, watchlist, week-over-week analytical deltas, framework amendments) that the analysis reports are presented as structured tables/cards rather than prose.
-- **SC-003**: The trimmed narrative no longer repeats the raw rows that have been promoted to tables; an owner reading the page sees each datum once.
+- **SC-003**: The narrative does not repeat the raw rows promoted to tables — the guardrail preamble instructs the model not to restate the code-supplied tables, and the base template no longer requires those sections — so an owner reading a newly-generated analysis sees each datum once.
 - **SC-004**: Every analysis generated before this feature continues to open and display correctly, with zero errors and zero empty table shells.
 - **SC-005**: Opening an analysis detail page surfaces the structured sections from stored data with no need to re-run the analysis.
 - **SC-006**: The previously structured sections (macro, totals, position changes, suggested orders) behave identically to before this feature.
