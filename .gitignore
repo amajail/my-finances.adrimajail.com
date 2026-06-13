@@ -112,6 +112,7 @@ local.settings.json
 # Seed data (contains real portfolio holdings — never commit)
 scripts/positions.json
 scripts/*.local.json
+scripts/*.local.js
 
 # Ad-hoc broker-update scripts (contain real PPCs / quantities)
 scripts/update-*.js
