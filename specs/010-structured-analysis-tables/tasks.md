@@ -125,7 +125,7 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [X] T031 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, per Principle IV)
-- [ ] T032 Run `specs/010-structured-analysis-tables/quickstart.md` end-to-end: seed targets → run analysis → verify all six tables + read-only preamble + editing guide → confirm pre-feature analysis and targets-absent degradation (SC-004, Edge cases), and confirm the feature-006/007 sections (macro context, portfolio totals, position-changes, suggested orders + execution controls) render unchanged after the T027 base-template trim (FR-011, SC-006)
+- [X] T032 Run `specs/010-structured-analysis-tables/quickstart.md` end-to-end: seed targets → run analysis → verify all six tables + read-only preamble + editing guide → confirm pre-feature analysis and targets-absent degradation (SC-004, Edge cases), and confirm the feature-006/007 sections (macro context, portfolio totals, position-changes, suggested orders + execution controls) render unchanged after the T027 base-template trim (FR-011, SC-006)
 - [X] T033 [P] Privacy self-review of the diff before any push: confirm `allocation-targets.local.json` is untracked and no real symbols/quantities/PPCs/caps appear in committed files (Principle I)
 
 ---
