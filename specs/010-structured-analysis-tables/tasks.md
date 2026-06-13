@@ -34,8 +34,8 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 
 **Purpose**: Committed placeholders for the new machine-readable targets artifact (real values stay local — Privacy First).
 
-- [ ] T001 [P] Create committed placeholder `scripts/allocation-targets.example.json` with generic, holdings-free sample data conforming to `specs/010-structured-analysis-tables/contracts/allocation-targets.schema.json` (buckets/classes/targets + a couple of caps using `SYM_A`-style placeholders)
-- [ ] T002 [P] Add `scripts/allocation-targets.local.json` to `.gitignore` (the real targets file — never committed)
+- [X] T001 [P] Create committed placeholder `scripts/allocation-targets.example.json` with generic, holdings-free sample data conforming to `specs/010-structured-analysis-tables/contracts/allocation-targets.schema.json` (buckets/classes/targets + a couple of caps using `SYM_A`-style placeholders)
+- [X] T002 [P] Add `scripts/allocation-targets.local.json` to `.gitignore` (the real targets file — never committed)
 
 ---
 
@@ -45,15 +45,15 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 
 **⚠️ CRITICAL**: US1, US2, and US3 persistence depend on T003 + T005; US1/US2 computation depends on T007–T011.
 
-- [ ] T003 Add six optional structured fields (`driftByBucket`, `driftByAssetClass`, `concentrationCaps`, `watchlist`, `weekOverWeek`, `frameworkAmendments`) to `src/domain/entities/WeeklyAnalysis.js` — constructor handling, light "absent=ok / present-but-malformed=reject" validation, freeze, and `toJSON`, mirroring the existing `macroContext`/`positionChanges` treatment
-- [ ] T004 [P] Unit tests for the six new fields (absent→null, `[]`→empty, valid array→accepted, malformed→ValidationError) in `tests/unit/domain/entities/WeeklyAnalysis.structuredSections.test.js`
-- [ ] T005 Add six JSON columns (`driftByBucketJson`, `driftByAssetClassJson`, `concentrationCapsJson`, `watchlistJson`, `weekOverWeekJson`, `frameworkAmendmentsJson`) to `_analysisToEntity`/`_analysisFromEntity` in `src/infrastructure/repositories/AzureAnalysisRepository.js` — write only when non-null, parse with the existing `_parseJsonColumn` helper (absent/malformed→null)
-- [ ] T006 [P] Round-trip unit test for the six columns (write→read, absent column→null, malformed→null) in `tests/unit/infrastructure/repositories/AzureAnalysisRepository.test.js`, including a re-run/replace case: a section present on the first upsert is cleared/overwritten on a second upsert for the same date (FR-013)
-- [ ] T007 [P] Create `IAllocationTargetsRepository` interface (`getActive(): Promise<targets|null>`) in `src/application/interfaces/IAllocationTargetsRepository.js` and export it from `src/application/interfaces/index.js`
-- [ ] T008 Implement `AzureAllocationTargetsRepository` reading the `portfolioSettings` row `analysis.allocationTargetsV1` (parse JSON; return null when absent/malformed, logged) in `src/infrastructure/repositories/AzureAllocationTargetsRepository.js`
-- [ ] T009 [P] Unit test `AzureAllocationTargetsRepository` (present→parsed, absent→null, malformed→null) in `tests/unit/infrastructure/repositories/AzureAllocationTargetsRepository.test.js`
-- [ ] T010 [P] Create idempotent seeder `scripts/seed-allocation-targets.js` — reads `scripts/allocation-targets.local.json`, skip-if-present on `analysis.allocationTargetsV1` (insert-only, per Principle III), mirroring `scripts/seed-analysis-framework.js`
-- [ ] T011 Wire `AzureAllocationTargetsRepository` into the DI container and make it available to `GenerateWeeklyAnalysis` in `src/application/di/container.js`
+- [X] T003 Add six optional structured fields (`driftByBucket`, `driftByAssetClass`, `concentrationCaps`, `watchlist`, `weekOverWeek`, `frameworkAmendments`) to `src/domain/entities/WeeklyAnalysis.js` — constructor handling, light "absent=ok / present-but-malformed=reject" validation, freeze, and `toJSON`, mirroring the existing `macroContext`/`positionChanges` treatment
+- [X] T004 [P] Unit tests for the six new fields (absent→null, `[]`→empty, valid array→accepted, malformed→ValidationError) in `tests/unit/domain/entities/WeeklyAnalysis.structuredSections.test.js`
+- [X] T005 Add six JSON columns (`driftByBucketJson`, `driftByAssetClassJson`, `concentrationCapsJson`, `watchlistJson`, `weekOverWeekJson`, `frameworkAmendmentsJson`) to `_analysisToEntity`/`_analysisFromEntity` in `src/infrastructure/repositories/AzureAnalysisRepository.js` — write only when non-null, parse with the existing `_parseJsonColumn` helper (absent/malformed→null)
+- [X] T006 [P] Round-trip unit test for the six columns (write→read, absent column→null, malformed→null) in `tests/unit/infrastructure/repositories/AzureAnalysisRepository.test.js`, including a re-run/replace case: a section present on the first upsert is cleared/overwritten on a second upsert for the same date (FR-013)
+- [X] T007 [P] Create `IAllocationTargetsRepository` interface (`getActive(): Promise<targets|null>`) in `src/application/interfaces/IAllocationTargetsRepository.js` and export it from `src/application/interfaces/index.js`
+- [X] T008 Implement `AzureAllocationTargetsRepository` reading the `portfolioSettings` row `analysis.allocationTargetsV1` (parse JSON; return null when absent/malformed, logged) in `src/infrastructure/repositories/AzureAllocationTargetsRepository.js`
+- [X] T009 [P] Unit test `AzureAllocationTargetsRepository` (present→parsed, absent→null, malformed→null) in `tests/unit/infrastructure/repositories/AzureAllocationTargetsRepository.test.js`
+- [X] T010 [P] Create idempotent seeder `scripts/seed-allocation-targets.js` — reads `scripts/allocation-targets.local.json`, skip-if-present on `analysis.allocationTargetsV1` (insert-only, per Principle III), mirroring `scripts/seed-analysis-framework.js`
+- [X] T011 Wire `AzureAllocationTargetsRepository` into the DI container and make it available to `GenerateWeeklyAnalysis` in `src/application/di/container.js`
 
 **Checkpoint**: Entity + persistence + targets infrastructure ready.
 
@@ -65,10 +65,10 @@ Three files are edited by multiple stories and therefore those tasks are **seque
 
 **Independent Test**: Seed targets, open a freshly run analysis detail page → "Bucket drift" and "Asset-class drift" tables show with over/under rows distinguished; a pre-feature analysis shows neither table and no errors.
 
-- [ ] T012 [US1] Create pure `AllocationDriftCalculator` in `src/domain/services/AllocationDriftCalculator.js` — membership resolution (symbols → assetTypes(+brokers) → synthetic `unclassified`), per-class & per-bucket current USD and % of grand total, `driftPct = currentPct − targetPct`; returns `driftByBucket[]` + `driftByAssetClass[]` (drift only this task)
-- [ ] T013 [P] [US1] Unit tests for drift math, membership precedence, and unclassified reconcile-to-100% in `tests/unit/domain/services/AllocationDriftCalculator.test.js`
-- [ ] T014 [US1] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, load targets via the repo, compute `driftByBucket`/`driftByAssetClass` from the existing `portfolioSummary`, attach to the `WeeklyAnalysis`; omit gracefully (null) when targets are absent (Edge: targets unavailable — run must not fail)
-- [ ] T015 [US1] Render "Bucket drift" and "Asset-class drift" sections (target/current/signed-drift columns; over-weight vs under-weight distinguished by sign per FR-005) in `dashboard/src/pages/analysis-detail.astro`, shown only when the arrays are present and non-empty
+- [X] T012 [US1] Create pure `AllocationDriftCalculator` in `src/domain/services/AllocationDriftCalculator.js` — membership resolution (symbols → assetTypes(+brokers) → synthetic `unclassified`), per-class & per-bucket current USD and % of grand total, `driftPct = currentPct − targetPct`; returns `driftByBucket[]` + `driftByAssetClass[]` (drift only this task)
+- [X] T013 [P] [US1] Unit tests for drift math, membership precedence, and unclassified reconcile-to-100% in `tests/unit/domain/services/AllocationDriftCalculator.test.js`
+- [X] T014 [US1] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, load targets via the repo, compute `driftByBucket`/`driftByAssetClass` from the existing `portfolioSummary`, attach to the `WeeklyAnalysis`; omit gracefully (null) when targets are absent (Edge: targets unavailable — run must not fail)
+- [X] T015 [US1] Render "Bucket drift" and "Asset-class drift" sections (target/current/signed-drift columns; over-weight vs under-weight distinguished by sign per FR-005) in `dashboard/src/pages/analysis-detail.astro`, shown only when the arrays are present and non-empty
 
 **Checkpoint**: US1 fully functional and independently testable (MVP).
 

@@ -1,0 +1,58 @@
+{
+  "_comment": "PLACEHOLDER TEMPLATE — committable, holdings-free. Copy to scripts/allocation-targets.local.json (gitignored), replace with your real buckets/classes/targets/caps, then run `node scripts/seed-allocation-targets.js` to persist it to the portfolioSettings row `analysis.allocationTargetsV1`. Conforms to specs/010-structured-analysis-tables/contracts/allocation-targets.schema.json.",
+  "version": 1,
+  "buckets": [
+    {
+      "key": "us",
+      "label": "US",
+      "classes": [
+        {
+          "key": "us-etf",
+          "label": "US — ETFs",
+          "targetPct": 25,
+          "membership": { "assetTypes": ["etf"], "symbols": [], "brokers": ["ibkr"] }
+        },
+        {
+          "key": "us-equities",
+          "label": "US — Equities",
+          "targetPct": 20,
+          "membership": { "assetTypes": ["stock"], "symbols": [], "brokers": ["ibkr"] }
+        }
+      ]
+    },
+    {
+      "key": "arg",
+      "label": "ARG",
+      "classes": [
+        {
+          "key": "arg-sovereign",
+          "label": "ARG — Sovereign bonds",
+          "targetPct": 30,
+          "membership": { "assetTypes": ["bond", "bopreal"], "symbols": [], "brokers": [] }
+        },
+        {
+          "key": "arg-cedear",
+          "label": "ARG — CEDEARs",
+          "targetPct": 25,
+          "membership": { "assetTypes": ["cedear"], "symbols": [], "brokers": [] }
+        }
+      ]
+    }
+  ],
+  "concentrationCaps": [
+    {
+      "label": "SYM_A single-name (US bucket)",
+      "scope": "bucket",
+      "bucketKey": "us",
+      "match": { "symbol": "SYM_A" },
+      "softPct": 40,
+      "hardPct": 50
+    },
+    {
+      "label": "CEDEARs (portfolio)",
+      "scope": "portfolio",
+      "match": { "assetType": "cedear" },
+      "softPct": 25
+    }
+  ]
+}

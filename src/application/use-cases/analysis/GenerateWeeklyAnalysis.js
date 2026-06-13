@@ -23,6 +23,7 @@ const UseCase = require('../UseCase');
 const WeeklyAnalysis = require('../../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../../domain/entities/SuggestedOrder');
 const PositionChangeCalculator = require('../../../domain/services/PositionChangeCalculator');
+const AllocationDriftCalculator = require('../../../domain/services/AllocationDriftCalculator');
 const logger = require('../../../shared/logging');
 const {
   CostCapExceededError,
@@ -69,6 +70,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     getPortfolioSummary,
     settingsRepository,
     instructionsRepository,
+    allocationTargetsRepository = null,
     clock = () => new Date(),
     toolSchema = TOOL_SCHEMA,
   }) {
@@ -81,6 +83,9 @@ class GenerateWeeklyAnalysis extends UseCase {
     this._getPortfolioSummary = getPortfolioSummary;
     this._settingsRepository = settingsRepository;
     this._instructionsRepository = instructionsRepository;
+    // Feature 010: optional — when absent (or no targets row), the code-computed
+    // drift/cap sections are simply omitted (FR-001a).
+    this._allocationTargetsRepository = allocationTargetsRepository;
     this._clock = clock;
     this._toolSchema = toolSchema;
   }
@@ -134,6 +139,9 @@ class GenerateWeeklyAnalysis extends UseCase {
     let positionChanges = null;
     let riesgoPaisBp = null;
     let riesgoPaisAsOf = null;
+    // Feature 010 code-computed sections (null = targets unavailable → omitted).
+    let driftByBucket = null;
+    let driftByAssetClass = null;
     // Feature 005: captured at the moment we read the instructions document,
     // then stamped onto every WeeklyAnalysis written by this run
     // (snapshot-at-start, FR-012).
@@ -144,6 +152,23 @@ class GenerateWeeklyAnalysis extends UseCase {
       portfolioSummary = await this._getPortfolioSummary.execute({});
       portfolioSnapshot = this._snapshotFromSummary(portfolioSummary);
       portfolioTotals = this._totalsFromSummary(portfolioSummary);
+
+      // Feature 010: code-computed bucket / asset-class drift from the holdings
+      // snapshot + machine-readable targets. Resilient — a missing targets row
+      // or any read error leaves the sections null (omitted), never fatal
+      // (FR-001a / Edge: targets unavailable).
+      if (this._allocationTargetsRepository) {
+        try {
+          const targets = await this._allocationTargetsRepository.getActive();
+          const drift = AllocationDriftCalculator.computeDrift(portfolioSnapshot, targets);
+          if (drift) {
+            driftByBucket = drift.driftByBucket;
+            driftByAssetClass = drift.driftByAssetClass;
+          }
+        } catch (driftErr) {
+          logger.warn('Allocation drift computation failed; omitting drift sections', driftErr);
+        }
+      }
 
       // 3. Previous week's analysis (loaded before macro so we can thread the
       //    prior IMF reading for carry-forward and the prior snapshot for the
@@ -264,6 +289,9 @@ class GenerateWeeklyAnalysis extends UseCase {
         macroContext,
         portfolioTotals,
         positionChanges,
+        // Feature 010: code-computed sections (null when targets unavailable).
+        driftByBucket,
+        driftByAssetClass,
         tokensIn: llmResult.usage.inputTokens + macroUsage.inputTokens,
         tokensOut: llmResult.usage.outputTokens + macroUsage.outputTokens,
         costUsd: Number((llmResult.usage.costUsd + macroUsage.costUsd).toFixed(4)),

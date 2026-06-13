@@ -275,6 +275,29 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     if (wa.positionChanges !== null && wa.positionChanges !== undefined) {
       entity.positionChangesJson = JSON.stringify(wa.positionChanges);
     }
+    // Feature 010: six optional structured sections, each as a JSON column.
+    // Only written when non-null so pre-feature rows (and absent sections)
+    // stay clean. A re-run upserts with 'Replace', so a section present last
+    // week but null this week is dropped (FR-013) — the column simply isn't
+    // written and reads back as null.
+    if (wa.driftByBucket !== null && wa.driftByBucket !== undefined) {
+      entity.driftByBucketJson = JSON.stringify(wa.driftByBucket);
+    }
+    if (wa.driftByAssetClass !== null && wa.driftByAssetClass !== undefined) {
+      entity.driftByAssetClassJson = JSON.stringify(wa.driftByAssetClass);
+    }
+    if (wa.concentrationCaps !== null && wa.concentrationCaps !== undefined) {
+      entity.concentrationCapsJson = JSON.stringify(wa.concentrationCaps);
+    }
+    if (wa.watchlist !== null && wa.watchlist !== undefined) {
+      entity.watchlistJson = JSON.stringify(wa.watchlist);
+    }
+    if (wa.weekOverWeek !== null && wa.weekOverWeek !== undefined) {
+      entity.weekOverWeekJson = JSON.stringify(wa.weekOverWeek);
+    }
+    if (wa.frameworkAmendments !== null && wa.frameworkAmendments !== undefined) {
+      entity.frameworkAmendmentsJson = JSON.stringify(wa.frameworkAmendments);
+    }
     return entity;
   }
 
@@ -297,6 +320,14 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     const positionChanges = entity.positionChangesJson !== undefined
       ? this._parseJsonColumn(entity.positionChangesJson, entity.rowKey, 'positionChangesJson', null)
       : null;
+    // Feature 010: parse the six structured-section columns; absent → null
+    // (pre-feature rows / sections not produced). Malformed JSON → null + warn.
+    const driftByBucket = this._parseJsonColumn(entity.driftByBucketJson, entity.rowKey, 'driftByBucketJson', null);
+    const driftByAssetClass = this._parseJsonColumn(entity.driftByAssetClassJson, entity.rowKey, 'driftByAssetClassJson', null);
+    const concentrationCaps = this._parseJsonColumn(entity.concentrationCapsJson, entity.rowKey, 'concentrationCapsJson', null);
+    const watchlist = this._parseJsonColumn(entity.watchlistJson, entity.rowKey, 'watchlistJson', null);
+    const weekOverWeek = this._parseJsonColumn(entity.weekOverWeekJson, entity.rowKey, 'weekOverWeekJson', null);
+    const frameworkAmendments = this._parseJsonColumn(entity.frameworkAmendmentsJson, entity.rowKey, 'frameworkAmendmentsJson', null);
     return new WeeklyAnalysis({
       date: entity.rowKey,
       status: entity.status,
@@ -321,6 +352,13 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       macroContext,
       portfolioTotals,
       positionChanges,
+      // Feature 010: structured sections (absent on pre-feature rows → null).
+      driftByBucket,
+      driftByAssetClass,
+      concentrationCaps,
+      watchlist,
+      weekOverWeek,
+      frameworkAmendments,
     });
   }
 
