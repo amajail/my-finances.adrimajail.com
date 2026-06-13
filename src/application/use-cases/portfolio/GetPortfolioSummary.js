@@ -83,10 +83,34 @@ class GetPortfolioSummary extends UseCase {
     const calculator = new PortfolioCalculator(portfolio, mepRate);
     const summary = calculator.summary();
 
+    // Per-position snapshot (feature 006). GenerateWeeklyAnalysis consumes this
+    // via _snapshotFromSummary to capture the week's holdings and compute exact
+    // week-over-week position changes. Shape must match the fields that
+    // _snapshotFromSummary reads. valueUsd converts the native market value to
+    // USD using the MEP rate (ARS only; other currencies are treated as USD).
+    const positionSnapshot = positions.map((p) => {
+      const mv = p.marketValue();
+      const valueUsd = (mv === null || mv === undefined)
+        ? 0
+        : (p.currency === 'ARS' ? mv / mepRate : mv);
+      return {
+        brokerId: p.brokerId.value,
+        assetType: p.assetType,
+        symbol: p.symbol.value,
+        quantity: p.quantity.value,
+        averageCost: p.averageCost,
+        currentPrice: p.currentPrice,
+        currency: p.currency,
+        valueUsd,
+        status: p.status
+      };
+    });
+
     logger.info('Portfolio summary generated', { mepRate, mepRateAsOf, positionCount: positions.length });
 
     return {
       ...summary,
+      positions: positionSnapshot,
       lastPriceRefreshAt,
       mepRate,
       mepRateAsOf
