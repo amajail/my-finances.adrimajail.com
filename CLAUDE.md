@@ -76,15 +76,22 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/009-performance-benchmarks/plan.md` (Phase 1 complete; tasks pending).
+`specs/010-structured-analysis-tables/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/api.md`. This feature adds a
-read-only "Performance" page: the weekly portfolio total value and benchmarks
-(MEP, S&P 500, US/AR inflation) each indexed to 100 over the window and
-overlaid (no cash-flow log, no time-weighted return — raw value, deposits show
-as steps). Portfolio value + MEP come from feature 006; benchmark levels are
-fetched SERVER-SIDE on-demand (FRED key never reaches the browser) via a new
-`GET /api/analysis/performance`. Hand-rolled SVG (feature 008), zero new deps,
-no new storage. Builds on 006 + 008 (shipped). Prior plan:
-`specs/008-macro-charts/plan.md`.
+`data-model.md`, `quickstart.md`, `contracts/` (`submit-analysis-additions.md`,
+`allocation-targets.schema.json`, `api-additions.md`). This feature renders the
+weekly analysis's still-prose sections as structured tables (hybrid design):
+bucket drift, asset-class drift, and concentration caps are **code-computed**
+(new pure `AllocationDriftCalculator`) from the portfolio summary + a NEW
+machine-readable targets artifact (`analysis.allocationTargetsV1` settings row,
+seeded from a committed placeholder); watchlist, week-over-week analytical
+deltas, and framework amendments are **LLM-emitted** via optional new
+`submit_analysis` tool-schema arrays. A fixed committed **guardrail preamble**
+(`src/application/use-cases/analysis/prompts/guardrail-preamble-v1.md`) is
+prepended to the owner-edited instructions body at assembly (effective prompt =
+preamble ⊕ body) and shown read-only in the editor with a short editing guide —
+it forbids inventing figures / recomputing the code-owned tables (also backs the
+trimmed narrative, FR-009). Persistence reuses feature-006 JSON columns; render
+reuses feature-006/008 hand-rolled sections. Zero new deps, no new tables.
+Builds on 002/005/006 (shipped). Prior plan: `specs/009-performance-benchmarks/plan.md`.
 <!-- SPECKIT END -->
