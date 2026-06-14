@@ -14,6 +14,13 @@ Each weekly rebalance analysis makes a paid call to a third-party AI model. A re
 
 This feature reduces tokens on three fronts: (1) trim what is sent to the model, (2) trim what the model is asked to write, and (3) make the remaining owner-controlled cost levers visible. It must not reduce the analytical content the owner relies on — every structured table must still be produced and the narrative must remain coherent.
 
+## Clarifications
+
+### Session 2026-06-14
+
+- Q: Is the ~25% token reduction a hard acceptance gate or a directional target? → A: **Directional target.** Success is that both input and output measurably drop while all tables and the narrative survive; ~25% is the goal, not a pass/fail threshold (a smaller real reduction still ships). Week-to-week holdings variance makes a hard percentage gate unreliable.
+- Q: How should the best/worst-performer prompt lists be removed, given the owner's editable instructions might reference them? → A: **Remove + document the revert.** Drop them from the model input (they're derivable from the holdings already sent), and document the one-line way to restore them if the owner finds the narrative degraded.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Cheaper runs that lose no information (Priority: P1)
@@ -60,7 +67,7 @@ As the portfolio owner, I want clear guidance on the cost levers only I can chan
 ### Functional Requirements
 
 - **FR-001**: The data sent to the model for each run MUST be reduced in size without removing any figure the analysis decisions depend on (current holdings, key portfolio totals, the currency-conversion rate, week-over-week position changes, and macro context MUST all remain available to the model).
-- **FR-002**: Redundant or low-value content MUST be removed from the model input, specifically: duplicated totals already conveyed elsewhere, and supplementary best/worst-performer lists that are derivable from the holdings.
+- **FR-002**: Redundant or low-value content MUST be removed from the model input, specifically: duplicated totals already conveyed elsewhere, and supplementary best/worst-performer lists that are derivable from the holdings. The performer lists are removed unconditionally (not gated on inspecting the owner's instructions), and a one-line way to restore them MUST be documented in case the owner finds the narrative degraded.
 - **FR-003**: The model MUST be instructed to keep its written narrative concise and to not restate content that is already presented in the structured tables.
 - **FR-004**: The length allowance for each suggested order's justification MUST be tightened to a level that still permits a clear, sufficient rationale, reducing output on multi-order weeks.
 - **FR-005**: All six structured sections produced today (bucket drift, asset-class drift, concentration caps, watchlist, week-over-week deltas, framework amendments) MUST continue to be produced; none may be dropped as a token-saving measure.
@@ -82,7 +89,7 @@ As the portfolio owner, I want clear guidance on the cost levers only I can chan
 
 ### Measurable Outcomes
 
-- **SC-001**: A like-for-like run after this feature uses at least ~25% fewer total tokens than the comparable run before it (baseline reference: ≈22k input / ≈8k output).
+- **SC-001**: A run after this feature uses fewer total tokens than the comparable run before it, trending toward a ~25% reduction (baseline reference: ≈22k input / ≈8k output). The ~25% figure is a directional target, not a pass/fail gate — a smaller but real, measured reduction still satisfies this feature (week-to-week holdings variance makes a hard threshold unreliable).
 - **SC-002**: Both input and output token counts decrease (neither side is left untouched).
 - **SC-003**: 100% of the structured sections that the comparable prior run produced are still produced after the change.
 - **SC-004**: The owner judges the post-change narrative coherent and non-redundant with the tables (no loss of usable analysis).
