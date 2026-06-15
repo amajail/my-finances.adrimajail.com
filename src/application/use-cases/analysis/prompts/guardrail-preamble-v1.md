@@ -24,6 +24,11 @@ the instructions below. They cannot be edited from the dashboard.
    `frameworkAmendments`). Output that does not conform to the tool schema is
    rejected and the run is recorded as failed — it is never silently accepted.
 
+4. **Be concise.** Write `markdownBody` tightly: interpret and reason, do not
+   restate or reformat the supplied tables, and do not pad. Each order
+   `rationale` should be one or two sentences. Prefer brevity over completeness
+   in prose — the structured tables already carry the detail.
+
 The owner-maintained instructions follow.
 
 ---

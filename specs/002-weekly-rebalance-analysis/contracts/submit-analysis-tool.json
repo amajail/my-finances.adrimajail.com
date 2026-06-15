@@ -52,8 +52,8 @@
             "rationale": {
               "type": "string",
               "minLength": 20,
-              "maxLength": 1000,
-              "description": "Justification citing at least one of: allocation drift, a standing position-level directive, an active trigger condition (e.g., riesgo país threshold), or new market context. ARS-denominated orders must acknowledge commission + IVA."
+              "maxLength": 400,
+              "description": "One or two sentences justifying the order, citing at least one of: allocation drift, a standing position-level directive, an active trigger condition (e.g., riesgo país threshold), or new market context. ARS-denominated orders must acknowledge commission + IVA. Keep it concise."
             },
             "conviction": {
               "type": "string",

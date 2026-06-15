@@ -33,18 +33,18 @@ No project setup or new infrastructure. Measurement baseline already captured (p
 
 ### Input trims — `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js` (`_buildUserMessage`)
 
-- [ ] T001 [US1] Compact-serialize every user-message block — replace `JSON.stringify(x, null, 2)` with `JSON.stringify(x)` for `currentHoldings`, `portfolioSummary`, `positionChanges`, `previousAnalysis`, and `macroContext` in `_buildUserMessage` (`src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`)
-- [ ] T002 [US1] Remove the `## portfolioTotals` block from the user message and emit a single `## mepRate` line (value + `mepRateAsOf`) in its place — the rest of `portfolioTotals` duplicates `portfolioSummary` (`src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`). Do NOT change `_totalsFromSummary` or persistence — `portfolioTotals` stays on the `WeeklyAnalysis` (FR-011)
-- [ ] T003 [US1] Strip `topPerformers`/`bottomPerformers` from the in-prompt `summaryForPrompt` (extend the existing reduction that already removes `positions`) in `_buildUserMessage` (`src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`). Do NOT change `PortfolioCalculator.summary()` — the dashboard still uses the performers (FR-011). Removal is unconditional with a documented revert (spec clarification Q2)
+- [X] T001 [US1] Compact-serialize every user-message block — replace `JSON.stringify(x, null, 2)` with `JSON.stringify(x)` for `currentHoldings`, `portfolioSummary`, `positionChanges`, `previousAnalysis`, and `macroContext` in `_buildUserMessage` (`src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`)
+- [X] T002 [US1] Remove the `## portfolioTotals` block from the user message and emit a single `## mepRate` line (value + `mepRateAsOf`) in its place — the rest of `portfolioTotals` duplicates `portfolioSummary` (`src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`). Do NOT change `_totalsFromSummary` or persistence — `portfolioTotals` stays on the `WeeklyAnalysis` (FR-011)
+- [X] T003 [US1] Strip `topPerformers`/`bottomPerformers` from the in-prompt `summaryForPrompt` (extend the existing reduction that already removes `positions`) in `_buildUserMessage` (`src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`). Do NOT change `PortfolioCalculator.summary()` — the dashboard still uses the performers (FR-011). Removal is unconditional with a documented revert (spec clarification Q2)
 
 ### Output trims
 
-- [ ] T004 [P] [US1] Add a concision directive to the fixed guardrail preamble (`src/application/use-cases/analysis/prompts/guardrail-preamble-v1.md`): keep `markdownBody` tight, interpret — don't restate — the supplied tables, prefer brevity; rationales one–two sentences. This is the only runtime-effective, code-owned narrative lever (FR-003, FR-007)
-- [ ] T005 [P] [US1] Tighten `orders[].rationale.maxLength` from 1000 to 400 (and nudge the description toward one–two sentences) in the runtime tool schema `specs/002-weekly-rebalance-analysis/contracts/submit-analysis-tool.json`, per `contracts/tool-schema-change.md` (FR-004). Leave `markdownBody` uncapped (FR-008) and all six feature-010 arrays unchanged (FR-005)
+- [X] T004 [P] [US1] Add a concision directive to the fixed guardrail preamble (`src/application/use-cases/analysis/prompts/guardrail-preamble-v1.md`): keep `markdownBody` tight, interpret — don't restate — the supplied tables, prefer brevity; rationales one–two sentences. This is the only runtime-effective, code-owned narrative lever (FR-003, FR-007)
+- [X] T005 [P] [US1] Tighten `orders[].rationale.maxLength` from 1000 to 400 (and nudge the description toward one–two sentences) in the runtime tool schema `specs/002-weekly-rebalance-analysis/contracts/submit-analysis-tool.json`, per `contracts/tool-schema-change.md` (FR-004). Leave `markdownBody` uncapped (FR-008) and all six feature-010 arrays unchanged (FR-005)
 
 ### Tests
 
-- [ ] T006 [US1] Update the prompt-assembly assertions in `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js`: the user message no longer contains a `## portfolioTotals` block, now contains a `## mepRate` line, the summary block no longer contains `topPerformers`/`bottomPerformers`, and blocks are compact (no 2-space-indented JSON). Add/adjust as needed; keep the existing structural assertions green (depends on T001–T003)
+- [X] T006 [US1] Update the prompt-assembly assertions in `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.test.js`: the user message no longer contains a `## portfolioTotals` block, now contains a `## mepRate` line, the summary block no longer contains `topPerformers`/`bottomPerformers`, and blocks are compact (no 2-space-indented JSON). Add/adjust as needed; keep the existing structural assertions green (depends on T001–T003)
 
 **Checkpoint**: US1 complete — fewer tokens both sides, tables intact, narrative coherent.
 
@@ -56,7 +56,7 @@ No project setup or new infrastructure. Measurement baseline already captured (p
 
 **Independent Test**: Open the `/instructions` editing guide; confirm it explains trimming the active instructions body and switching `analysis.model` (with the quality/cost tradeoff).
 
-- [ ] T007 [US2] Add a "Saving tokens" section to `src/application/use-cases/analysis/prompts/editing-guide-v1.md` (shown read-only in the `/instructions` editor by feature 010): (a) the editable instructions body is the largest variable per-run contributor — trim prose that restates the now-tabular sections or asks for long multi-section narratives; (b) `analysis.model` — a cheaper tier (e.g. `claude-sonnet-4-6`) is ~5× cheaper in/out, a quality tradeoff, switchable without code; default stays Opus; (c) mention `analysis.maxOutputTokens` as a hard output ceiling. Generic/holdings-free (FR-010, FR-019 of feature 010)
+- [X] T007 [US2] Add a "Saving tokens" section to `src/application/use-cases/analysis/prompts/editing-guide-v1.md` (shown read-only in the `/instructions` editor by feature 010): (a) the editable instructions body is the largest variable per-run contributor — trim prose that restates the now-tabular sections or asks for long multi-section narratives; (b) `analysis.model` — a cheaper tier (e.g. `claude-sonnet-4-6`) is ~5× cheaper in/out, a quality tradeoff, switchable without code; default stays Opus; (c) mention `analysis.maxOutputTokens` as a hard output ceiling. Generic/holdings-free (FR-010, FR-019 of feature 010)
 
 **Checkpoint**: Owner can self-serve the two further levers (SC-006).
 
@@ -64,9 +64,9 @@ No project setup or new infrastructure. Measurement baseline already captured (p
 
 ## Phase 4: Polish & Verification
 
-- [ ] T008 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, Principle IV)
+- [X] T008 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, Principle IV)
 - [ ] T009 Live before/after on the running func host: `node scripts/delete-analysis.local.js <date>` → `curl -X POST http://localhost:7071/admin/functions/weeklyAnalysisTimer -d '{}'` → compare `tokensIn`/`tokensOut`/`costUsd` of the new run to the baseline; confirm both lower, all six tables populated, narrative coherent (SC-001, SC-002, SC-003, SC-004, SC-005)
-- [ ] T010 [P] Privacy check before push: the diff only *reduces* prompt content and edits generic preamble/guide/schema text — confirm no real holdings/symbols/quantities/PPCs in committed files (Principle I)
+- [X] T010 [P] Privacy check before push: the diff only *reduces* prompt content and edits generic preamble/guide/schema text — confirm no real holdings/symbols/quantities/PPCs in committed files (Principle I)
 
 ---
 
