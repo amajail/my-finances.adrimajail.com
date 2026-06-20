@@ -65,7 +65,7 @@ No project setup or new infrastructure. Measurement baseline already captured (p
 ## Phase 4: Polish & Verification
 
 - [X] T008 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, Principle IV)
-- [ ] T009 Live before/after on the running func host: `node scripts/delete-analysis.local.js <date>` → `curl -X POST http://localhost:7071/admin/functions/weeklyAnalysisTimer -d '{}'` → compare `tokensIn`/`tokensOut`/`costUsd` of the new run to the baseline; confirm both lower, all six tables populated, narrative coherent (SC-001, SC-002, SC-003, SC-004, SC-005)
+- [X] T009 Live before/after on the running func host: `node scripts/delete-analysis.local.js <date>` → `curl -X POST http://localhost:7071/admin/functions/weeklyAnalysisTimer -d '{}'` → compare `tokensIn`/`tokensOut`/`costUsd` of the new run to the baseline; confirm both lower, all six tables populated, narrative coherent (SC-001, SC-002, SC-003, SC-004, SC-005)
 - [X] T010 [P] Privacy check before push: the diff only *reduces* prompt content and edits generic preamble/guide/schema text — confirm no real holdings/symbols/quantities/PPCs in committed files (Principle I)
 
 ---
