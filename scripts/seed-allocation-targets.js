@@ -65,10 +65,16 @@ async function main() {
   // Idempotent: skip if the row already exists (insert-only).
   const existing = await fetch(`${BASE}/settings/${encodeURIComponent(KEY)}`, { headers: headers() });
   if (existing.status >= 200 && existing.status < 300) {
-    console.log(`SKIP: ${KEY} already exists — not overwriting (insert-only seeder).`);
-    return;
-  }
-  if (existing.status !== 404) {
+    // The settings row may exist with an EMPTY value (the GET returns 200 with
+    // value:null). Insert-only means "skip when a real value is present" — a
+    // null/empty value is treated as not-yet-seeded so we proceed to PUT.
+    let currentValue = null;
+    try { currentValue = (await existing.json()).value; } catch (_) { /* ignore */ }
+    if (currentValue !== null && currentValue !== undefined && String(currentValue).trim() !== '') {
+      console.log(`SKIP: ${KEY} already has a value — not overwriting (insert-only seeder).`);
+      return;
+    }
+  } else if (existing.status !== 404) {
     const text = await existing.text();
     console.error(`FAIL: unexpected status checking ${KEY}: HTTP ${existing.status} — ${text}`);
     process.exit(1);

@@ -28,6 +28,8 @@ function fakePortfolioSummary() {
     costBasisByCurrency: { USD: 88800, ARS: 14550000 },
     mepRate: 1450,
     mepRateAsOf: '2026-05-15',
+    topPerformers: [{ symbol: 'BRK.B', pnlPct: 14.3 }],
+    bottomPerformers: [{ symbol: 'GD41D', pnlPct: -3.1 }],
     positions: [
       {
         brokerId: 'ibkr', assetType: 'stock', symbol: 'BRK.B',
@@ -480,7 +482,33 @@ describe('GenerateWeeklyAnalysis (007 freeze guard + status feed)', () => {
     await useCase.execute({ targetDate: '2026-05-15' });
 
     const userMessage = llmClient.submitAnalysis.mock.calls[0][0].userMessage;
-    expect(userMessage).toContain('"executionStatus": "skipped"');
+    // Feature 011: blocks are compact-serialized (no pretty-print spacing).
+    expect(userMessage).toContain('"executionStatus":"skipped"');
+  });
+});
+
+describe('GenerateWeeklyAnalysis user message — feature 011 token diet', () => {
+  it('drops the portfolioTotals block in favor of a one-line mepRate, omits performers, and uses compact JSON', async () => {
+    const { useCase, llmClient } = buildUseCase();
+    await useCase.execute({ targetDate: '2026-05-15' });
+    const userMessage = llmClient.submitAnalysis.mock.calls[0][0].userMessage;
+
+    // portfolioTotals block removed; replaced by a compact mepRate line.
+    expect(userMessage).not.toContain('## portfolioTotals');
+    expect(userMessage).toContain('## mepRate');
+    expect(userMessage).toContain('1450'); // mep rate value (one-liner)
+
+    // best/worst performers stripped from the prompt summary.
+    expect(userMessage).not.toContain('topPerformers');
+    expect(userMessage).not.toContain('bottomPerformers');
+
+    // compact serialization: no 2-space-indented JSON keys.
+    expect(userMessage).not.toContain('\n  "');
+
+    // decision-relevant blocks still present (FR-001).
+    expect(userMessage).toContain('## currentHoldings');
+    expect(userMessage).toContain('## portfolioSummary');
+    expect(userMessage).toContain('## macroContext');
   });
 });
 

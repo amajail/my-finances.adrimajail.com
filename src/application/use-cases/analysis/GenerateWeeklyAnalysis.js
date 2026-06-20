@@ -445,8 +445,16 @@ class GenerateWeeklyAnalysis extends UseCase {
     const holdings = (portfolioSummary && Array.isArray(portfolioSummary.positions))
       ? portfolioSummary.positions
       : null;
-    const summaryForPrompt = holdings
-      ? (() => { const { positions, ...rest } = portfolioSummary; return rest; })()
+    // Feature 011 (FR-002): also strip topPerformers/bottomPerformers from the
+    // prompt copy — they are derivable from currentHoldings and pure token
+    // overhead. PortfolioCalculator.summary() is unchanged, so the dashboard
+    // still receives them (FR-011). To restore them in the prompt, drop
+    // `topPerformers`/`bottomPerformers` from this destructured omit-list.
+    const summaryForPrompt = portfolioSummary
+      ? (() => {
+          const { positions, topPerformers, bottomPerformers, ...rest } = portfolioSummary;
+          return rest;
+        })()
       : portfolioSummary;
     // The prior week's full narrative (markdownBody) and snapshot are NOT fed
     // back into the prompt: the narrative is a contamination vector (any
@@ -468,8 +476,10 @@ class GenerateWeeklyAnalysis extends UseCase {
       '## currentHoldings',
       'These are ALL of the open positions currently held. This is the complete and authoritative holdings list — do not reference, recommend holding, or flag for review any instrument that does not appear here.',
     ];
+    // Feature 011 (FR-001): compact JSON (no 2-space indent) throughout — the
+    // pretty-print whitespace was pure token overhead the model does not need.
     if (holdings) {
-      parts.push('```json', JSON.stringify(holdings, null, 2), '```');
+      parts.push('```json', JSON.stringify(holdings), '```');
     } else {
       parts.push('unavailable');
     }
@@ -477,13 +487,18 @@ class GenerateWeeklyAnalysis extends UseCase {
       '',
       '## portfolioSummary',
       '```json',
-      JSON.stringify(summaryForPrompt, null, 2),
+      JSON.stringify(summaryForPrompt),
       '```',
       '',
-      '## portfolioTotals',
-      '```json',
-      JSON.stringify(portfolioTotals, null, 2),
-      '```',
+      // Feature 011 (FR-002): the former `## portfolioTotals` block duplicated
+      // portfolioSummary (totals by currency, grand total, unrealized P&L, cost
+      // basis); the only unique datum is the MEP rate, kept as a one-liner.
+      // portfolioTotals is still computed + persisted on the WeeklyAnalysis and
+      // shown on the dashboard (FR-011) — only this prompt block is removed.
+      '## mepRate',
+      portfolioTotals && portfolioTotals.mepRate != null
+        ? `${portfolioTotals.mepRate}${portfolioTotals.mepRateAsOf ? ` (as of ${portfolioTotals.mepRateAsOf})` : ''}`
+        : 'unavailable',
       '',
       // Feature 006: precomputed week-over-week position changes. null = unknown
       // (no prior snapshot); [] = no changes; otherwise the exact deltas.
@@ -494,19 +509,19 @@ class GenerateWeeklyAnalysis extends UseCase {
     } else if (positionChanges.length === 0) {
       parts.push('none — no positions changed this week');
     } else {
-      parts.push('```json', JSON.stringify(positionChanges, null, 2), '```');
+      parts.push('```json', JSON.stringify(positionChanges), '```');
     }
     // The previousAnalysis block carries the prior macro panel (when present),
     // so the model can reason about week-over-week direction (FR-010).
     parts.push('', '## previousAnalysis');
     if (previousForPrompt) {
-      parts.push('```json', JSON.stringify(previousForPrompt, null, 2), '```');
+      parts.push('```json', JSON.stringify(previousForPrompt), '```');
     } else {
       parts.push('none — first run');
     }
     parts.push('', '## macroContext');
     if (macroContext) {
-      parts.push('```json', JSON.stringify(macroContext, null, 2), '```');
+      parts.push('```json', JSON.stringify(macroContext), '```');
     } else {
       parts.push('unavailable');
     }

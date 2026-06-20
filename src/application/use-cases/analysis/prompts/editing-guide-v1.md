@@ -35,3 +35,21 @@ You can edit the body freely; you cannot edit or remove the preamble.
   weights, drift, or cap call-outs.
 - Every save is versioned in History — if an edit makes runs worse, restore the
   previous version.
+
+## Saving tokens (cost levers you control)
+
+Each run is a paid model call; output is priced several times higher than input.
+The system already trims the prompt and asks for a concise narrative, but the two
+biggest levers are yours:
+
+- **Trim this instructions body.** It is the largest variable contributor to each
+  run's token count. Remove prose that restates what the tables now show, and
+  avoid asking for long, multi-section narratives. Shorter instructions → cheaper
+  runs, every week.
+- **Choose the model.** The `analysis.model` setting controls which model runs.
+  A cheaper tier (for example `claude-sonnet-4-6`) costs roughly 5× less for both
+  input and output, at the cost of some reasoning quality — reasonable on quiet
+  weeks, while keeping the top tier for rebalance weeks. The default stays the
+  high-quality model; switching is a settings change, no code required.
+- **Cap the output.** `analysis.maxOutputTokens` sets a hard ceiling on how much
+  the model may write in one run.

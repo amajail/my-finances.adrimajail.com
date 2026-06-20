@@ -76,22 +76,21 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/010-structured-analysis-tables/plan.md` (Phase 1 complete; tasks pending).
+`specs/011-analysis-token-diet/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/` (`submit-analysis-additions.md`,
-`allocation-targets.schema.json`, `api-additions.md`). This feature renders the
-weekly analysis's still-prose sections as structured tables (hybrid design):
-bucket drift, asset-class drift, and concentration caps are **code-computed**
-(new pure `AllocationDriftCalculator`) from the portfolio summary + a NEW
-machine-readable targets artifact (`analysis.allocationTargetsV1` settings row,
-seeded from a committed placeholder); watchlist, week-over-week analytical
-deltas, and framework amendments are **LLM-emitted** via optional new
-`submit_analysis` tool-schema arrays. A fixed committed **guardrail preamble**
-(`src/application/use-cases/analysis/prompts/guardrail-preamble-v1.md`) is
-prepended to the owner-edited instructions body at assembly (effective prompt =
-preamble ⊕ body) and shown read-only in the editor with a short editing guide —
-it forbids inventing figures / recomputing the code-owned tables (also backs the
-trimmed narrative, FR-009). Persistence reuses feature-006 JSON columns; render
-reuses feature-006/008 hand-rolled sections. Zero new deps, no new tables.
-Builds on 002/005/006 (shipped). Prior plan: `specs/009-performance-benchmarks/plan.md`.
+`data-model.md`, `quickstart.md`, `contracts/tool-schema-change.md`. This feature
+cuts per-run tokens/cost of the weekly analysis without losing content. Output is
+~5× input price and feature 010 moved tabular detail into tables, so the narrative
+can shrink. INPUT trim (in `_buildUserMessage`): compact JSON (drop pretty-print),
+drop the redundant `portfolioTotals` block (keep a one-line MEP rate), strip
+`topPerformers`/`bottomPerformers` from the prompt summary (revertable). OUTPUT
+trim: concision directive added to the fixed `guardrail-preamble-v1.md` (the ONLY
+code-controlled part of the runtime system prompt — the editable
+`analysis.instructionsV1` body is what's used; the seed template
+`weekly-rebalance-v1.md` is inert at runtime), plus tighten `submit_analysis`
+`orders[].rationale` maxLength 1000→400. Owner-only levers (trim the instructions
+body; `analysis.model` cheaper tier) are DOCUMENTED in `editing-guide-v1.md` +
+quickstart — default model stays Opus. No new deps/tables/entities; persistence +
+dashboard unchanged. Directional ~25% target. Builds on 010 (branch stacked on
+it). Prior plan: `specs/010-structured-analysis-tables/plan.md`.
 <!-- SPECKIT END -->
