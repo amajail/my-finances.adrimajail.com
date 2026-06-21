@@ -304,6 +304,13 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     if (wa.macroChanges !== null && wa.macroChanges !== undefined) {
       entity.macroChangesJson = JSON.stringify(wa.macroChanges);
     }
+    // Feature 013: administrative / non-investable positions. Only written when
+    // non-empty so pre-feature rows and runs with no stubs stay clean; a re-run
+    // upserts with 'Replace', so a section present last week but empty this week
+    // is dropped (the column simply isn't written and reads back as []).
+    if (Array.isArray(wa.administrativePositions) && wa.administrativePositions.length > 0) {
+      entity.administrativePositionsJson = JSON.stringify(wa.administrativePositions);
+    }
     return entity;
   }
 
@@ -336,6 +343,8 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     const frameworkAmendments = this._parseJsonColumn(entity.frameworkAmendmentsJson, entity.rowKey, 'frameworkAmendmentsJson', null);
     // Feature 012: macro week-over-week comparison (absent on pre-feature rows → null).
     const macroChanges = this._parseJsonColumn(entity.macroChangesJson, entity.rowKey, 'macroChangesJson', null);
+    // Feature 013: administrative positions (absent on pre-feature rows / no stubs → []).
+    const administrativePositions = this._parseJsonColumn(entity.administrativePositionsJson, entity.rowKey, 'administrativePositionsJson', []);
     return new WeeklyAnalysis({
       date: entity.rowKey,
       status: entity.status,
@@ -369,6 +378,8 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       frameworkAmendments,
       // Feature 012:
       macroChanges,
+      // Feature 013:
+      administrativePositions,
     });
   }
 

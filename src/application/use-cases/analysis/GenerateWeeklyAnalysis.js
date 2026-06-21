@@ -135,6 +135,10 @@ class GenerateWeeklyAnalysis extends UseCase {
 
     // Buffers we may need to persist even on failure paths.
     let portfolioSnapshot = [];
+    // Feature 013: positions whose computed value is <= 0 (zero OR negative) —
+    // legacy/tokenized stubs with no recoverable price. Classified administrative
+    // and excluded from drift/caps; surfaced as their own section. [] = none.
+    let administrativePositions = [];
     let portfolioSummary = null;
     // Feature 006 capture buffers — preserved on failure paths too (FR-014).
     let macroContext = null;
@@ -160,19 +164,30 @@ class GenerateWeeklyAnalysis extends UseCase {
       portfolioSnapshot = this._snapshotFromSummary(portfolioSummary);
       portfolioTotals = this._totalsFromSummary(portfolioSummary);
 
+      // Feature 013: partition the snapshot once. A position is administrative
+      // (non-investable) when its computed USD value is <= 0 — zero OR negative.
+      // This is NOT keyed off a null price: cash/deposit can have a null price
+      // but a real positive value and MUST stay investable (FR-005). Only the
+      // investable set feeds the allocation-drift / concentration-cap / position-
+      // change computations; excluded positions contribute 0 USD, so no value-
+      // bearing percentage changes — only the spurious "unclassified" stub row
+      // disappears (FR-002..FR-004).
+      const investableSnapshot = portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) > 0);
+      administrativePositions = portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) <= 0);
+
       // Feature 010: code-computed bucket / asset-class drift from the holdings
       // snapshot + machine-readable targets. Resilient — a missing targets row
       // or any read error leaves the sections null (omitted), never fatal
-      // (FR-001a / Edge: targets unavailable).
+      // (FR-001a / Edge: targets unavailable). Feature 013: investable set only.
       if (this._allocationTargetsRepository) {
         try {
           const targets = await this._allocationTargetsRepository.getActive();
-          const drift = AllocationDriftCalculator.computeDrift(portfolioSnapshot, targets);
+          const drift = AllocationDriftCalculator.computeDrift(investableSnapshot, targets);
           if (drift) {
             driftByBucket = drift.driftByBucket;
             driftByAssetClass = drift.driftByAssetClass;
           }
-          concentrationCaps = AllocationDriftCalculator.computeConcentrationCaps(portfolioSnapshot, targets);
+          concentrationCaps = AllocationDriftCalculator.computeConcentrationCaps(investableSnapshot, targets);
         } catch (driftErr) {
           logger.warn('Allocation drift/cap computation failed; omitting code-computed sections', driftErr);
         }
@@ -185,10 +200,13 @@ class GenerateWeeklyAnalysis extends UseCase {
 
       // 3b. Exact week-over-week position changes (Feature 006, FR-015..FR-017).
       //     null when there is no prior snapshot to diff (unknown / first run).
+      //     Feature 013: diff investable-vs-investable so administrative stubs
+      //     (value <= 0) don't surface as spurious add/remove rows. The prior
+      //     snapshot is filtered the same way for a like-for-like comparison.
       const priorSnapshot = previousAnalysis && Array.isArray(previousAnalysis.portfolioSnapshot) && previousAnalysis.portfolioSnapshot.length > 0
-        ? previousAnalysis.portfolioSnapshot
+        ? previousAnalysis.portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) > 0)
         : null;
-      positionChanges = PositionChangeCalculator.diff(priorSnapshot, portfolioSnapshot);
+      positionChanges = PositionChangeCalculator.diff(priorSnapshot, investableSnapshot);
 
       // 4. Macro context panel (Feature 006, FR-001..FR-011). Resilient: a
       //    failing source becomes available:false and the run proceeds — riesgo
@@ -254,6 +272,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         macroContext,
         portfolioTotals,
         positionChanges,
+        administrativePositions,
       });
 
       // 6. Call the LLM. The privacy boundary lives inside this method.
@@ -270,7 +289,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       } catch (err) {
         // Feature 006: all capture buffers ride onto the failed row (FR-014).
         const captured = {
-          targetDate, startedAt, model, portfolioSnapshot,
+          targetDate, startedAt, model, portfolioSnapshot, administrativePositions,
           macroContext, macroUsage, portfolioTotals, positionChanges, macroChanges,
           riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
         };
@@ -304,6 +323,9 @@ class GenerateWeeklyAnalysis extends UseCase {
         riesgoPaisBp,
         riesgoPaisAsOf,
         portfolioSnapshot,
+        // Feature 013: zero/negative-value administrative positions (excluded
+        // from drift/caps; [] when none).
+        administrativePositions,
         macroContext,
         portfolioTotals,
         positionChanges,
@@ -366,6 +388,7 @@ class GenerateWeeklyAnalysis extends UseCase {
   async _persistFailed({
     targetDate, startedAt, model, portfolioSnapshot, errorMessage,
     instructionsHistoryRowKey = null,
+    administrativePositions = [],
     macroContext = null, macroUsage = null, portfolioTotals = null,
     positionChanges = null, macroChanges = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
   }) {
@@ -380,6 +403,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       modelUsed: model,
       promptVersion: INSTRUCTIONS_PROMPT_VERSION,
       portfolioSnapshot,
+      administrativePositions,
       macroContext,
       portfolioTotals,
       positionChanges,
@@ -453,13 +477,17 @@ class GenerateWeeklyAnalysis extends UseCase {
       }));
   }
 
-  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges }) {
+  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [] }) {
     // The full per-position holdings list is delivered separately as an
     // authoritative `currentHoldings` block (below), so it is pulled out of the
     // portfolioSummary aggregates to avoid duplicating it in the prompt.
+    // Feature 013: only the investable holdings (valueUsd > 0) go in
+    // currentHoldings; the zero/negative-value stubs are delivered in a separate
+    // `administrativePositions` block (below) so the model does not flag them.
     const holdings = (portfolioSummary && Array.isArray(portfolioSummary.positions))
-      ? portfolioSummary.positions
+      ? portfolioSummary.positions.filter((p) => (Number(p.valueUsd) || 0) > 0)
       : null;
+    const adminPositions = Array.isArray(administrativePositions) ? administrativePositions : [];
     // Feature 011 (FR-002): also strip topPerformers/bottomPerformers from the
     // prompt copy — they are derivable from currentHoldings and pure token
     // overhead. PortfolioCalculator.summary() is unchanged, so the dashboard
@@ -497,6 +525,19 @@ class GenerateWeeklyAnalysis extends UseCase {
       parts.push('```json', JSON.stringify(holdings), '```');
     } else {
       parts.push('unavailable');
+    }
+    // Feature 013: zero/negative-value administrative positions, surfaced as a
+    // distinct, explicitly-labeled block so the model can reference them but does
+    // NOT raise them as holdings to review (FR-010). Omitted when there are none.
+    if (adminPositions.length > 0) {
+      parts.push(
+        '',
+        '## administrativePositions',
+        'These are excluded zero-value/legacy stubs (computed value <= 0, no recoverable price). They are deliberately excluded from allocation drift and concentration caps. Do NOT flag them for review or suggest orders for them; they are listed only for awareness.',
+        '```json',
+        JSON.stringify(adminPositions),
+        '```'
+      );
     }
     parts.push(
       '',

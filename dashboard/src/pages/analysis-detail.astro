@@ -52,6 +52,28 @@ import Layout from '../layouts/Layout.astro';
     </table>
   </section>
 
+  <!-- Feature 013: administrative / non-investable positions (computed value
+       <= 0). Excluded from drift/caps; shown here for awareness. Omitted when
+       there are none. -->
+  <section id="admin-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-baseline justify-between">
+      <h2 class="font-semibold">Administrative / non-investable</h2>
+      <span class="text-xs text-[var(--color-muted)]" id="admin-note"></span>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Broker</th>
+          <th class="text-left px-4 py-2">Type</th>
+          <th class="text-left px-4 py-2">Symbol</th>
+          <th class="text-right px-4 py-2">Qty</th>
+          <th class="text-right px-4 py-2">Value USD</th>
+        </tr>
+      </thead>
+      <tbody id="admin-tbody"></tbody>
+    </table>
+  </section>
+
   <section id="macro-wow-section" class="card mb-6 overflow-x-auto hidden">
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Macro — week over week</h2>
@@ -317,6 +339,24 @@ import Layout from '../layouts/Layout.astro';
     show(document.getElementById('changes-section'));
   }
 
+  // ---- Feature 013: administrative / non-investable positions ----
+
+  function renderAdministrative(rows) {
+    // [] / absent / malformed → omit the section entirely (FR-009).
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    document.getElementById('admin-note').textContent = `${rows.length} excluded (value ≤ 0)`;
+    document.getElementById('admin-tbody').innerHTML = rows.map((p) => `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2">${escapeHtml(p.broker)}</td>
+        <td class="px-4 py-2">${escapeHtml(p.assetType)}</td>
+        <td class="px-4 py-2 num-mono">${escapeHtml(p.symbol)}</td>
+        <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(p.quantity))}</td>
+        <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(p.valueUsd))}</td>
+      </tr>
+    `).join('');
+    show(document.getElementById('admin-section'));
+  }
+
   // ---- Feature 012: deterministic macro week-over-week ----
 
   function renderMacroWow(rows) {
@@ -540,6 +580,8 @@ import Layout from '../layouts/Layout.astro';
     renderMacro(detail.macroContext);
     renderTotals(detail.portfolioTotals);
     renderChanges(detail.positionChanges);
+    // Feature 013: administrative / non-investable positions (omitted when none).
+    renderAdministrative(detail.administrativePositions);
     // Feature 012: deterministic macro week-over-week (absent on first run /
     // pre-feature rows).
     renderMacroWow(detail.macroChanges);
