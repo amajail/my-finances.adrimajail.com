@@ -23,6 +23,7 @@ const UseCase = require('../UseCase');
 const WeeklyAnalysis = require('../../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../../domain/entities/SuggestedOrder');
 const PositionChangeCalculator = require('../../../domain/services/PositionChangeCalculator');
+const MacroChangeCalculator = require('../../../domain/services/MacroChangeCalculator');
 const AllocationDriftCalculator = require('../../../domain/services/AllocationDriftCalculator');
 const { buildSystemPrompt } = require('./prompts/guardrails');
 const logger = require('../../../shared/logging');
@@ -140,6 +141,8 @@ class GenerateWeeklyAnalysis extends UseCase {
     let macroUsage = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
     let portfolioTotals = null;
     let positionChanges = null;
+    // Feature 012: deterministic macro week-over-week (null = no prior panel).
+    let macroChanges = null;
     let riesgoPaisBp = null;
     let riesgoPaisAsOf = null;
     // Feature 010 code-computed sections (null = targets unavailable → omitted).
@@ -199,6 +202,15 @@ class GenerateWeeklyAnalysis extends UseCase {
       const macroResult = await this._macroContextProvider.getLatest({ priorImfReading });
       macroContext = macroResult.readings;
       macroUsage = macroResult.usage || macroUsage;
+
+      // 4b. Deterministic macro week-over-week (Feature 012): compare the prior
+      //     analysis's macro panel against this run's. null when there is no
+      //     prior analysis (first run); indicators missing/unavailable on either
+      //     side are skipped by the calculator.
+      macroChanges = MacroChangeCalculator.diff(
+        previousAnalysis ? previousAnalysis.macroContext : null,
+        macroContext
+      );
       // Mirror riesgo país onto the legacy columns for backward compat (FR-011).
       const rp = macroContext.riesgoPais;
       riesgoPaisBp = rp && rp.available && typeof rp.value === 'number' ? rp.value : null;
@@ -259,7 +271,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         // Feature 006: all capture buffers ride onto the failed row (FR-014).
         const captured = {
           targetDate, startedAt, model, portfolioSnapshot,
-          macroContext, macroUsage, portfolioTotals, positionChanges,
+          macroContext, macroUsage, portfolioTotals, positionChanges, macroChanges,
           riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
         };
         if (err instanceof CostCapExceededError) {
@@ -295,6 +307,8 @@ class GenerateWeeklyAnalysis extends UseCase {
         macroContext,
         portfolioTotals,
         positionChanges,
+        // Feature 012: deterministic macro week-over-week comparison.
+        macroChanges,
         // Feature 010: code-computed sections (null when targets unavailable).
         driftByBucket,
         driftByAssetClass,
@@ -353,7 +367,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     targetDate, startedAt, model, portfolioSnapshot, errorMessage,
     instructionsHistoryRowKey = null,
     macroContext = null, macroUsage = null, portfolioTotals = null,
-    positionChanges = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
+    positionChanges = null, macroChanges = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
   }) {
     // Feature 006: whatever context was gathered before the failure is
     // preserved on the failed row (macro, totals, position changes) and the
@@ -369,6 +383,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       macroContext,
       portfolioTotals,
       positionChanges,
+      macroChanges,
       riesgoPaisBp,
       riesgoPaisAsOf,
       tokensIn: usage.inputTokens || 0,

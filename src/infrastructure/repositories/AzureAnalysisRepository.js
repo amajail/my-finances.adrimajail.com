@@ -298,6 +298,12 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     if (wa.frameworkAmendments !== null && wa.frameworkAmendments !== undefined) {
       entity.frameworkAmendmentsJson = JSON.stringify(wa.frameworkAmendments);
     }
+    // Feature 012: deterministic macro week-over-week comparison. Only written
+    // when non-null; a re-run upserts with 'Replace', so a comparison present
+    // last week but null this week is dropped (FR-012).
+    if (wa.macroChanges !== null && wa.macroChanges !== undefined) {
+      entity.macroChangesJson = JSON.stringify(wa.macroChanges);
+    }
     return entity;
   }
 
@@ -328,6 +334,8 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     const watchlist = this._parseJsonColumn(entity.watchlistJson, entity.rowKey, 'watchlistJson', null);
     const weekOverWeek = this._parseJsonColumn(entity.weekOverWeekJson, entity.rowKey, 'weekOverWeekJson', null);
     const frameworkAmendments = this._parseJsonColumn(entity.frameworkAmendmentsJson, entity.rowKey, 'frameworkAmendmentsJson', null);
+    // Feature 012: macro week-over-week comparison (absent on pre-feature rows → null).
+    const macroChanges = this._parseJsonColumn(entity.macroChangesJson, entity.rowKey, 'macroChangesJson', null);
     return new WeeklyAnalysis({
       date: entity.rowKey,
       status: entity.status,
@@ -359,6 +367,8 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       watchlist,
       weekOverWeek,
       frameworkAmendments,
+      // Feature 012:
+      macroChanges,
     });
   }
 

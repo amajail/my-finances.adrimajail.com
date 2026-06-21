@@ -62,6 +62,9 @@ app.http('getWeeklyAnalysis', {
         watchlist: analysis.watchlist,
         weekOverWeek: analysis.weekOverWeek,
         frameworkAmendments: analysis.frameworkAmendments,
+        // Feature 012: deterministic macro week-over-week comparison (null on
+        // pre-feature rows and first runs).
+        macroChanges: analysis.macroChanges,
       };
 
       if (analysis.isCompleted()) {
