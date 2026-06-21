@@ -52,6 +52,24 @@ import Layout from '../layouts/Layout.astro';
     </table>
   </section>
 
+  <section id="macro-wow-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold">Macro — week over week</h2>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Indicator</th>
+          <th class="text-right px-4 py-2">Prior</th>
+          <th class="text-right px-4 py-2">Current</th>
+          <th class="text-right px-4 py-2">Δ</th>
+          <th class="text-right px-4 py-2">%</th>
+        </tr>
+      </thead>
+      <tbody id="macro-wow-tbody"></tbody>
+    </table>
+  </section>
+
   <section id="drift-bucket-section" class="card mb-6 overflow-x-auto hidden">
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Bucket drift vs target</h2>
@@ -299,6 +317,35 @@ import Layout from '../layouts/Layout.astro';
     show(document.getElementById('changes-section'));
   }
 
+  // ---- Feature 012: deterministic macro week-over-week ----
+
+  function renderMacroWow(rows) {
+    // Absent / empty / malformed → omit the section (FR-008).
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    const num = (v) => (typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—');
+    const deltaCell = (n) => {
+      if (typeof n !== 'number') return '<span class="num-mono">—</span>';
+      const cls = n > 0 ? 'pos-positive' : (n < 0 ? 'pos-negative' : '');
+      const sign = n > 0 ? '+' : '';
+      return `<span class="num-mono ${cls}">${sign}${num(n)}</span>`;
+    };
+    const pctCell = (n) => {
+      if (typeof n !== 'number') return '<span class="num-mono">—</span>';
+      const cls = n > 0 ? 'pos-positive' : (n < 0 ? 'pos-negative' : '');
+      const sign = n > 0 ? '+' : '';
+      return `<span class="num-mono ${cls}">${sign}${n.toFixed(2)}%</span>`;
+    };
+    document.getElementById('macro-wow-tbody').innerHTML = rows.map((r) => `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2">${escapeHtml(r.label)}${r.unit ? ` <span class="text-xs text-[var(--color-muted)]">${escapeHtml(r.unit)}</span>` : ''}</td>
+        <td class="px-4 py-2 text-right num-mono">${num(r.priorValue)}</td>
+        <td class="px-4 py-2 text-right num-mono">${num(r.currentValue)}</td>
+        <td class="px-4 py-2 text-right">${deltaCell(r.deltaAbs)}</td>
+        <td class="px-4 py-2 text-right">${pctCell(r.deltaPct)}</td>
+      </tr>`).join('');
+    show(document.getElementById('macro-wow-section'));
+  }
+
   // ---- Feature 010: code-computed drift tables ----
 
   function renderDrift(rows, tbodyId, sectionId) {
@@ -493,6 +540,9 @@ import Layout from '../layouts/Layout.astro';
     renderMacro(detail.macroContext);
     renderTotals(detail.portfolioTotals);
     renderChanges(detail.positionChanges);
+    // Feature 012: deterministic macro week-over-week (absent on first run /
+    // pre-feature rows).
+    renderMacroWow(detail.macroChanges);
     // Feature 010: code-computed drift tables (shown on completed AND failed
     // rows when captured; omitted when absent/empty).
     renderDrift(detail.driftByBucket, 'drift-bucket-tbody', 'drift-bucket-section');

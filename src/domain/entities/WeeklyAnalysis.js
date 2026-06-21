@@ -97,6 +97,10 @@ class WeeklyAnalysis {
     this._weekOverWeek = Array.isArray(data.weekOverWeek) ? data.weekOverWeek : null;
     this._frameworkAmendments = Array.isArray(data.frameworkAmendments) ? data.frameworkAmendments : null;
 
+    // Feature 012: deterministic macro week-over-week comparison. OPTIONAL —
+    // null on the first run (no prior panel to diff) and on pre-feature rows.
+    this._macroChanges = Array.isArray(data.macroChanges) ? data.macroChanges : null;
+
     this._validate();
     Object.freeze(this._portfolioSnapshot);
     if (this._macroContext) Object.freeze(this._macroContext);
@@ -108,6 +112,7 @@ class WeeklyAnalysis {
     if (this._watchlist) Object.freeze(this._watchlist);
     if (this._weekOverWeek) Object.freeze(this._weekOverWeek);
     if (this._frameworkAmendments) Object.freeze(this._frameworkAmendments);
+    if (this._macroChanges) Object.freeze(this._macroChanges);
     Object.freeze(this);
   }
 
@@ -182,6 +187,8 @@ class WeeklyAnalysis {
       watchlist: this._watchlist,
       weekOverWeek: this._weekOverWeek,
       frameworkAmendments: this._frameworkAmendments,
+      // Feature 012: same "present → array of objects, else reject" rule.
+      macroChanges: this._macroChanges,
     })) {
       if (arr !== null) {
         for (const item of arr) {
@@ -227,6 +234,7 @@ class WeeklyAnalysis {
   get watchlist() { return this._watchlist; }
   get weekOverWeek() { return this._weekOverWeek; }
   get frameworkAmendments() { return this._frameworkAmendments; }
+  get macroChanges() { return this._macroChanges; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -266,6 +274,7 @@ class WeeklyAnalysis {
       watchlist: this._watchlist,
       weekOverWeek: this._weekOverWeek,
       frameworkAmendments: this._frameworkAmendments,
+      macroChanges: this._macroChanges,
     };
   }
 

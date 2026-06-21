@@ -33,21 +33,21 @@ No project setup or new infrastructure (no new deps/tables/settings).
 
 ### Calculator
 
-- [ ] T001 [P] [US1] Create pure `MacroChangeCalculator` in `src/domain/services/MacroChangeCalculator.js` — `static diff(priorMacro, currentMacro)`: a `KEY_META` map of the 8 numeric keys → {label, unit} (riesgoPais/fxGap/bcraReserves/argInflation/argInterestRate/usaInflation/usaInterestRate/sp500Drawdown); return `null` when `priorMacro` is null/absent; per key include a row only when both prior+current readings exist, `available !== false`, and `value` is finite; compute `deltaAbs = current − prior` and `deltaPct = prior === 0 ? null : ((current−prior)/prior)*100` (rounded); carry label/unit/prior+asOf/current+asOf. Returns `MacroChangeRow[]` (possibly `[]`)
-- [ ] T002 [P] [US1] Unit tests for `MacroChangeCalculator` in `tests/unit/domain/services/MacroChangeCalculator.test.js` — diff math, reserves row present, skip when missing/unavailable on either side, `imfReviewStatus` (textual) excluded, `deltaPct === null` when prior is 0, `diff` returns null when prior macro absent, `[]` when no key qualifies
+- [X] T001 [P] [US1] Create pure `MacroChangeCalculator` in `src/domain/services/MacroChangeCalculator.js` — `static diff(priorMacro, currentMacro)`: a `KEY_META` map of the 8 numeric keys → {label, unit} (riesgoPais/fxGap/bcraReserves/argInflation/argInterestRate/usaInflation/usaInterestRate/sp500Drawdown); return `null` when `priorMacro` is null/absent; per key include a row only when both prior+current readings exist, `available !== false`, and `value` is finite; compute `deltaAbs = current − prior` and `deltaPct = prior === 0 ? null : ((current−prior)/prior)*100` (rounded); carry label/unit/prior+asOf/current+asOf. Returns `MacroChangeRow[]` (possibly `[]`)
+- [X] T002 [P] [US1] Unit tests for `MacroChangeCalculator` in `tests/unit/domain/services/MacroChangeCalculator.test.js` — diff math, reserves row present, skip when missing/unavailable on either side, `imfReviewStatus` (textual) excluded, `deltaPct === null` when prior is 0, `diff` returns null when prior macro absent, `[]` when no key qualifies
 
 ### Entity + persistence
 
-- [ ] T003 [US1] Add an optional `macroChanges` field to `src/domain/entities/WeeklyAnalysis.js` — constructor handling (`Array.isArray ? : null`), light "present → array of objects, else reject" validation, freeze, getter, and `toJSON`, mirroring `positionChanges`
-- [ ] T004 [P] [US1] Unit tests for the `macroChanges` field in `tests/unit/domain/entities/WeeklyAnalysis.macroChanges.test.js` — absent→null, `[]`→empty, valid array accepted, malformed (non-object entries)→ValidationError, toJSON round-trip
-- [ ] T005 [US1] Add a `macroChangesJson` column to `_analysisToEntity`/`_analysisFromEntity` in `src/infrastructure/repositories/AzureAnalysisRepository.js` — write only when non-null, parse with `_parseJsonColumn` (absent/malformed→null), per the feature-006/010 pattern
-- [ ] T006 [P] [US1] Round-trip unit test for `macroChangesJson` in `tests/unit/infrastructure/repositories/AzureAnalysisRepository.macroChanges.test.js` — write→read, absent column→null, malformed→null, and a re-run/replace case (present last week, null this week → dropped) (FR-012)
+- [X] T003 [US1] Add an optional `macroChanges` field to `src/domain/entities/WeeklyAnalysis.js` — constructor handling (`Array.isArray ? : null`), light "present → array of objects, else reject" validation, freeze, getter, and `toJSON`, mirroring `positionChanges`
+- [X] T004 [P] [US1] Unit tests for the `macroChanges` field in `tests/unit/domain/entities/WeeklyAnalysis.macroChanges.test.js` — absent→null, `[]`→empty, valid array accepted, malformed (non-object entries)→ValidationError, toJSON round-trip
+- [X] T005 [US1] Add a `macroChangesJson` column to `_analysisToEntity`/`_analysisFromEntity` in `src/infrastructure/repositories/AzureAnalysisRepository.js` — write only when non-null, parse with `_parseJsonColumn` (absent/malformed→null), per the feature-006/010 pattern
+- [X] T006 [P] [US1] Round-trip unit test for `macroChangesJson` in `tests/unit/infrastructure/repositories/AzureAnalysisRepository.macroChanges.test.js` — write→read, absent column→null, malformed→null, and a re-run/replace case (present last week, null this week → dropped) (FR-012)
 
 ### Wiring + API + render
 
-- [ ] T007 [US1] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, compute `macroChanges = MacroChangeCalculator.diff(previousAnalysis ? previousAnalysis.macroContext : null, macroContext)` right after the `positionChanges` line, and attach it to the completed `WeeklyAnalysis` (also carry it onto the failed-path record if macro was captured, mirroring feature-006 capture buffers) (depends on T001, T003)
-- [ ] T008 [US1] Expose `macroChanges` in the `GET /api/analysis/weekly/{date}` response body in `src/functions/getWeeklyAnalysis.js` (alongside `positionChanges`/the feature-010 sections) per `contracts/api-additions.md` (depends on T003)
-- [ ] T009 [US1] Render a "Macro — week over week" `<section>` + render function in `dashboard/src/pages/analysis-detail.astro` — columns: indicator, prior, current, Δ (signed, colored), % (or "—" when null); shown only when `macroChanges` is present and non-empty; visually distinct from "Changes this week" (positions) and "Week-over-week (analytical)" (LLM) (FR-009) (depends on T008)
+- [X] T007 [US1] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, compute `macroChanges = MacroChangeCalculator.diff(previousAnalysis ? previousAnalysis.macroContext : null, macroContext)` right after the `positionChanges` line, and attach it to the completed `WeeklyAnalysis` (also carry it onto the failed-path record if macro was captured, mirroring feature-006 capture buffers) (depends on T001, T003)
+- [X] T008 [US1] Expose `macroChanges` in the `GET /api/analysis/weekly/{date}` response body in `src/functions/getWeeklyAnalysis.js` (alongside `positionChanges`/the feature-010 sections) per `contracts/api-additions.md` (depends on T003)
+- [X] T009 [US1] Render a "Macro — week over week" `<section>` + render function in `dashboard/src/pages/analysis-detail.astro` — columns: indicator, prior, current, Δ (signed, colored), % (or "—" when null); shown only when `macroChanges` is present and non-empty; visually distinct from "Changes this week" (positions) and "Week-over-week (analytical)" (LLM) (FR-009) (depends on T008)
 
 **Checkpoint**: US1 complete — deterministic macro comparison computed, persisted, and rendered; absent gracefully on first run / pre-feature rows.
 
@@ -55,9 +55,9 @@ No project setup or new infrastructure (no new deps/tables/settings).
 
 ## Phase 3: Polish & Verification
 
-- [ ] T010 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, Principle IV)
+- [X] T010 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, Principle IV)
 - [ ] T011 Live verify (needs two consecutive analyses): run the timer twice for different weeks → open the latest; confirm the "Macro — week over week" table shows the reserves row + other numeric indicators with `deltaAbs == current − prior`, and that the earliest/first-run analysis shows it absent (SC-001..SC-006). Per `quickstart.md`
-- [ ] T012 [P] Privacy check before push: confirm no real holdings/PPCs in committed files (this feature handles only public macro indicators + computed deltas; nothing personal) (Principle I)
+- [X] T012 [P] Privacy check before push: confirm no real holdings/PPCs in committed files (this feature handles only public macro indicators + computed deltas; nothing personal) (Principle I)
 
 ---
 
