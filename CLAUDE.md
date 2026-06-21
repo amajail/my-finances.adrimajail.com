@@ -76,28 +76,23 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/013-administrative-positions/plan.md` (Phase 1 complete; tasks pending).
+`specs/014-duplicate-holdings-detector/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/api-additions.md`. This feature
-excludes legacy zero-value positions (computed `valueUsd <= 0`, zero OR negative —
-NOT null-price, so cash/deposit with real value stay investable) from the weekly
-analysis's allocation-drift + concentration-cap math, and surfaces them in a
-separate optional "administrative / non-investable" section. Approach: partition
-the portfolio snapshot once in `GenerateWeeklyAnalysis` into `investableSnapshot`
-(valueUsd>0) and `administrativePositions` (valueUsd<=0); feed only the investable
-set to `AllocationDriftCalculator.computeDrift`/`computeConcentrationCaps` and
-`PositionChangeCalculator.diff` (the drift calculator stays a PURE function —
-exclusion happens upstream; excluded rows contribute 0 USD so no value-bearing
-percentage changes, only the spurious "unclassified" row disappears). Carry the
-new field through `WeeklyAnalysis` (optional `_administrativePositions`, mirroring
-feature-006/010 optional sections), `AzureAnalysisRepository`
-(`administrativePositionsJson` column, write-when-non-empty), the
-`/api/analysis/weekly/{date}` detail response (additive optional field), and a new
-"Administrative / non-investable" table on `analysis-detail.astro` (omitted when
-empty). The generation input gets a compact labeled `## administrativePositions`
-block ("excluded zero-value stubs — do not flag for review") so the narrative
-stops raising them. No new deps/tables/data source/model change; backward
-compatible. First of three sibling features (013 here; 014 = duplicate-holdings
-detector; 015 = analysis token-diet v2). Prior plan:
-`specs/012-macro-week-over-week/plan.md`.
+`data-model.md`, `quickstart.md`, `contracts/api-additions.md`. This feature adds
+a deterministic, code-computed "duplicate holdings" section to the weekly analysis:
+a NEW pure `src/domain/services/DuplicateHoldingsDetector.js` with a stateless
+`detect(snapshot)` that groups holdings by shared `symbol`, keeps underlyings held
+in ≥2 distinct `(broker, assetType)` placements (so BOTH same-ETF-at-two-brokers
+AND ADR-vs-CEDEAR count), excludes cash, and returns groups sorted by combined
+value desc (`[]` when none). Mirrors feature-006 `PositionChangeCalculator` /
+feature-012 `MacroChangeCalculator`. Wired through `GenerateWeeklyAnalysis`
+(compute next to positionChanges/macroChanges + a compact labeled `## duplications`
+prompt block so the narrative doesn't re-enumerate), `WeeklyAnalysis` (optional
+`_duplications` field), `AzureAnalysisRepository` (`duplicationsJson` column,
+write-when-non-empty), the detail response (additive optional field), and a
+"Duplicate holdings" table on `analysis-detail.astro` (omit when empty). Stateless
+(works on first run); deterministic. No new deps/tables/data source/model change;
+backward compatible. Second of three sibling features (013 admin positions; 014
+here; 015 token-diet v2). Implementation wiring mirrors 012 (`macroChanges`), so
+best built after 012 merges. Prior plan: `specs/013-administrative-positions/plan.md`.
 <!-- SPECKIT END -->
