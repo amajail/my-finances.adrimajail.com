@@ -8,6 +8,13 @@
 
 **Input**: User description: "Exclude legacy zero-value positions from the weekly analysis allocation-drift and concentration-cap computations, and surface them in a separate administrative / non-investable section instead."
 
+## Clarifications
+
+### Session 2026-06-21
+
+- Q: How should administrative positions appear in the generation input so the narrative stops flagging them (FR-010)? → A: As their own compact, explicitly-labeled block ("excluded zero-value stubs — do not flag for review"); the model may reference them but must not raise them as actions.
+- Q: Should a negative computed value (not just exactly zero) also count as administrative? → A: Yes — any value ≤ 0 (zero or negative) is administrative; in this long-only portfolio a negative value is a data anomaly and is safely set aside.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Drift and caps ignore zero-value stub holdings (Priority: P1)
@@ -101,7 +108,8 @@ and confirm the narrative/watchlist no longer raises it as an item needing revie
 ### Functional Requirements
 
 - **FR-001**: The system MUST classify a held position as "administrative / non-investable"
-  when its computed value in the reporting currency is less than or equal to zero.
+  when its computed value in the reporting currency is less than or equal to zero (i.e. zero
+  OR negative — a negative value is treated as administrative, not as an investable holding).
 - **FR-002**: The system MUST exclude administrative positions from the allocation-drift
   breakdown (both the by-bucket and by-asset-class views).
 - **FR-003**: The system MUST exclude administrative positions from the concentration-cap
@@ -119,8 +127,10 @@ and confirm the narrative/watchlist no longer raises it as an item needing revie
 - **FR-009**: The analysis detail view MUST present administrative positions in a clearly
   separated section, distinct from the investable holdings and the drift tables, and MUST omit
   that section entirely when there are no administrative positions.
-- **FR-010**: The generated narrative MUST be informed that administrative positions are
-  excluded stubs so it does not raise them as items requiring review.
+- **FR-010**: The generation input MUST present administrative positions as their own compact,
+  explicitly-labeled block ("excluded zero-value stubs — do not flag for review"), separate from
+  the investable holdings, so the narrative does not raise them as items requiring review (it may
+  still reference them if relevant). When there are no administrative positions, the block is omitted.
 - **FR-011**: The feature MUST introduce no new external data source, no new market data, no
   new persisted table, and no change to which pricing/model is used.
 
