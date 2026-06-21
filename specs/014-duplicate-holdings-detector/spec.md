@@ -8,6 +8,13 @@
 
 **Input**: User description: "Deterministic cross-broker duplicate-holdings detector for the weekly analysis — identify the same underlying instrument held across more than one broker or instrument wrapper (e.g. an ADR and a CEDEAR of the same company, or the same ETF at two brokers), compute it in code, and present it as its own section instead of relying on the narrative to spot it."
 
+## Clarifications
+
+### Session 2026-06-21
+
+- Q: What counts as a duplicate placement of the same underlying symbol? → A: A placement is a (broker, wrapper) pair; the same symbol in 2+ distinct (broker, wrapper) pairs is a duplicate — so both same-wrapper-different-broker (e.g. one ETF at two brokers) AND different-wrapper (e.g. ADR vs CEDEAR) are flagged.
+- Q: How should duplicates appear in the generation input so the narrative defers to the deterministic section (FR-012)? → A: As their own compact, explicitly-labeled block (deterministically detected) with an instruction not to re-enumerate them; the model may reference it. Omitted when there are no duplicates.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - See where the same underlying is held more than once (Priority: P1)
@@ -103,7 +110,9 @@ the narrative does not separately enumerate the duplicate placements as watchlis
 
 - **FR-001**: The system MUST identify, from the current portfolio, every underlying instrument
   that is held in two or more distinct placements, where a placement is a unique combination of
-  broker and instrument wrapper (asset type).
+  broker and instrument wrapper (asset type). Both kinds of difference qualify: the same wrapper
+  at different brokers (e.g. one ETF at two brokers) AND different wrappers of the same underlying
+  (e.g. an ADR and a CEDEAR), in any combination.
 - **FR-002**: The system MUST match placements to the same underlying by the instrument's
   identifying symbol (e.g. a share and its CEDEAR of the same ticker, or the same ETF at two
   brokers count as the same underlying).
@@ -124,8 +133,10 @@ the narrative does not separately enumerate the duplicate placements as watchlis
 - **FR-011**: The analysis detail view MUST present duplicate groups in a clearly separated
   section, distinct from the holdings list and the drift tables, and MUST omit that section when
   there are no duplicate groups.
-- **FR-012**: The generated narrative MUST be informed that duplicates are detected
-  deterministically and shown separately, so it does not re-enumerate them item-by-item.
+- **FR-012**: The generation input MUST present the duplicate groups as their own compact,
+  explicitly-labeled block (deterministically detected) with an instruction not to re-enumerate
+  them item-by-item; the narrative may reference the block. The block is omitted when there are
+  no duplicate groups.
 - **FR-013**: The detection MUST be deterministic — the same portfolio input always yields the
   same groups in the same order.
 - **FR-014**: The feature MUST introduce no new external data source, no new market data, no new
