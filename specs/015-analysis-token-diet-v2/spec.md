@@ -8,6 +8,13 @@
 
 **Input**: User description: "Reduce the per-run token cost of the weekly analysis beyond the first token-diet pass, focusing on the part that now dominates cost (the generated narrative / output) and on input that has become redundant now that more sections are computed deterministically — without losing any information the owner actually reads."
 
+## Clarifications
+
+### Session 2026-06-21
+
+- Q: Is the ≥15% output-reduction target a hard acceptance gate or a directional goal? → A: Directional aim; the hard acceptance gate is "output measurably drops AND all required narrative sections remain present." The 15% is a target, not a blocking threshold (output volume varies with market conditions).
+- Q: How is the output-token reduction measured for acceptance? → A: Deterministic A/B on identical captured inputs — generate one run's exact inputs under the old vs new guidance and compare recorded token/cost telemetry, isolating the change from week-to-week variance.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Cheaper runs without losing readable content (Priority: P1)
@@ -109,10 +116,12 @@ quality and continuity (references to last week, open suggestions) are unchanged
 
 ### Measurable Outcomes
 
-- **SC-001**: For equivalent portfolio and macro inputs, the recorded output token count of a run
-  decreases by a meaningful, directional margin (target ≥ 15%) versus the pre-change baseline.
-- **SC-002**: Total recorded cost per run decreases versus the pre-change baseline for equivalent
-  inputs.
+- **SC-001**: Measured by deterministic A/B on identical captured inputs (same inputs generated
+  under old vs new guidance), the recorded output token count decreases. The hard acceptance gate
+  is a measurable decrease with all required sections preserved (SC-003); a ≥ 15% reduction is the
+  directional target, not a blocking threshold.
+- **SC-002**: In the same A/B comparison, total recorded cost per run decreases versus the
+  pre-change measurement on identical inputs.
 - **SC-003**: 100% of required narrative sections (summary, market context, assessment, suggested
   actions, watchlist) remain present in post-change runs.
 - **SC-004**: Redundant prior-period macro input is no longer present in the generation payload
