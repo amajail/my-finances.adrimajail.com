@@ -76,23 +76,23 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/014-duplicate-holdings-detector/plan.md` (Phase 1 complete; tasks pending).
+`specs/015-analysis-token-diet-v2/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/api-additions.md`. This feature adds
-a deterministic, code-computed "duplicate holdings" section to the weekly analysis:
-a NEW pure `src/domain/services/DuplicateHoldingsDetector.js` with a stateless
-`detect(snapshot)` that groups holdings by shared `symbol`, keeps underlyings held
-in ≥2 distinct `(broker, assetType)` placements (so BOTH same-ETF-at-two-brokers
-AND ADR-vs-CEDEAR count), excludes cash, and returns groups sorted by combined
-value desc (`[]` when none). Mirrors feature-006 `PositionChangeCalculator` /
-feature-012 `MacroChangeCalculator`. Wired through `GenerateWeeklyAnalysis`
-(compute next to positionChanges/macroChanges + a compact labeled `## duplications`
-prompt block so the narrative doesn't re-enumerate), `WeeklyAnalysis` (optional
-`_duplications` field), `AzureAnalysisRepository` (`duplicationsJson` column,
-write-when-non-empty), the detail response (additive optional field), and a
-"Duplicate holdings" table on `analysis-detail.astro` (omit when empty). Stateless
-(works on first run); deterministic. No new deps/tables/data source/model change;
-backward compatible. Second of three sibling features (013 admin positions; 014
-here; 015 token-diet v2). Implementation wiring mirrors 012 (`macroChanges`), so
-best built after 012 merges. Prior plan: `specs/013-administrative-positions/plan.md`.
+`data-model.md`, `quickstart.md`, `contracts/prompt-changes.md`. This feature is a
+second token-diet pass (after 011), focused on the cost-dominant OUTPUT plus
+now-redundant input. NO schema/data/model change. Three levers: (1) strengthen the
+fixed `guardrail-preamble-v1.md` so `markdownBody` INTERPRETS rather than reproduces
+the deterministic tables (drift, caps, positionChanges, macroChanges from 012,
+duplications from 014, administrative positions from 013) — required sections
+(summary, market context, assessment, suggested actions, watchlist) still kept;
+(2) in `_buildUserMessage`, drop the redundant prior-macro panel from
+`## previousAnalysis` (redundant given 012's deterministic macro week-over-week),
+keeping prior summary + open suggestions; (3) omit unavailable indicators from
+`## macroContext` instead of null placeholders. Default model UNCHANGED (downgrade
+is an owner-config lever, out of scope). Verified by A/B on identical captured
+inputs comparing recorded tokensOut/costUsd; 15% is a directional target with a
+hard "no required section dropped" gate. Best built after 012/013/014 merge so the
+"interpret not restate" rule references sections present on main. Third of three
+sibling features (013 admin positions; 014 duplicate detector; 015 here). Prior
+plan: `specs/014-duplicate-holdings-detector/plan.md`.
 <!-- SPECKIT END -->
