@@ -80,7 +80,7 @@ divide-by-zero while still showing the absolute move (FR-010).
 absent) with light validation (present → array of objects), serialized as a
 `macroChangesJson` column via the existing mapper + `_parseJsonColumn` helper.
 Expose `macroChanges` in the `GET /api/analysis/weekly/{date}` response. Render a
-new "Macro changes this week" `<section>` on `analysis-detail.astro`, shown only
+new "Macro — week over week" `<section>` on `analysis-detail.astro`, shown only
 when present and non-empty, visually distinct from "Changes this week" (positions)
 and "Week-over-week (analytical)" (LLM).
 

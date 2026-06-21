@@ -28,7 +28,7 @@ curl -s "http://localhost:7071/api/analysis/weekly/<latest-date>" | node -e "let
 
 Open `analysis-detail?date=<latest-date>` and confirm:
 
-- A **"Macro changes this week"** table shows, with one row per numeric indicator
+- A **"Macro — week over week"** table shows, with one row per numeric indicator
   that both weeks captured — including **BCRA reserves** — each with prior, current,
   Δ, and %.
 - It is visually distinct from **"Changes this week"** (positions) and

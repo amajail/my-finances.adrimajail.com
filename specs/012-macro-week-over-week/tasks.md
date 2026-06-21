@@ -29,7 +29,7 @@ No project setup or new infrastructure (no new deps/tables/settings).
 
 **Goal**: A deterministic macro week-over-week table (prior → current → Δ → %) on each analysis that has a prior week, anchored on BCRA reserves and covering the numeric macro panel.
 
-**Independent Test**: Open an analysis with a prior week → a "Macro changes this week" table shows one row per numeric indicator present in both weeks (incl. reserves) with prior/current/Δ/%/as-of; first-run and pre-feature analyses show it absent with no errors.
+**Independent Test**: Open an analysis with a prior week → a "Macro — week over week" table shows one row per numeric indicator present in both weeks (incl. reserves) with prior/current/Δ/%/as-of; first-run and pre-feature analyses show it absent with no errors.
 
 ### Calculator
 
@@ -47,7 +47,7 @@ No project setup or new infrastructure (no new deps/tables/settings).
 
 - [ ] T007 [US1] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, compute `macroChanges = MacroChangeCalculator.diff(previousAnalysis ? previousAnalysis.macroContext : null, macroContext)` right after the `positionChanges` line, and attach it to the completed `WeeklyAnalysis` (also carry it onto the failed-path record if macro was captured, mirroring feature-006 capture buffers) (depends on T001, T003)
 - [ ] T008 [US1] Expose `macroChanges` in the `GET /api/analysis/weekly/{date}` response body in `src/functions/getWeeklyAnalysis.js` (alongside `positionChanges`/the feature-010 sections) per `contracts/api-additions.md` (depends on T003)
-- [ ] T009 [US1] Render a "Macro changes this week" `<section>` + render function in `dashboard/src/pages/analysis-detail.astro` — columns: indicator, prior, current, Δ (signed, colored), % (or "—" when null); shown only when `macroChanges` is present and non-empty; visually distinct from "Changes this week" (positions) and "Week-over-week (analytical)" (LLM) (FR-009) (depends on T008)
+- [ ] T009 [US1] Render a "Macro — week over week" `<section>` + render function in `dashboard/src/pages/analysis-detail.astro` — columns: indicator, prior, current, Δ (signed, colored), % (or "—" when null); shown only when `macroChanges` is present and non-empty; visually distinct from "Changes this week" (positions) and "Week-over-week (analytical)" (LLM) (FR-009) (depends on T008)
 
 **Checkpoint**: US1 complete — deterministic macro comparison computed, persisted, and rendered; absent gracefully on first run / pre-feature rows.
 
@@ -56,7 +56,7 @@ No project setup or new infrastructure (no new deps/tables/settings).
 ## Phase 3: Polish & Verification
 
 - [ ] T010 [P] Run the full Jest suite (`npm test`) and the dashboard build (`cd dashboard && npm run build`); fix any failures (no red on `main`, Principle IV)
-- [ ] T011 Live verify (needs two consecutive analyses): run the timer twice for different weeks → open the latest; confirm the "Macro changes this week" table shows the reserves row + other numeric indicators with `deltaAbs == current − prior`, and that the earliest/first-run analysis shows it absent (SC-001..SC-006). Per `quickstart.md`
+- [ ] T011 Live verify (needs two consecutive analyses): run the timer twice for different weeks → open the latest; confirm the "Macro — week over week" table shows the reserves row + other numeric indicators with `deltaAbs == current − prior`, and that the earliest/first-run analysis shows it absent (SC-001..SC-006). Per `quickstart.md`
 - [ ] T012 [P] Privacy check before push: confirm no real holdings/PPCs in committed files (this feature handles only public macro indicators + computed deltas; nothing personal) (Principle I)
 
 ---

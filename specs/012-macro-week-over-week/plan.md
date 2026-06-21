@@ -75,7 +75,7 @@ src/
     └── getWeeklyAnalysis.js                  # expose `macroChanges` in the detail response
 
 dashboard/src/pages/
-└── analysis-detail.astro                     # NEW "Macro changes this week" section + render fn
+└── analysis-detail.astro                     # NEW "Macro — week over week" section + render fn
 
 tests/ (Jest)
 ├── unit/domain/services/MacroChangeCalculator.test.js
@@ -90,7 +90,7 @@ tests/ (Jest)
 - **Inputs already exist.** `GenerateWeeklyAnalysis` loads `previousAnalysis` (`:181`) and already reads `previousAnalysis.macroContext` (`:193`); the current `macroContext` is computed in the same run. So the diff is `MacroChangeCalculator.diff(previousAnalysis?.macroContext, macroContext)`, slotted right after the `positionChanges` line (`:188`).
 - **Reading shape is uniform.** Every macro reading is `{ value, asOf, available }` (unavailable → `{value:null, asOf:null, available:false}`). The calculator includes a key only when both prior and current are present, `available !== false`, and the value is numeric.
 - **Numeric indicator set + labels** (excludes the textual `imfReviewStatus`): `riesgoPais` (Riesgo país, bp), `fxGap` (MEP/official gap, %), `bcraReserves` (BCRA reserves, USD M), `argInflation` (Monthly inflation, %), `argInterestRate` (Policy rate, %), `usaInflation` (CPI YoY, %), `usaInterestRate` (Fed funds upper, %), `sp500Drawdown` (S&P 500 drawdown, %). A small key→{label,unit} map lives in the calculator (matching the panel's `MACRO_GROUPS`); keys outside it are skipped, which naturally excludes non-numeric indicators.
-- **Distinct from existing tables (FR-009).** Three sibling sections on the detail page: "Changes this week" (positions, feature 006), "Week-over-week (analytical)" (LLM, feature 010), and the new "Macro changes this week" (this feature) — clearly labeled.
+- **Distinct from existing tables (FR-009).** Three sibling sections on the detail page: "Changes this week" (positions, feature 006), "Week-over-week (analytical)" (LLM, feature 010), and the new "Macro — week over week" (this feature) — clearly labeled.
 
 ## Complexity Tracking
 
