@@ -516,10 +516,13 @@ class GenerateWeeklyAnalysis extends UseCase {
     // back into the prompt: the narrative is a contamination vector (any
     // instrument the model once mentioned gets carried forward indefinitely,
     // even if never held), and the snapshot is redundant with currentHoldings +
-    // positionChanges. We keep the prior summary, orders and macro panel so the
-    // model still has week-over-week continuity (FR-010).
+    // positionChanges. Feature 015 (FR-003): the prior macro panel is also
+    // dropped here — the deterministic macro week-over-week comparison (feature
+    // 012, `## macroChanges`) already expresses the prior→current macro deltas,
+    // so re-sending the raw prior panel is redundant. We keep the prior summary
+    // and orders (with status) for week-over-week continuity (FR-010).
     const previousForPrompt = previousAnalysis
-      ? (() => { const { markdownBody, portfolioSnapshot, ...rest } = previousAnalysis; return rest; })()
+      ? (() => { const { markdownBody, portfolioSnapshot, macroContext: _priorMacro, ...rest } = previousAnalysis; return rest; })()
       : previousAnalysis;
     const parts = [
       '## generatedAt',
@@ -604,7 +607,13 @@ class GenerateWeeklyAnalysis extends UseCase {
     }
     parts.push('', '## macroContext');
     if (macroContext) {
-      parts.push('```json', JSON.stringify(macroContext), '```');
+      // Feature 015 (FR-004): omit indicators flagged unavailable instead of
+      // sending `{value:null, available:false}` placeholders — they carry no
+      // signal and only cost tokens. When all are available this is a no-op.
+      const availableMacro = Object.fromEntries(
+        Object.entries(macroContext).filter(([, v]) => !(v && typeof v === 'object' && v.available === false))
+      );
+      parts.push('```json', JSON.stringify(availableMacro), '```');
     } else {
       parts.push('unavailable');
     }

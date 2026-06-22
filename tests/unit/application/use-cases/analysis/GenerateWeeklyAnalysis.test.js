@@ -385,7 +385,7 @@ describe('GenerateWeeklyAnalysis (US3 position changes)', () => {
 // Feature 006 — US4: prior macro panel reaches the prompt (trend reasoning)
 // =========================================================================
 describe('GenerateWeeklyAnalysis (US4 trend context)', () => {
-  it('includes the prior week macro panel and threads prior IMF reading for carry-forward', async () => {
+  it('threads the prior IMF reading for carry-forward; feature 015 drops the prior macro panel from the prompt', async () => {
     const prior = new WeeklyAnalysis({
       date: '2026-05-08', status: 'completed', generatedAt: '2026-05-08T21:00:14Z',
       modelUsed: 'claude-opus-4-7', promptVersion: 'editable-instructions-v1',
@@ -402,11 +402,16 @@ describe('GenerateWeeklyAnalysis (US4 trend context)', () => {
     const { useCase, llmClient } = buildUseCase({ repository: repo, macroContextProvider });
     await useCase.execute({ targetDate: '2026-05-15' });
 
-    // Prior macro travelled into the prompt via previousAnalysis.
+    // Feature 015 (FR-003): the prior macro panel is NO LONGER fed into the
+    // prompt (the deterministic macro week-over-week comparison covers it). The
+    // prior riesgo-país value 540 must not appear via previousAnalysis. The
+    // CURRENT panel (524) is still present in the `## macroContext` block.
     const submitCall = llmClient.submitAnalysis.mock.calls[0][0];
-    expect(submitCall.userMessage).toContain('"macroContext"');
-    expect(submitCall.userMessage).toContain('540');
-    // Prior IMF reading threaded to the orchestrator for carry-forward.
+    expect(submitCall.userMessage).not.toContain('540');
+    expect(submitCall.userMessage).toContain('## macroContext');
+    expect(submitCall.userMessage).toContain('524'); // current riesgo país
+    // Prior IMF reading is still threaded to the orchestrator for carry-forward
+    // (a separate mechanism from the prompt panel).
     expect(macroContextProvider.getLatest).toHaveBeenCalledWith(
       expect.objectContaining({ priorImfReading: expect.objectContaining({ value: 'approved' }) })
     );
