@@ -47,7 +47,7 @@ all required sections present.
 
 ### Implementation
 
-- [ ] T002 [US1] Strengthen the interpret-not-restate rule in the fixed `guardrail-preamble-v1.md`
+- [x] T002 [US1] Strengthen the interpret-not-restate rule in the fixed `guardrail-preamble-v1.md`
   (the code-controlled runtime system-prompt part): the `markdownBody` must INTERPRET and REFERENCE
   the supplied deterministic tables (drift, concentration caps, position changes, macro
   week-over-week, duplicate holdings, administrative positions) and MUST NOT reproduce their rows;
@@ -70,18 +70,18 @@ unavailable-indicator placeholders; prior summary + open suggestions still prese
 
 ### Tests for User Story 2 ⚠️ (write first, ensure they fail)
 
-- [ ] T004 [P] [US2] Unit test: `_buildUserMessage` `## previousAnalysis` block omits the
+- [x] T004 [P] [US2] Unit test: `_buildUserMessage` `## previousAnalysis` block omits the
   prior-macro panel when a prior analysis exists, but retains prior summary + open suggestions
   (SC-004, SC-006), in `tests/unit/.../GenerateWeeklyAnalysis.input.test.js`.
-- [ ] T005 [P] [US2] Unit test: `_buildUserMessage` `## macroContext` block omits indicators with
+- [x] T005 [P] [US2] Unit test: `_buildUserMessage` `## macroContext` block omits indicators with
   `available === false` and is unchanged when all are available (SC-005).
 
 ### Implementation
 
-- [ ] T006 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js` `_buildUserMessage`,
+- [x] T006 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js` `_buildUserMessage`,
   drop the prior-macro sub-block from `## previousAnalysis` (keep summary + open suggestions);
   guard so first-run / no-prior is a no-op (FR-003).
-- [ ] T007 [US2] In the same `_buildUserMessage`, omit unavailable indicators from `## macroContext`
+- [x] T007 [US2] In the same `_buildUserMessage`, omit unavailable indicators from `## macroContext`
   (FR-004). Make T004/T005 pass.
 
 **Checkpoint**: US1 + US2 both in; input + output both trimmed.
@@ -94,7 +94,7 @@ unavailable-indicator placeholders; prior summary + open suggestions still prese
   post-change code; compare `tokensOut`/`costUsd` to T001 baseline; confirm a measurable decrease
   (directional ≥15%) with all required sections present. Record the delta in the PR (no real values).
 - [ ] T009 Run `specs/015-analysis-token-diet-v2/quickstart.md` acceptance checks end-to-end.
-- [ ] T010 Privacy self-review of the diff (preamble text + any test fixtures use placeholders only).
+- [x] T010 Privacy self-review of the diff (preamble text + any test fixtures use placeholders only).
 
 ---
 
