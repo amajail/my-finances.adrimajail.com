@@ -101,6 +101,11 @@ class WeeklyAnalysis {
     // null on the first run (no prior panel to diff) and on pre-feature rows.
     this._macroChanges = Array.isArray(data.macroChanges) ? data.macroChanges : null;
 
+    // Feature 013: administrative / non-investable positions (computed value
+    // <= 0 — zero/negative-value stubs). Excluded from drift/caps; surfaced as
+    // their own section. [] when none and on pre-feature rows.
+    this._administrativePositions = Array.isArray(data.administrativePositions) ? data.administrativePositions : [];
+
     this._validate();
     Object.freeze(this._portfolioSnapshot);
     if (this._macroContext) Object.freeze(this._macroContext);
@@ -113,6 +118,7 @@ class WeeklyAnalysis {
     if (this._weekOverWeek) Object.freeze(this._weekOverWeek);
     if (this._frameworkAmendments) Object.freeze(this._frameworkAmendments);
     if (this._macroChanges) Object.freeze(this._macroChanges);
+    Object.freeze(this._administrativePositions);
     Object.freeze(this);
   }
 
@@ -189,6 +195,8 @@ class WeeklyAnalysis {
       frameworkAmendments: this._frameworkAmendments,
       // Feature 012: same "present → array of objects, else reject" rule.
       macroChanges: this._macroChanges,
+      // Feature 013: administrative positions — same rule ([] is fine).
+      administrativePositions: this._administrativePositions,
     })) {
       if (arr !== null) {
         for (const item of arr) {
@@ -235,6 +243,7 @@ class WeeklyAnalysis {
   get weekOverWeek() { return this._weekOverWeek; }
   get frameworkAmendments() { return this._frameworkAmendments; }
   get macroChanges() { return this._macroChanges; }
+  get administrativePositions() { return this._administrativePositions; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -275,6 +284,7 @@ class WeeklyAnalysis {
       weekOverWeek: this._weekOverWeek,
       frameworkAmendments: this._frameworkAmendments,
       macroChanges: this._macroChanges,
+      administrativePositions: this._administrativePositions,
     };
   }
 

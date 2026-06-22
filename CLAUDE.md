@@ -76,23 +76,28 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/012-macro-week-over-week/plan.md` (Phase 1 complete; tasks pending).
+`specs/013-administrative-positions/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/api-additions.md`. This feature adds
-a deterministic, code-computed week-over-week comparison of the numeric macro
-indicators (anchored on BCRA gross reserves) to the weekly analysis — prior →
-current → absolute change → % change + as-of dates per indicator. Mirrors feature
-006's `PositionChangeCalculator`: a NEW pure `src/domain/services/MacroChangeCalculator.js`
-diffs the prior analysis's `macroContext` against the current run's (both already
-in `GenerateWeeklyAnalysis`, slotted after the `positionChanges` line). 8 numeric
-keys via a `KEY_META` map (riesgoPais, fxGap, bcraReserves, argInflation,
-argInterestRate, usaInflation, usaInterestRate, sp500Drawdown); textual
-`imfReviewStatus` excluded. Persisted as an optional `macroChanges` field +
-`macroChangesJson` column (feature-006/010 pattern); rendered as a new "Macro
-changes this week" table on `analysis-detail.astro`, distinct from "Changes this
-week" (positions) and "Week-over-week (analytical)" (LLM). Skip rules: null when
-no prior; omit an indicator missing/unavailable on either side; pct null when
-prior=0. NO new data source (uses existing gross reserves), NO charts/LLM change.
-No new deps/tables/settings. Builds on 006 + 010 (in main); branched from main.
-Prior plan: `specs/011-analysis-token-diet/plan.md`.
+`data-model.md`, `quickstart.md`, `contracts/api-additions.md`. This feature
+excludes legacy zero-value positions (computed `valueUsd <= 0`, zero OR negative —
+NOT null-price, so cash/deposit with real value stay investable) from the weekly
+analysis's allocation-drift + concentration-cap math, and surfaces them in a
+separate optional "administrative / non-investable" section. Approach: partition
+the portfolio snapshot once in `GenerateWeeklyAnalysis` into `investableSnapshot`
+(valueUsd>0) and `administrativePositions` (valueUsd<=0); feed only the investable
+set to `AllocationDriftCalculator.computeDrift`/`computeConcentrationCaps` and
+`PositionChangeCalculator.diff` (the drift calculator stays a PURE function —
+exclusion happens upstream; excluded rows contribute 0 USD so no value-bearing
+percentage changes, only the spurious "unclassified" row disappears). Carry the
+new field through `WeeklyAnalysis` (optional `_administrativePositions`, mirroring
+feature-006/010 optional sections), `AzureAnalysisRepository`
+(`administrativePositionsJson` column, write-when-non-empty), the
+`/api/analysis/weekly/{date}` detail response (additive optional field), and a new
+"Administrative / non-investable" table on `analysis-detail.astro` (omitted when
+empty). The generation input gets a compact labeled `## administrativePositions`
+block ("excluded zero-value stubs — do not flag for review") so the narrative
+stops raising them. No new deps/tables/data source/model change; backward
+compatible. First of three sibling features (013 here; 014 = duplicate-holdings
+detector; 015 = analysis token-diet v2). Prior plan:
+`specs/012-macro-week-over-week/plan.md`.
 <!-- SPECKIT END -->

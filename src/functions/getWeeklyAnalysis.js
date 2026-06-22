@@ -65,6 +65,9 @@ app.http('getWeeklyAnalysis', {
         // Feature 012: deterministic macro week-over-week comparison (null on
         // pre-feature rows and first runs).
         macroChanges: analysis.macroChanges,
+        // Feature 013: administrative / non-investable positions (computed value
+        // <= 0; excluded from drift/caps). [] on pre-feature rows and when none.
+        administrativePositions: analysis.administrativePositions,
       };
 
       if (analysis.isCompleted()) {

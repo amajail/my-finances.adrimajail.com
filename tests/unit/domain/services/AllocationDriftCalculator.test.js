@@ -155,3 +155,34 @@ describe('AllocationDriftCalculator.computeConcentrationCaps', () => {
     expect(row.breach).toBe('none');
   });
 });
+
+// Feature 013: administrative positions (valueUsd <= 0) are excluded UPSTREAM,
+// so the pure calculator never sees them. These tests pin the property the
+// exclusion relies on: a value-bearing-only set yields the same drift as the set
+// plus zero/negative stubs would, and no stub-driven "unclassified" row appears
+// (FR-004 / SC-001 / SC-002).
+describe('AllocationDriftCalculator — feature 013 administrative exclusion property', () => {
+  const investable = [
+    pos('ibkr', 'etf', 'VOO', 50),
+    pos('ibkr', 'stock', 'BRK.B', 50),
+    pos('iol', 'cedear', 'AAPL', 100),
+  ];
+
+  it('excluding zero-value stubs leaves every value-bearing percentage identical', () => {
+    const withStub = [...investable, pos('iol', 'cedear', 'STUB', 0)];
+    const investableDrift = AllocationDriftCalculator.computeDrift(investable, targets());
+    const withStubDrift = AllocationDriftCalculator.computeDrift(withStub, targets());
+    // The stub contributes 0 USD, so the drift output is identical to the
+    // investable-only set — confirming exclusion is a no-op for value-bearing rows.
+    expect(withStubDrift.driftByAssetClass).toEqual(investableDrift.driftByAssetClass);
+    expect(withStubDrift.driftByBucket).toEqual(investableDrift.driftByBucket);
+  });
+
+  it('an unmapped zero-value stub does NOT create an "unclassified" row', () => {
+    // 'GD35' bond matches no class; with value 0 it must not surface a row.
+    const { driftByBucket } = AllocationDriftCalculator.computeDrift(
+      [...investable, pos('galicia', 'bond', 'GD35', 0)], targets()
+    );
+    expect(driftByBucket.find((r) => r.key === 'unclassified')).toBeUndefined();
+  });
+});
