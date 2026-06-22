@@ -106,6 +106,11 @@ class WeeklyAnalysis {
     // their own section. [] when none and on pre-feature rows.
     this._administrativePositions = Array.isArray(data.administrativePositions) ? data.administrativePositions : [];
 
+    // Feature 014: cross-broker duplicate-holdings groups (same underlying held
+    // in 2+ (broker, assetType) placements). OPTIONAL — null on pre-feature rows
+    // and when the column is absent; [] when computed but no duplicates.
+    this._duplications = Array.isArray(data.duplications) ? data.duplications : null;
+
     this._validate();
     Object.freeze(this._portfolioSnapshot);
     if (this._macroContext) Object.freeze(this._macroContext);
@@ -119,6 +124,7 @@ class WeeklyAnalysis {
     if (this._frameworkAmendments) Object.freeze(this._frameworkAmendments);
     if (this._macroChanges) Object.freeze(this._macroChanges);
     Object.freeze(this._administrativePositions);
+    if (this._duplications) Object.freeze(this._duplications);
     Object.freeze(this);
   }
 
@@ -197,6 +203,8 @@ class WeeklyAnalysis {
       macroChanges: this._macroChanges,
       // Feature 013: administrative positions — same rule ([] is fine).
       administrativePositions: this._administrativePositions,
+      // Feature 014: duplicate-holdings groups — same rule.
+      duplications: this._duplications,
     })) {
       if (arr !== null) {
         for (const item of arr) {
@@ -244,6 +252,7 @@ class WeeklyAnalysis {
   get frameworkAmendments() { return this._frameworkAmendments; }
   get macroChanges() { return this._macroChanges; }
   get administrativePositions() { return this._administrativePositions; }
+  get duplications() { return this._duplications; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -285,6 +294,7 @@ class WeeklyAnalysis {
       frameworkAmendments: this._frameworkAmendments,
       macroChanges: this._macroChanges,
       administrativePositions: this._administrativePositions,
+      duplications: this._duplications,
     };
   }
 

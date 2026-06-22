@@ -68,6 +68,9 @@ app.http('getWeeklyAnalysis', {
         // Feature 013: administrative / non-investable positions (computed value
         // <= 0; excluded from drift/caps). [] on pre-feature rows and when none.
         administrativePositions: analysis.administrativePositions,
+        // Feature 014: cross-broker duplicate-holdings groups (null on pre-feature
+        // rows and when there are no duplicates).
+        duplications: analysis.duplications,
       };
 
       if (analysis.isCompleted()) {

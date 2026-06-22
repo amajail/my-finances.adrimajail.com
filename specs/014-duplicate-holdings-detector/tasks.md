@@ -40,7 +40,7 @@ feature-012 optional-section pattern._
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they fail)
 
-- [ ] T001 [P] [US1] Create `tests/unit/domain/services/DuplicateHoldingsDetector.test.js` mirroring
+- [x] T001 [P] [US1] Create `tests/unit/domain/services/DuplicateHoldingsDetector.test.js` mirroring
   `PositionChangeCalculator.test.js`, covering: same symbol at two brokers (same wrapper) → 1 group;
   same symbol two wrappers (e.g. stock+cedear) → 1 group; same symbol three placements → 1 group of
   3; all-unique → `[]`; cash assetType excluded; empty snapshot → `[]`; ordering by combined value
@@ -49,7 +49,7 @@ feature-012 optional-section pattern._
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] Create `src/domain/services/DuplicateHoldingsDetector.js` — pure static
+- [x] T002 [US1] Create `src/domain/services/DuplicateHoldingsDetector.js` — pure static
   `detect(snapshot)`: filter cash-like asset types, group by normalized `symbol`, collapse repeated
   `(broker, assetType)` placements, keep groups with ≥ 2 distinct placements, compute
   `placementCount` + `totalValueUsd`, sort by `totalValueUsd` desc then `symbol` asc, return `[]`
@@ -68,15 +68,15 @@ detail response and renders the table; none → omitted; pre-feature row → no 
 
 ### Implementation for User Story 2
 
-- [ ] T003 [US2] In `src/domain/entities/WeeklyAnalysis.js`, add optional `_duplications` field
+- [x] T003 [US2] In `src/domain/entities/WeeklyAnalysis.js`, add optional `_duplications` field
   (validate as object-array, getter, freeze, include in `toJSON()`), mirroring `macroChanges`.
-- [ ] T004 [US2] In `src/infrastructure/repositories/AzureAnalysisRepository.js`, write
+- [x] T004 [US2] In `src/infrastructure/repositories/AzureAnalysisRepository.js`, write
   `duplicationsJson` when non-empty and parse it back (mirror `macroChangesJson` to/from-entity).
-- [ ] T005 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, declare
+- [x] T005 [US2] In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, declare
   `duplications`, compute `DuplicateHoldingsDetector.detect(investableSnapshot)` next to
   `positionChanges`/`macroChanges`, pass it to the `WeeklyAnalysis` constructor and the `captured`
   failure object. (If feature 013 is present, use its investable snapshot; else the full snapshot.)
-- [ ] T006 [P] [US2] In `dashboard/src/pages/analysis-detail.astro`, add a "Duplicate holdings"
+- [x] T006 [P] [US2] In `dashboard/src/pages/analysis-detail.astro`, add a "Duplicate holdings"
   table + `renderDuplications()` called from `load()`, mirroring `renderMacroWow()`; omit when
   null/empty. Escape all rendered values.
 
@@ -93,7 +93,7 @@ list the duplicate placements.
 
 ### Implementation for User Story 3
 
-- [ ] T007 [US3] In `GenerateWeeklyAnalysis._buildUserMessage`, add a compact `## duplications`
+- [x] T007 [US3] In `GenerateWeeklyAnalysis._buildUserMessage`, add a compact `## duplications`
   block (labeled deterministically detected) with an instruction not to re-enumerate; omit when
   none. (FR-012; consistent with feature 013's labeled-block decision.)
 
@@ -105,8 +105,8 @@ list the duplicate placements.
 
 - [ ] T008 Run `specs/014-duplicate-holdings-detector/quickstart.md` acceptance checks end-to-end
   (generate locally on :7071, inspect `.duplications`, open the dashboard table).
-- [ ] T009 `npm test` green; `cd dashboard && npm run build` succeeds.
-- [ ] T010 Privacy self-review of the diff (tests/docs use placeholders only).
+- [x] T009 `npm test` green; `cd dashboard && npm run build` succeeds.
+- [x] T010 Privacy self-review of the diff (tests/docs use placeholders only).
 
 ---
 
