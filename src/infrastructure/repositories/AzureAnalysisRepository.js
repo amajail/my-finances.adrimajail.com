@@ -311,6 +311,12 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     if (Array.isArray(wa.administrativePositions) && wa.administrativePositions.length > 0) {
       entity.administrativePositionsJson = JSON.stringify(wa.administrativePositions);
     }
+    // Feature 014: cross-broker duplicate-holdings groups. Only written when
+    // non-empty; a re-run upserts with 'Replace', so a section present last week
+    // but empty this week is dropped (reads back as null).
+    if (Array.isArray(wa.duplications) && wa.duplications.length > 0) {
+      entity.duplicationsJson = JSON.stringify(wa.duplications);
+    }
     return entity;
   }
 
@@ -345,6 +351,8 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     const macroChanges = this._parseJsonColumn(entity.macroChangesJson, entity.rowKey, 'macroChangesJson', null);
     // Feature 013: administrative positions (absent on pre-feature rows / no stubs → []).
     const administrativePositions = this._parseJsonColumn(entity.administrativePositionsJson, entity.rowKey, 'administrativePositionsJson', []);
+    // Feature 014: duplicate-holdings groups (absent on pre-feature rows / none → null).
+    const duplications = this._parseJsonColumn(entity.duplicationsJson, entity.rowKey, 'duplicationsJson', null);
     return new WeeklyAnalysis({
       date: entity.rowKey,
       status: entity.status,
@@ -380,6 +388,8 @@ class AzureAnalysisRepository extends IAnalysisRepository {
       macroChanges,
       // Feature 013:
       administrativePositions,
+      // Feature 014:
+      duplications,
     });
   }
 
