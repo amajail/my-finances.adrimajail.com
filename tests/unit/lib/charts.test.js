@@ -5,7 +5,7 @@
  */
 
 const {
-  METRIC_CATALOGUE, buildSeries, niceScale, sliceLastN, imfChangePoints,
+  METRIC_CATALOGUE, buildSeries, pointsForSource, niceScale, sliceLastN, imfChangePoints,
   lineChartSvg, dualAxisSvg, eventStripSvg,
   indexTo100, growthPct, multiLineSvg,
 } = require('../../../dashboard/src/lib/charts.cjs');
@@ -82,6 +82,26 @@ describe('buildSeries', () => {
   });
 });
 
+describe('pointsForSource', () => {
+  const pts = [
+    { date: 'a', macroContext: { riesgoPais: { value: 500, available: true } }, portfolioTotals: null },
+    { date: 'b', macroContext: null, portfolioTotals: { totalUsd: 100 } }, // portfolio-only row
+    { date: 'c', macroContext: { riesgoPais: { value: null, available: false } }, portfolioTotals: { totalUsd: 110 } },
+  ];
+  it('keeps only rows carrying a macro panel (drops portfolio-only rows)', () => {
+    expect(pointsForSource(pts, 'macro').map((p) => p.date)).toEqual(['a', 'c']);
+  });
+  it('keeps a macro row even when this metric is unavailable (still a genuine gap)', () => {
+    // row "c" has macroContext but riesgoPais unavailable → kept, then buildSeries makes it null
+    const kept = pointsForSource(pts, 'macro');
+    const s = buildSeries(kept, METRIC_CATALOGUE.find((m) => m.key === 'riesgoPais'));
+    expect(s.map((d) => d.value)).toEqual([500, null]);
+  });
+  it('keeps only rows carrying portfolio totals', () => {
+    expect(pointsForSource(pts, 'totals').map((p) => p.date)).toEqual(['b', 'c']);
+  });
+});
+
 describe('niceScale', () => {
   it('pads when min === max (never zero-height)', () => {
     const { min, max } = niceScale(5, 5);
@@ -123,19 +143,44 @@ describe('SVG renderers (smoke)', () => {
   const total = METRIC_CATALOGUE.find((m) => m.key === 'totalUsd');
   const pts = [macroPoint('2026-06-05'), macroPoint('2026-06-12')];
 
-  it('lineChartSvg returns an svg with points', () => {
+  it('lineChartSvg returns an svg with points and first/last date labels', () => {
     const svg = lineChartSvg(buildSeries(pts, macro), { unit: 'bp' });
     expect(svg).toContain('<svg');
     expect(svg).toContain('<circle');
+    // x-axis date labels (feature: charts polish)
+    expect(svg).toContain('2026-06-05');
+    expect(svg).toContain('2026-06-12');
   });
-  it('dualAxisSvg renders two series with independent scales', () => {
+  it('lineChartSvg shades contiguous gaps as one band, not per-week dashed lines', () => {
+    // Two leading gaps then two real points → a single <rect> band, no dashed <line>s.
+    const gappy = [
+      { date: 'a', value: null, asOf: null, available: false },
+      { date: 'b', value: null, asOf: null, available: false },
+      { date: 'c', value: 500, asOf: 'c', available: true },
+      { date: 'd', value: 520, asOf: 'd', available: true },
+    ];
+    const svg = lineChartSvg(gappy, { unit: 'bp' });
+    expect(svg).toContain('<rect');
+    expect(svg).not.toContain('stroke-dasharray="2 2"'); // old barcode marker gone
+  });
+  it('dualAxisSvg renders two series with independent scales and numeric ticks', () => {
     const svg = dualAxisSvg(buildSeries(pts, total), buildSeries(pts, macro), { leftLabel: 'USD', rightLabel: 'bp' });
     expect(svg).toContain('<svg');
     expect(svg).toContain('USD');
     expect(svg).toContain('bp');
+    // numeric axis ticks (both series carry constant values here → their value appears as a tick)
+    expect(svg).toContain('>500<'); // right-axis (riesgoPais) tick value
+    expect(svg).toMatch(/100,000|100000/); // left-axis (totalUsd) tick value, formatted
   });
-  it('eventStripSvg renders the IMF strip', () => {
-    expect(eventStripSvg(pts)).toContain('<svg');
+  it('eventStripSvg renders the IMF strip and de-collides adjacent labels', () => {
+    // Alternating statuses at every point would overprint; only spaced labels survive.
+    const alt = ['a', 'b', 'c', 'd'].map((dte, i) => macroPoint(dte, {
+      imfReviewStatus: { value: i % 2 ? 'pending' : 'approved', available: true },
+    }));
+    const svg = eventStripSvg(alt, { w: 120 }); // narrow strip forces the min-gap skip
+    expect(svg).toContain('<svg');
+    const labelCount = (svg.match(/<text/g) || []).length;
+    expect(labelCount).toBeLessThan(4); // not every change gets a label
   });
   it('lineChartSvg degrades to "no data" with an all-gap series', () => {
     expect(lineChartSvg([{ date: 'd', value: null, asOf: null, available: false }])).toContain('no data');

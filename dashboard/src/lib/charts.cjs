@@ -54,6 +54,18 @@ function buildSeries(points, metric) {
   });
 }
 
+/**
+ * Keep only the points that actually carry data of a given source, so a chart's
+ * x-axis reflects that metric's own cadence. Rows that never had a macro panel
+ * (e.g. portfolio-only / pre-macro-capture analyses) would otherwise inject
+ * spurious gaps into every macro chart — isolating real readings as lone dots.
+ * A row IS kept when its panel object exists even if this metric's reading is
+ * unavailable (that stays a genuine gap).
+ */
+function pointsForSource(points, source) {
+  return (points || []).filter((p) => (source === 'macro' ? p.macroContext != null : p.portfolioTotals != null));
+}
+
 /** Rounded, padded axis bounds for a set of numbers (never min===max). */
 function niceScale(min, max) {
   if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: 0, max: 1 };
@@ -98,8 +110,39 @@ function fmt(v) {
   return Math.abs(v) >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-function plotGeometry(series, w, h) {
-  const padL = 6, padR = 6, padT = 10, padB = 16;
+// Theme colors — resolved from the dashboard's CSS custom properties at render
+// time (var() works inside inline SVG), with hex fallbacks matching @amajail/ui.
+// Using tokens keeps the hand-rolled SVGs legible on the light theme instead of
+// the old faint hardcoded greys.
+const C = {
+  muted: 'var(--color-muted,#64748b)',   // axis / date / label text
+  grid: 'var(--color-border,#e2e8f0)',   // gridlines, baselines
+  band: 'var(--color-surface-2,#f1f5f9)', // gap "no data" shading
+  accent: 'var(--color-accent,#1d4ed8)', // primary series (blue)
+  accent2: '#d97706',                    // secondary series in overlays (amber-600)
+};
+
+/** Index ranges [start,end] of contiguous null (gap) runs in a series. */
+function contiguousGapRuns(series) {
+  const runs = [];
+  let start = -1;
+  (series || []).forEach((d, i) => {
+    if (d.value == null) {
+      if (start === -1) start = i;
+    } else if (start !== -1) {
+      runs.push([start, i - 1]);
+      start = -1;
+    }
+  });
+  if (start !== -1) runs.push([start, series.length - 1]);
+  return runs;
+}
+
+function plotGeometry(series, w, h, pad = {}) {
+  const padL = pad.l != null ? pad.l : 6;
+  const padR = pad.r != null ? pad.r : 6;
+  const padT = pad.t != null ? pad.t : 10;
+  const padB = pad.b != null ? pad.b : 16;
   const n = series.length;
   const xs = (i) => (n <= 1 ? (w / 2) : padL + (i * (w - padL - padR)) / (n - 1));
   const vals = series.filter((d) => d.value != null).map((d) => d.value);
@@ -108,76 +151,129 @@ function plotGeometry(series, w, h) {
   return { xs, ys, sc, padB, padL, padR, padT };
 }
 
-/** A single mini line chart. Path breaks at gaps; gaps get a distinct marker. */
+/**
+ * A single mini line chart. Path breaks at gaps (no interpolation); each
+ * contiguous run of missing weeks is shown as ONE soft shaded band rather than a
+ * per-week dashed line (which used to stack into a "barcode"). First/last dates
+ * label the x-axis; the y min/max sit outside faint gridlines.
+ */
 function lineChartSvg(series, opts = {}) {
-  const w = opts.w || 230, h = opts.h || 96;
+  const w = opts.w || 230, h = opts.h || 112;
   if (!series.length || series.every((d) => d.value == null)) {
-    return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><text x="${w / 2}" y="${h / 2}" text-anchor="middle" font-size="10" fill="#888">no data</text></svg>`;
+    return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><text x="${w / 2}" y="${h / 2}" text-anchor="middle" font-size="10" fill="${C.muted}">no data</text></svg>`;
   }
-  const g = plotGeometry(series, w, h);
+  const pad = { l: 6, r: 6, t: 14, b: 28 };
+  const g = plotGeometry(series, w, h, pad);
+  const top = g.padT, bot = h - g.padB;
+
+  // One shaded band per contiguous gap run (edge → mid-point of neighbours).
+  let bands = '';
+  for (const [i0, i1] of contiguousGapRuns(series)) {
+    const left = i0 === 0 ? g.padL : (g.xs(i0 - 1) + g.xs(i0)) / 2;
+    const right = i1 === series.length - 1 ? (w - g.padR) : (g.xs(i1) + g.xs(i1 + 1)) / 2;
+    const bw = Math.max(1, right - left);
+    bands += `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${(bot - top).toFixed(1)}" fill="${C.band}"><title>no data · ${esc(series[i0].date)}${i1 > i0 ? ' … ' + esc(series[i1].date) : ''}</title></rect>`;
+  }
+
   // Path segments — break at nulls (no interpolation across gaps).
-  let d = '', started = false, circles = '', gaps = '';
+  let d = '', started = false, circles = '';
   series.forEach((pt, i) => {
-    const x = g.xs(i);
-    if (pt.value == null) {
-      started = false;
-      gaps += `<line x1="${x}" y1="${g.padT}" x2="${x}" y2="${h - g.padB}" stroke="#bbb" stroke-width="1" stroke-dasharray="2 2"><title>unavailable · ${esc(pt.date)}</title></line>`;
-      return;
-    }
-    const y = g.ys(pt.value);
+    if (pt.value == null) { started = false; return; }
+    const x = g.xs(i), y = g.ys(pt.value);
     d += `${started ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
     started = true;
-    circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="var(--color-accent,#4f8)"><title>${fmt(pt.value)}${opts.unit ? ' ' + opts.unit : ''}${pt.asOf ? ' · as of ' + esc(pt.asOf) : ''} (${esc(pt.date)})</title></circle>`;
+    circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${C.accent}"><title>${fmt(pt.value)}${opts.unit ? ' ' + opts.unit : ''}${pt.asOf ? ' · as of ' + esc(pt.asOf) : ''} (${esc(pt.date)})</title></circle>`;
   });
+
+  const grid = `<line x1="${g.padL}" y1="${top.toFixed(1)}" x2="${w - g.padR}" y2="${top.toFixed(1)}" stroke="${C.grid}" stroke-width="1" />`
+    + `<line x1="${g.padL}" y1="${bot.toFixed(1)}" x2="${w - g.padR}" y2="${bot.toFixed(1)}" stroke="${C.grid}" stroke-width="1" />`;
+  const first = series[0].date, last = series[series.length - 1].date;
   return `<svg viewBox="0 0 ${w} ${h}" class="w-full">`
-    + `<text x="${g.padL}" y="8" font-size="8" fill="#888">${fmt(g.sc.max)}</text>`
-    + `<text x="${g.padL}" y="${h - g.padB + 12}" font-size="8" fill="#888">${fmt(g.sc.min)}</text>`
-    + gaps
-    + `<path d="${d}" fill="none" stroke="var(--color-accent,#4f8)" stroke-width="1.5" />`
+    + bands
+    + grid
+    + `<text x="${g.padL}" y="${(top - 3).toFixed(1)}" font-size="8" fill="${C.muted}">${fmt(g.sc.max)}</text>`
+    + `<text x="${g.padL}" y="${(bot + 9).toFixed(1)}" font-size="8" fill="${C.muted}">${fmt(g.sc.min)}</text>`
+    + `<path d="${d}" fill="none" stroke="${C.accent}" stroke-width="1.5" />`
     + circles
+    + `<text x="${g.padL}" y="${h - 3}" font-size="8" fill="${C.muted}">${esc(first)}</text>`
+    + (last !== first ? `<text x="${w - g.padR}" y="${h - 3}" text-anchor="end" font-size="8" fill="${C.muted}">${esc(last)}</text>` : '')
     + `</svg>`;
 }
 
-/** Two series on independent left/right axes, shared x. */
+/**
+ * Two series on independent left/right axes, shared x. Each axis gets min/mid/max
+ * numeric ticks in its series colour (left = accent, right = amber) so the values
+ * are actually readable; first/last dates label the x-axis; faint gridlines are
+ * drawn off the left scale.
+ */
 function dualAxisSvg(left, right, opts = {}) {
   const w = opts.w || 640, h = opts.h || 240;
-  const render = (series, color) => {
-    if (!series.length || series.every((d) => d.value == null)) return '';
-    const g = plotGeometry(series, w, h);
+  const pad = { l: 48, r: 56, t: 24, b: 26 };
+  const has = (s) => s && s.some((d) => d && d.value != null);
+  const gL = has(left) ? plotGeometry(left, w, h, pad) : null;
+  const gR = has(right) ? plotGeometry(right, w, h, pad) : null;
+
+  const draw = (series, g, color) => {
+    if (!g) return '';
     let d = '', started = false, circles = '';
     series.forEach((pt, i) => {
-      const x = g.xs(i);
       if (pt.value == null) { started = false; return; }
-      const y = g.ys(pt.value);
+      const x = g.xs(i), y = g.ys(pt.value);
       d += `${started ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; started = true;
       circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${color}"><title>${fmt(pt.value)}${pt.asOf ? ' · as of ' + esc(pt.asOf) : ''} (${esc(pt.date)})</title></circle>`;
     });
     return `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.5" />${circles}`;
   };
+  const tickVals = (g) => [g.sc.max, (g.sc.max + g.sc.min) / 2, g.sc.min];
+  const ticks = (g, color, side) => (g ? tickVals(g).map((v) => {
+    const x = side === 'left' ? pad.l - 4 : w - pad.r + 4;
+    return `<text x="${x}" y="${(g.ys(v) + 3).toFixed(1)}" text-anchor="${side === 'left' ? 'end' : 'start'}" font-size="9" fill="${color}">${fmt(v)}</text>`;
+  }).join('') : '');
+
+  const gGrid = gL || gR;
+  const grid = gGrid ? tickVals(gGrid).map((v) => `<line x1="${pad.l}" y1="${gGrid.ys(v).toFixed(1)}" x2="${w - pad.r}" y2="${gGrid.ys(v).toFixed(1)}" stroke="${C.grid}" stroke-width="1" />`).join('') : '';
+
+  const dates = (has(left) ? left : (right || [])).map((d) => d.date);
+  const n = dates.length;
+  const xdates = n ? `<text x="${pad.l}" y="${h - 6}" font-size="9" fill="${C.muted}">${esc(dates[0])}</text>`
+    + (n > 1 ? `<text x="${w - pad.r}" y="${h - 6}" text-anchor="end" font-size="9" fill="${C.muted}">${esc(dates[n - 1])}</text>` : '') : '';
+
   return `<svg viewBox="0 0 ${w} ${h}" class="w-full">`
-    + `<text x="6" y="12" font-size="10" fill="#39f">${esc(opts.leftLabel || 'left')}</text>`
-    + `<text x="${w - 6}" y="12" text-anchor="end" font-size="10" fill="#f93">${esc(opts.rightLabel || 'right')}</text>`
-    + render(left, '#39f') + render(right, '#f93')
+    + grid
+    + `<text x="${pad.l}" y="14" font-size="10" fill="${C.accent}">${esc(opts.leftLabel || 'left')}</text>`
+    + `<text x="${w - pad.r}" y="14" text-anchor="end" font-size="10" fill="${C.accent2}">${esc(opts.rightLabel || 'right')}</text>`
+    + draw(left, gL, C.accent) + draw(right, gR, C.accent2)
+    + ticks(gL, C.accent, 'left') + ticks(gR, C.accent2, 'right')
+    + xdates
     + `</svg>`;
 }
 
-/** Categorical IMF status as an event strip with markers at changes. */
+/**
+ * Categorical IMF status as an event strip with markers at changes. A change
+ * label is only drawn when it clears the previously drawn one horizontally, so
+ * adjacent transitions no longer overprint into unreadable text (the dot +
+ * tooltip still mark every change).
+ */
 function eventStripSvg(points, opts = {}) {
   const w = opts.w || 640, h = 44;
   const n = points.length;
-  if (!n) return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><text x="${w / 2}" y="24" text-anchor="middle" font-size="10" fill="#888">no data</text></svg>`;
+  if (!n) return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><text x="${w / 2}" y="24" text-anchor="middle" font-size="10" fill="${C.muted}">no data</text></svg>`;
   const xs = (i) => (n <= 1 ? w / 2 : 8 + (i * (w - 16)) / (n - 1));
-  let prev = null, marks = '';
+  const MIN_LABEL_GAP = 46; // px; skip labels closer than this to the last drawn
+  let prev = null, lastLabelX = -Infinity, marks = '';
   points.forEach((p, i) => {
     const r = p.macroContext ? p.macroContext.imfReviewStatus : null;
     const status = r && r.available !== false && r.value ? String(r.value) : 'unknown';
     const x = xs(i);
     const changed = status !== prev;
-    marks += `<circle cx="${x.toFixed(1)}" cy="22" r="${changed ? 4 : 2}" fill="${status === 'unknown' ? '#bbb' : 'var(--color-accent,#4f8)'}"><title>${esc(status)} · ${esc(p.date)}</title></circle>`;
-    if (changed) marks += `<text x="${x.toFixed(1)}" y="14" text-anchor="middle" font-size="8" fill="#888">${esc(status)}</text>`;
+    marks += `<circle cx="${x.toFixed(1)}" cy="26" r="${changed ? 4 : 2}" fill="${status === 'unknown' ? C.muted : C.accent}"><title>${esc(status)} · ${esc(p.date)}</title></circle>`;
+    if (changed && x - lastLabelX >= MIN_LABEL_GAP) {
+      marks += `<text x="${x.toFixed(1)}" y="14" text-anchor="middle" font-size="9" fill="${C.muted}">${esc(status)}</text>`;
+      lastLabelX = x;
+    }
     prev = status;
   });
-  return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><line x1="8" y1="22" x2="${w - 8}" y2="22" stroke="#ddd" stroke-width="1" />${marks}</svg>`;
+  return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><line x1="8" y1="26" x2="${w - 8}" y2="26" stroke="${C.grid}" stroke-width="1" />${marks}</svg>`;
 }
 
 // ==================== Feature 009: indexed growth ====================
@@ -209,7 +305,7 @@ function multiLineSvg(seriesList, opts = {}) {
   const n = dates.length;
   const allVals = list.flatMap((s) => s.series.filter((d) => d.value != null).map((d) => d.value));
   if (!allVals.length) {
-    return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><text x="${w / 2}" y="${h / 2}" text-anchor="middle" font-size="11" fill="#888">no data</text></svg>`;
+    return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><text x="${w / 2}" y="${h / 2}" text-anchor="middle" font-size="11" fill="${C.muted}">no data</text></svg>`;
   }
   const sc = niceScale(Math.min(...allVals, 100), Math.max(...allVals, 100));
   const xs = (i) => (n <= 1 ? w / 2 : padL + (i * (w - padL - padR)) / (n - 1));
@@ -229,17 +325,17 @@ function multiLineSvg(seriesList, opts = {}) {
   });
 
   const y100 = ys(100);
-  const legend = list.map((s, i) => `<g transform="translate(${padL + i * 130}, ${h - 6})"><rect width="8" height="8" y="-8" fill="${s.color}" /><text x="11" font-size="9" fill="#888">${esc(s.label)}</text></g>`).join('');
-  const xlabels = n ? `<text x="${xs(0)}" y="${h - 20}" font-size="8" fill="#888">${esc(dates[0])}</text><text x="${xs(n - 1)}" y="${h - 20}" text-anchor="end" font-size="8" fill="#888">${esc(dates[n - 1])}</text>` : '';
+  const legend = list.map((s, i) => `<g transform="translate(${padL + i * 130}, ${h - 6})"><rect width="8" height="8" y="-8" fill="${s.color}" /><text x="11" font-size="9" fill="${C.muted}">${esc(s.label)}</text></g>`).join('');
+  const xlabels = n ? `<text x="${xs(0)}" y="${h - 20}" font-size="8" fill="${C.muted}">${esc(dates[0])}</text><text x="${xs(n - 1)}" y="${h - 20}" text-anchor="end" font-size="8" fill="${C.muted}">${esc(dates[n - 1])}</text>` : '';
   return `<svg viewBox="0 0 ${w} ${h}" class="w-full">`
-    + `<line x1="${padL}" y1="${y100.toFixed(1)}" x2="${w - padR}" y2="${y100.toFixed(1)}" stroke="#ddd" stroke-dasharray="3 3" />`
-    + `<text x="${padL}" y="${(y100 - 2).toFixed(1)}" font-size="8" fill="#aaa">100</text>`
+    + `<line x1="${padL}" y1="${y100.toFixed(1)}" x2="${w - padR}" y2="${y100.toFixed(1)}" stroke="${C.grid}" stroke-dasharray="3 3" />`
+    + `<text x="${padL}" y="${(y100 - 2).toFixed(1)}" font-size="8" fill="${C.muted}">100</text>`
     + body + xlabels + legend + `</svg>`;
 }
 
 module.exports = {
   METRIC_CATALOGUE, PORTFOLIO_KEYS, MACRO_NUMERIC_KEYS,
-  buildSeries, niceScale, sliceLastN, imfChangePoints,
+  buildSeries, pointsForSource, niceScale, sliceLastN, imfChangePoints,
   lineChartSvg, dualAxisSvg, eventStripSvg,
   indexTo100, growthPct, multiLineSvg,
 };

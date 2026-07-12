@@ -57,7 +57,7 @@ import Layout from '../layouts/Layout.astro';
   import charts from '../lib/charts.cjs';
   const {
     METRIC_CATALOGUE, PORTFOLIO_KEYS, MACRO_NUMERIC_KEYS,
-    buildSeries, sliceLastN, imfChangePoints,
+    buildSeries, pointsForSource, sliceLastN, imfChangePoints,
     lineChartSvg, dualAxisSvg, eventStripSvg,
   } = charts;
 
@@ -73,16 +73,20 @@ import Layout from '../layouts/Layout.astro';
   }
 
   function renderMultiples(points) {
-    // IMF strip
-    const imfPts = imfChangePoints(points);
+    // IMF strip — only rows that actually carry a macro panel (skip portfolio-only
+    // / pre-macro-capture rows so they don't show as spurious "unknown" segments).
+    const macroPoints = pointsForSource(points, 'macro');
+    const imfPts = imfChangePoints(macroPoints);
     const imfCard = document.getElementById('imf-strip-card');
     if (imfPts.length) {
-      document.getElementById('imf-strip').innerHTML = eventStripSvg(points);
+      document.getElementById('imf-strip').innerHTML = eventStripSvg(macroPoints);
       show(imfCard);
     } else hide(imfCard);
 
     document.getElementById('grid').innerHTML = METRIC_CATALOGUE.map((m) => {
-      const series = buildSeries(points, m);
+      // Each card uses only the points relevant to its source, so a metric's own
+      // cadence drives its x-axis instead of gaps from unrelated rows.
+      const series = buildSeries(pointsForSource(points, m.source), m);
       return `<div class="card p-3">
         <div class="flex items-baseline justify-between mb-1">
           <span class="text-sm font-medium">${m.label}</span>
