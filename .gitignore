@@ -5,6 +5,7 @@
 .playwright-mcp/
 **/.playwright-mcp/
 audit-*.png
+verify-*.png
 
 # Environment variables (contains sensitive data)
 .env
