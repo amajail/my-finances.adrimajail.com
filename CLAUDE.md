@@ -76,28 +76,24 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/013-administrative-positions/plan.md` (Phase 1 complete; tasks pending).
+`specs/016-responsive-dashboard/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/api-additions.md`. This feature
-excludes legacy zero-value positions (computed `valueUsd <= 0`, zero OR negative —
-NOT null-price, so cash/deposit with real value stay investable) from the weekly
-analysis's allocation-drift + concentration-cap math, and surfaces them in a
-separate optional "administrative / non-investable" section. Approach: partition
-the portfolio snapshot once in `GenerateWeeklyAnalysis` into `investableSnapshot`
-(valueUsd>0) and `administrativePositions` (valueUsd<=0); feed only the investable
-set to `AllocationDriftCalculator.computeDrift`/`computeConcentrationCaps` and
-`PositionChangeCalculator.diff` (the drift calculator stays a PURE function —
-exclusion happens upstream; excluded rows contribute 0 USD so no value-bearing
-percentage changes, only the spurious "unclassified" row disappears). Carry the
-new field through `WeeklyAnalysis` (optional `_administrativePositions`, mirroring
-feature-006/010 optional sections), `AzureAnalysisRepository`
-(`administrativePositionsJson` column, write-when-non-empty), the
-`/api/analysis/weekly/{date}` detail response (additive optional field), and a new
-"Administrative / non-investable" table on `analysis-detail.astro` (omitted when
-empty). The generation input gets a compact labeled `## administrativePositions`
-block ("excluded zero-value stubs — do not flag for review") so the narrative
-stops raising them. No new deps/tables/data source/model change; backward
-compatible. First of three sibling features (013 here; 014 = duplicate-holdings
-detector; 015 = analysis token-diet v2). Prior plan:
-`specs/012-macro-week-over-week/plan.md`.
+`data-model.md`, `quickstart.md`. This is a presentation-only frontend feature:
+make all nine Astro dashboard pages usable in phone portrait (target 360px, guard
+320px) with zero horizontal document scroll, without changing the desktop layout.
+Root cause (proven by a Playwright audit): the shared top nav is nine links in one
+non-wrapping flex row (809px) that inflate `<body>` on every page and defeat the
+`overflow-x-auto` table containers 4 of 5 table pages already have. Approach:
+(1) NAV — in `dashboard/src/layouts/Layout.astro`, show the full horizontal `<ul>`
+at `lg+` (≥1024px) and a hamburger-toggled stacked panel below `lg`; mobile links +
+toggle get ≥44px touch targets; minimal vanilla JS (`hidden` class + `aria-expanded`),
+no new dep. (2) TABLES — add a reusable `.table-stack` pattern in
+`dashboard/src/styles/global.css` (`thead` hidden, `tr`→card, `td`→flex row with
+`::before{content:attr(data-label)}`) that reflows to stacked label/value cards below
+`sm` (640px); apply it (+ `data-label` on each `<td>`) to the read-only analytical
+tables (`scorecard.astro`, `analysis.astro`, `analysis-detail.astro`). CRUD tables
+with inline inputs/buttons (`positions.astro` already has `overflow-x-auto`;
+`brokers.astro` gains it) keep the sanctioned horizontal-scroll fallback. No backend,
+domain, data-model, table, or dependency changes; desktop (≥1024px) renders exactly
+as today. Prior plan: `specs/013-administrative-positions/plan.md`.
 <!-- SPECKIT END -->
