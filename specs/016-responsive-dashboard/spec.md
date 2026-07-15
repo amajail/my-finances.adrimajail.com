@@ -83,18 +83,20 @@ legitimately be wider than a phone screen, but that width must be contained so t
 *page* stays fixed and only the *table* scrolls (or the table reflows).
 
 **Independent Test**: At a 360px-wide viewport, load each table page; confirm the
-page/body width equals the viewport, while any table wider than the screen is
-readable via its own contained horizontal scroll or a reflowed layout.
+page/body width equals the viewport and each wide table has reflowed to a stacked
+label/value layout with every field readable.
 
 **Acceptance Scenarios**:
 
 1. **Given** the Positions page at 360px, **When** it loads its full holdings
-   table, **Then** the page does not scroll horizontally and all columns remain
-   accessible (via a scoped scroll region or a reflowed presentation).
+   table, **Then** the page does not scroll horizontally and every row's data is
+   readable as a stacked label/value card with no field hidden.
 2. **Given** the Analysis-detail page (which stacks ~10 tables) at 360px, **When**
-   it loads, **Then** no table pushes the page wider than the viewport.
-3. **Given** any contained-scroll table, **When** the user scrolls it sideways,
-   **Then** the surrounding page and navigation stay fixed in place.
+   it loads, **Then** each table reflows to the stacked layout and no table pushes
+   the page wider than the viewport.
+3. **Given** the same pages at desktop width, **When** they load, **Then** the
+   tables render in their normal columnar form (the stacked layout applies only to
+   narrow viewports).
 
 ---
 
@@ -150,10 +152,12 @@ tables, no horizontal scroll).
   present all destinations in the current horizontal bar form.
 - **FR-004**: Interactive navigation controls MUST present touch targets of at
   least ~44px in their smaller dimension on touch/narrow viewports.
-- **FR-005**: Data tables that are wider than the viewport MUST be contained so the
-  table — not the page — is what scrolls horizontally (or the table MUST reflow to
-  a narrow-friendly layout). This applies to Positions, Brokers, Scorecard, the
-  Analysis list, and Analysis detail.
+- **FR-005**: On narrow viewports, data tables that are wider than the viewport
+  MUST reflow to a stacked, narrow-friendly layout (each row presented as a
+  stacked label/value card) so the page does not scroll horizontally. This applies
+  to Positions, Brokers, Scorecard, the Analysis list, and Analysis detail. (A
+  contained horizontal-scroll region is an acceptable fallback only where a
+  particular table cannot be sensibly reflowed; the default is reflow.)
 - **FR-006**: The current/active page MUST remain visually indicated in the mobile
   navigation form.
 - **FR-007**: The responsive changes MUST NOT alter the desktop layout or behaviour
@@ -198,9 +202,10 @@ storage, or API changes are involved.*
   Astro dashboard. No backend, API, data model, or storage changes.
 - **Touch-target figure**: ~44px is used as the minimum comfortable tap size
   (common mobile-accessibility guidance); the exact value is a design detail.
-- **Table strategy is left to design**: containing wide tables in a horizontal
-  scroll region and/or reflowing them to a stacked layout are both acceptable; the
-  requirement is only that the *page* never overflows and data stays reachable.
+- **Table strategy (decided)**: on narrow viewports wide tables **reflow to
+  stacked label/value cards** (owner's choice). A contained horizontal-scroll
+  region is only a fallback for a table that cannot be sensibly reflowed. Either
+  way the *page* never overflows and no data is hidden.
 - **CORS / data-loading errors** seen in the dev environment when the dashboard is
   served from the `127.0.0.1` origin (API rejected the cross-origin request; the
   `localhost` origin worked) are a local dev-config matter, **out of scope** for
