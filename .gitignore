@@ -1,6 +1,11 @@
 # Claude Code local session files
 .claude/
 
+# Playwright MCP audit artifacts (screenshots/snapshots may capture real holdings)
+.playwright-mcp/
+**/.playwright-mcp/
+audit-*.png
+
 # Environment variables (contains sensitive data)
 .env
 .env.local
