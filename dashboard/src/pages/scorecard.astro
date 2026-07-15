@@ -20,7 +20,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Execution by conviction</h2>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Group</th>
@@ -53,13 +53,13 @@ import Layout from '../layouts/Layout.astro';
     const rate = (b.executed + b.partial + b.skipped) > 0 ? pct(b.executionRate) : '—';
     return `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2">${label}</td>
-        <td class="px-4 py-2 text-right num-mono">${b.executed}</td>
-        <td class="px-4 py-2 text-right num-mono">${b.partial}</td>
-        <td class="px-4 py-2 text-right num-mono">${b.skipped}</td>
-        <td class="px-4 py-2 text-right num-mono">${b.pending}</td>
-        <td class="px-4 py-2 text-right num-mono">${b.total}</td>
-        <td class="px-4 py-2 text-right num-mono">${rate}</td>
+        <td class="px-4 py-2" data-label="Group">${label}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Executed">${b.executed}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Partial">${b.partial}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Skipped">${b.skipped}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Pending">${b.pending}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Total">${b.total}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Exec. rate">${rate}</td>
       </tr>`;
   }
 

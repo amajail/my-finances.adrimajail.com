@@ -13,7 +13,7 @@ import Layout from '../layouts/Layout.astro';
   </header>
 
   <div class="card overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Date</th>
@@ -70,13 +70,13 @@ import Layout from '../layouts/Layout.astro';
       : '<span class="text-[var(--color-muted)]">(seed)</span>';
     return `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2 num-mono">${dateLink}</td>
-        <td class="px-4 py-2">${statusBadge}</td>
-        <td class="px-4 py-2 text-[var(--color-text-primary)]">${escapeHtml(summaryText)}</td>
-        <td class="px-4 py-2 text-right num-mono">${rp}</td>
-        <td class="px-4 py-2 text-right num-mono">${cost}</td>
-        <td class="px-4 py-2 text-xs text-[var(--color-muted)]">${escapeHtml(item.modelUsed || '')}</td>
-        <td class="px-4 py-2 text-xs num-mono">${fwCell}</td>
+        <td class="px-4 py-2 num-mono" data-label="Date">${dateLink}</td>
+        <td class="px-4 py-2" data-label="Status">${statusBadge}</td>
+        <td class="px-4 py-2 text-[var(--color-text-primary)]" data-label="Summary / reason">${escapeHtml(summaryText)}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Riesgo país">${rp}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Cost (USD)">${cost}</td>
+        <td class="px-4 py-2 text-xs text-[var(--color-muted)]" data-label="Model">${escapeHtml(item.modelUsed || '')}</td>
+        <td class="px-4 py-2 text-xs num-mono" data-label="Instructions">${fwCell}</td>
       </tr>
     `;
   }

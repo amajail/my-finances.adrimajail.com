@@ -42,3 +42,45 @@
     opacity: 0.7;
   }
 }
+
+/*
+ * Responsive table → stacked cards.
+ * Below the Tailwind `sm` breakpoint (<640px) a `.table-stack` table reflows so
+ * each row becomes a label/value card and never forces horizontal page scroll.
+ * Each <td> supplies its column name via `data-label`, surfaced with ::before.
+ * Kept UNLAYERED (outside @layer components) so it reliably wins over Tailwind
+ * utility classes on the cells; inert at >=640px (normal columnar table).
+ */
+@media (max-width: 639.98px) {
+  /* Fully break table layout so the table box no longer sizes to its columns. */
+  .table-stack,
+  .table-stack tbody {
+    display: block;
+    width: 100%;
+  }
+  .table-stack thead {
+    display: none;
+  }
+  .table-stack tr {
+    display: block;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .table-stack td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    text-align: right;
+    padding: 0.375rem 0.75rem;
+    border: 0;
+  }
+  .table-stack td[data-label]::before {
+    content: attr(data-label);
+    font-weight: 600;
+    text-align: left;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+}

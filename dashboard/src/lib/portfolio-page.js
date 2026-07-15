@@ -214,17 +214,19 @@ async function load() {
             <span class="text-xs text-[var(--color-muted)]">${brokerPositions.length} position${brokerPositions.length === 1 ? '' : 's'}</span>
           </div>
           ${filterPills}
-          <table class="w-full text-sm" data-broker-table="${brokerId}">
-            <thead class="bg-[var(--color-surface-2)]">
-              <tr class="text-xs uppercase text-[var(--color-muted)]">
-                <th class="text-left px-4 py-2 sort-th" data-sort-key="symbol">Symbol<span class="sort-indicator"></span></th>
-                <th class="text-right px-4 py-2 sort-th" data-sort-key="value">Value<span class="sort-indicator"></span></th>
-                <th class="text-right px-4 py-2 sort-th" data-sort-key="pnl">P&L<span class="sort-indicator"></span></th>
-                <th class="text-right px-4 py-2 sort-th" data-sort-key="pct">%<span class="sort-indicator"></span></th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm" data-broker-table="${brokerId}">
+              <thead class="bg-[var(--color-surface-2)]">
+                <tr class="text-xs uppercase text-[var(--color-muted)]">
+                  <th class="text-left px-4 py-2 sort-th" data-sort-key="symbol">Symbol<span class="sort-indicator"></span></th>
+                  <th class="text-right px-4 py-2 sort-th" data-sort-key="value">Value<span class="sort-indicator"></span></th>
+                  <th class="text-right px-4 py-2 sort-th" data-sort-key="pnl">P&L<span class="sort-indicator"></span></th>
+                  <th class="text-right px-4 py-2 sort-th" data-sort-key="pct">%<span class="sort-indicator"></span></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       `;
     }).join('') || '<div class="text-sm text-[var(--color-muted)]">No open positions yet.</div>';
