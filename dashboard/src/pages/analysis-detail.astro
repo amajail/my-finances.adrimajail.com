@@ -37,7 +37,7 @@ import Layout from '../layouts/Layout.astro';
       <h2 class="font-semibold">Changes this week</h2>
       <span class="text-xs text-[var(--color-muted)]" id="changes-note"></span>
     </div>
-    <table class="w-full text-sm" id="changes-table">
+    <table class="w-full text-sm table-stack" id="changes-table">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Broker</th>
@@ -60,7 +60,7 @@ import Layout from '../layouts/Layout.astro';
       <h2 class="font-semibold">Administrative / non-investable</h2>
       <span class="text-xs text-[var(--color-muted)]" id="admin-note"></span>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Broker</th>
@@ -78,7 +78,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Macro — week over week</h2>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Indicator</th>
@@ -96,7 +96,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Bucket drift vs target</h2>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Bucket</th>
@@ -113,7 +113,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Asset-class drift vs target</h2>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Asset class</th>
@@ -130,7 +130,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Concentration caps</h2>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Cap</th>
@@ -149,7 +149,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Watchlist</h2>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Item</th>
@@ -165,7 +165,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Week-over-week (analytical)</h2>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Metric</th>
@@ -182,7 +182,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Framework amendment suggestions</h2>
     </div>
-    <table class="w-full text-sm">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">Proposal</th>
@@ -327,12 +327,12 @@ import Layout from '../layouts/Layout.astro';
       const badge = (c) => (c === 'added' || c === 'increased') ? 'badge-success' : 'badge-pending';
       tbody.innerHTML = changes.map((c) => `
         <tr class="border-t border-[var(--color-border)]">
-          <td class="px-4 py-2">${escapeHtml(c.broker)}</td>
-          <td class="px-4 py-2 num-mono">${escapeHtml(c.symbol)}</td>
-          <td class="px-4 py-2"><span class="badge ${badge(c.change)}">${escapeHtml(c.change)}</span></td>
-          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(c.quantityBefore))}</td>
-          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(c.quantityAfter))}</td>
-          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(c.deltaQuantity))}</td>
+          <td class="px-4 py-2" data-label="Broker">${escapeHtml(c.broker)}</td>
+          <td class="px-4 py-2 num-mono" data-label="Symbol">${escapeHtml(c.symbol)}</td>
+          <td class="px-4 py-2" data-label="Change"><span class="badge ${badge(c.change)}">${escapeHtml(c.change)}</span></td>
+          <td class="px-4 py-2 text-right num-mono" data-label="Before">${escapeHtml(String(c.quantityBefore))}</td>
+          <td class="px-4 py-2 text-right num-mono" data-label="After">${escapeHtml(String(c.quantityAfter))}</td>
+          <td class="px-4 py-2 text-right num-mono" data-label="Δ">${escapeHtml(String(c.deltaQuantity))}</td>
         </tr>
       `).join('');
     }
@@ -347,11 +347,11 @@ import Layout from '../layouts/Layout.astro';
     document.getElementById('admin-note').textContent = `${rows.length} excluded (value ≤ 0)`;
     document.getElementById('admin-tbody').innerHTML = rows.map((p) => `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2">${escapeHtml(p.broker)}</td>
-        <td class="px-4 py-2">${escapeHtml(p.assetType)}</td>
-        <td class="px-4 py-2 num-mono">${escapeHtml(p.symbol)}</td>
-        <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(p.quantity))}</td>
-        <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(p.valueUsd))}</td>
+        <td class="px-4 py-2" data-label="Broker">${escapeHtml(p.broker)}</td>
+        <td class="px-4 py-2" data-label="Type">${escapeHtml(p.assetType)}</td>
+        <td class="px-4 py-2 num-mono" data-label="Symbol">${escapeHtml(p.symbol)}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Qty">${escapeHtml(String(p.quantity))}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Value USD">${escapeHtml(String(p.valueUsd))}</td>
       </tr>
     `).join('');
     show(document.getElementById('admin-section'));
@@ -377,18 +377,18 @@ import Layout from '../layouts/Layout.astro';
     };
     document.getElementById('macro-wow-tbody').innerHTML = rows.map((r) => `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2">${escapeHtml(r.label)}${r.unit ? ` <span class="text-xs text-[var(--color-muted)]">${escapeHtml(r.unit)}</span>` : ''}</td>
-        <td class="px-4 py-2 text-right num-mono">${num(r.priorValue)}</td>
-        <td class="px-4 py-2 text-right num-mono">${num(r.currentValue)}</td>
-        <td class="px-4 py-2 text-right">${deltaCell(r.deltaAbs)}</td>
-        <td class="px-4 py-2 text-right">${pctCell(r.deltaPct)}</td>
+        <td class="px-4 py-2" data-label="Indicator">${escapeHtml(r.label)}${r.unit ? ` <span class="text-xs text-[var(--color-muted)]">${escapeHtml(r.unit)}</span>` : ''}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Prior">${num(r.priorValue)}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Current">${num(r.currentValue)}</td>
+        <td class="px-4 py-2 text-right" data-label="Δ">${deltaCell(r.deltaAbs)}</td>
+        <td class="px-4 py-2 text-right" data-label="%">${pctCell(r.deltaPct)}</td>
       </tr>`).join('');
     show(document.getElementById('macro-wow-section'));
   }
 
   // ---- Feature 010: code-computed drift tables ----
 
-  function renderDrift(rows, tbodyId, sectionId) {
+  function renderDrift(rows, tbodyId, sectionId, firstColLabel) {
     // Absent / empty / malformed → omit the section (FR-008).
     if (!Array.isArray(rows) || rows.length === 0) return;
     const pctCell = (n) => (typeof n === 'number' ? n.toFixed(2) + '%' : '—');
@@ -400,10 +400,10 @@ import Layout from '../layouts/Layout.astro';
     };
     document.getElementById(tbodyId).innerHTML = rows.map((r) => `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2">${escapeHtml(r.label)}</td>
-        <td class="px-4 py-2 text-right num-mono">${pctCell(r.targetPct)}</td>
-        <td class="px-4 py-2 text-right num-mono">${pctCell(r.currentPct)}</td>
-        <td class="px-4 py-2 text-right">${driftCell(r.driftPct)}</td>
+        <td class="px-4 py-2" data-label="${firstColLabel}">${escapeHtml(r.label)}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Target %">${pctCell(r.targetPct)}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Current %">${pctCell(r.currentPct)}</td>
+        <td class="px-4 py-2 text-right" data-label="Drift">${driftCell(r.driftPct)}</td>
       </tr>`).join('');
     show(document.getElementById(sectionId));
   }
@@ -418,12 +418,12 @@ import Layout from '../layouts/Layout.astro';
     };
     document.getElementById('caps-tbody').innerHTML = rows.map((c) => `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2">${escapeHtml(c.label)}</td>
-        <td class="px-4 py-2">${escapeHtml(c.scope)}${c.bucketKey ? ' · ' + escapeHtml(c.bucketKey) : ''}</td>
-        <td class="px-4 py-2 text-right num-mono">${pctCell(c.softPct)}</td>
-        <td class="px-4 py-2 text-right num-mono">${pctCell(c.hardPct)}</td>
-        <td class="px-4 py-2 text-right num-mono">${pctCell(c.currentPct)}</td>
-        <td class="px-4 py-2">${breachBadge(c.breach)}</td>
+        <td class="px-4 py-2" data-label="Cap">${escapeHtml(c.label)}</td>
+        <td class="px-4 py-2" data-label="Scope">${escapeHtml(c.scope)}${c.bucketKey ? ' · ' + escapeHtml(c.bucketKey) : ''}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Soft %">${pctCell(c.softPct)}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Hard %">${pctCell(c.hardPct)}</td>
+        <td class="px-4 py-2 text-right num-mono" data-label="Current %">${pctCell(c.currentPct)}</td>
+        <td class="px-4 py-2" data-label="Breach">${breachBadge(c.breach)}</td>
       </tr>`).join('');
     show(document.getElementById('caps-section'));
   }
@@ -432,9 +432,9 @@ import Layout from '../layouts/Layout.astro';
     if (!Array.isArray(rows) || rows.length === 0) return;
     document.getElementById('watchlist-tbody').innerHTML = rows.map((w) => `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2">${escapeHtml(w.item)}</td>
-        <td class="px-4 py-2">${escapeHtml(w.trigger)}</td>
-        <td class="px-4 py-2">${w.severity ? escapeHtml(w.severity) : '—'}</td>
+        <td class="px-4 py-2" data-label="Item">${escapeHtml(w.item)}</td>
+        <td class="px-4 py-2" data-label="Trigger">${escapeHtml(w.trigger)}</td>
+        <td class="px-4 py-2" data-label="Severity">${w.severity ? escapeHtml(w.severity) : '—'}</td>
       </tr>`).join('');
     show(document.getElementById('watchlist-section'));
   }
@@ -443,10 +443,10 @@ import Layout from '../layouts/Layout.astro';
     if (!Array.isArray(rows) || rows.length === 0) return;
     document.getElementById('wow-tbody').innerHTML = rows.map((d) => `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2">${escapeHtml(d.metric)}</td>
-        <td class="px-4 py-2 num-mono">${escapeHtml(String(d.prior))}</td>
-        <td class="px-4 py-2 num-mono">${escapeHtml(String(d.current))}</td>
-        <td class="px-4 py-2">${escapeHtml(d.direction || '')}</td>
+        <td class="px-4 py-2" data-label="Metric">${escapeHtml(d.metric)}</td>
+        <td class="px-4 py-2 num-mono" data-label="Prior">${escapeHtml(String(d.prior))}</td>
+        <td class="px-4 py-2 num-mono" data-label="Current">${escapeHtml(String(d.current))}</td>
+        <td class="px-4 py-2" data-label="Direction">${escapeHtml(d.direction || '')}</td>
       </tr>`).join('');
     show(document.getElementById('wow-section'));
   }
@@ -455,8 +455,8 @@ import Layout from '../layouts/Layout.astro';
     if (!Array.isArray(rows) || rows.length === 0) return;
     document.getElementById('amendments-tbody').innerHTML = rows.map((a) => `
       <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2 align-top">${escapeHtml(a.proposal)}</td>
-        <td class="px-4 py-2 align-top text-[var(--color-text-primary)]">${escapeHtml(a.rationale)}</td>
+        <td class="px-4 py-2 align-top" data-label="Proposal">${escapeHtml(a.proposal)}</td>
+        <td class="px-4 py-2 align-top text-[var(--color-text-primary)]" data-label="Rationale">${escapeHtml(a.rationale)}</td>
       </tr>`).join('');
     show(document.getElementById('amendments-section'));
   }
@@ -587,8 +587,8 @@ import Layout from '../layouts/Layout.astro';
     renderMacroWow(detail.macroChanges);
     // Feature 010: code-computed drift tables (shown on completed AND failed
     // rows when captured; omitted when absent/empty).
-    renderDrift(detail.driftByBucket, 'drift-bucket-tbody', 'drift-bucket-section');
-    renderDrift(detail.driftByAssetClass, 'drift-class-tbody', 'drift-class-section');
+    renderDrift(detail.driftByBucket, 'drift-bucket-tbody', 'drift-bucket-section', 'Bucket');
+    renderDrift(detail.driftByAssetClass, 'drift-class-tbody', 'drift-class-section', 'Asset class');
     renderCaps(detail.concentrationCaps);
     renderWatchlist(detail.watchlist);
     renderWeekOverWeek(detail.weekOverWeek);

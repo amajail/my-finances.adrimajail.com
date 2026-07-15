@@ -9,8 +9,8 @@ import Layout from '../layouts/Layout.astro';
     <h1 class="text-2xl font-bold">Manage brokers</h1>
   </header>
 
-  <div class="card mb-6">
-    <table class="w-full text-sm">
+  <div class="card mb-6 overflow-x-auto">
+    <table class="w-full text-sm table-stack">
       <thead class="bg-[var(--color-surface-2)]">
         <tr class="text-xs uppercase text-[var(--color-muted)]">
           <th class="text-left px-4 py-2">ID</th>
@@ -52,16 +52,16 @@ import Layout from '../layouts/Layout.astro';
       document.getElementById('brokers-tbody').innerHTML = brokers.length
         ? brokers.map(b => `
             <tr class="border-t border-[var(--color-border)]">
-              <td class="px-4 py-2 num-mono">${b.id}</td>
-              <td class="px-4 py-2">
+              <td class="px-4 py-2 num-mono" data-label="ID">${b.id}</td>
+              <td class="px-4 py-2" data-label="Name">
                 ${b.accentColor ? `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${b.accentColor};margin-right:6px;vertical-align:middle"></span>` : ''}
                 ${b.displayName}
               </td>
-              <td class="px-4 py-2">
+              <td class="px-4 py-2" data-label="Type">
                 <span class="badge ${b.type === 'cash_holder' ? 'badge-pending' : 'badge-success'}">${TYPE_LABELS[b.type] || b.type}</span>
               </td>
-              <td class="px-4 py-2 text-[var(--color-muted)] text-xs">${b.notes || ''}</td>
-              <td class="px-4 py-2 text-right text-xs text-[var(--color-muted)]">—</td>
+              <td class="px-4 py-2 text-[var(--color-muted)] text-xs" data-label="Notes">${b.notes || ''}</td>
+              <td class="px-4 py-2 text-right text-xs text-[var(--color-muted)]" data-label="Actions">—</td>
             </tr>
           `).join('')
         : '<tr><td colspan="5" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No brokers yet.</td></tr>';

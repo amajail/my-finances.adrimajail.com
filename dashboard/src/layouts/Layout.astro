@@ -35,7 +35,9 @@ const navItems = [
         <a href="/" class="text-base font-bold text-[var(--color-text-primary)]">
           my-finances
         </a>
-        <ul class="flex gap-1">
+
+        <!-- Desktop nav: full horizontal bar at lg+ (the 809px row only fits here) -->
+        <ul class="hidden lg:flex gap-1">
           {navItems.map(item => (
             <li>
               <a
@@ -51,11 +53,63 @@ const navItems = [
             </li>
           ))}
         </ul>
+
+        <!-- Mobile nav toggle: below lg. ≥44px touch target. -->
+        <button
+          id="nav-toggle"
+          type="button"
+          class="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)]"
+          aria-label="Toggle navigation menu"
+          aria-controls="mobile-nav"
+          aria-expanded="false"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
       </nav>
+
+      <!-- Mobile menu panel: hidden by default and always hidden at lg+. -->
+      <ul id="mobile-nav" class="hidden lg:hidden border-t border-[var(--color-border)]">
+        {navItems.map(item => (
+          <li>
+            <a
+              href={item.href}
+              class={`block px-4 py-3 text-base border-b border-[var(--color-border)] transition-colors ${
+                active === item.id
+                  ? 'bg-[var(--color-surface-2)] text-[var(--color-accent)] font-semibold'
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)]'
+              }`}
+            >
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
     </header>
 
     <main class="mx-auto max-w-6xl px-4 md:px-6 py-8">
       <slot />
     </main>
+
+    <script>
+      const btn = document.getElementById('nav-toggle');
+      const panel = document.getElementById('mobile-nav');
+      if (btn && panel) {
+        btn.addEventListener('click', () => {
+          const nowHidden = panel.classList.toggle('hidden');
+          btn.setAttribute('aria-expanded', String(!nowHidden));
+        });
+        // Collapse the panel after choosing a destination (in-page safety).
+        panel.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).closest('a')) {
+            panel.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+          }
+        });
+      }
+    </script>
   </body>
 </html>
