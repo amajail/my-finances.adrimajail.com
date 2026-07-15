@@ -129,3 +129,8 @@ metaprompt-rebalance-plan.md
 # via `node scripts/seed-analysis-framework.js`. The example template at
 # scripts/seed-analysis-framework.example.md IS committed (placeholders).
 scripts/analysis-framework.local.md
+
+# Playwright MCP browser artifacts — snapshots/screenshots of the running
+# dashboard capture REAL holdings figures (Total USD/ARS, P&L). Never commit.
+.playwright-mcp/
+*-mcp-*.png
