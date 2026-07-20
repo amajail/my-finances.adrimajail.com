@@ -21,7 +21,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
     "@azure/data-tables": "^13.3.2",
-    "@azure/functions": "^4.5.0",
+    "@azure/functions": "^4.16.2",
     "dotenv": "^17.2.2",
     "winston": "^3.19.0",
     "yahoo-finance2": "^3.14.0"

@@ -18,3 +18,4 @@ require('./getSuggestionScorecard');
 require('./getMacroSeries');
 require('./getPerformanceSeries');
 require('./instructions');
+require('./mcp');
