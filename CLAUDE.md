@@ -51,6 +51,7 @@ Slugs: `galicia`, `iol`, `ibkr`, `bullmarket`, `cash` (off-system USD reserve).
 2. To add new positions: append to `scripts/positions.json` and run `node scripts/seed-positions.js`.
 3. To bulk-update many positions: write a one-off `scripts/` script that issues PUTs (or extend `seed-positions.js` with an `--update` flag).
 4. Always keep `scripts/positions.json` in sync with the DB so it remains the canonical snapshot.
+5. To sync real IOL/IBKR broker holdings into the store, use the `sync-positions` skill (`.claude/skills/sync-positions/SKILL.md`) — it encodes the full pull → diff → dry-run → apply workflow.
 
 ## Conventions
 - Branch naming:
