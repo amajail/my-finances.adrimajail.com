@@ -54,9 +54,9 @@
 
 **Independent test**: unit-level — prompt contains the block iff ≥1 event in window; a throwing calendar dep never fails the run.
 
-- [ ] T016 [US2] Add optional `getCalendarEvents` constructor dep (default null) to `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`; in `execute`, fetch 28-day window inside try/catch (failure → null, warn-log without payload); in `_buildUserMessage`, append `## upcomingEvents` with trimmed fields `{type,date,daysUntil,symbol,broker,amountUsd}` only when non-empty (FR-005; mirror the concentrationCaps block style)
-- [ ] T017 [US2] Pass the calendar use case to GenerateWeeklyAnalysis in `src/application/di/container.js`
-- [ ] T018 [P] [US2] Unit tests in `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.upcomingEvents.test.js` — block present with event in window, absent when empty, absent + run succeeds when dep throws, absent when dep null (all existing tests must pass unchanged — optional-dep pattern)
+- [X] T016 [US2] Add optional `getCalendarEvents` constructor dep (default null) to `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`; in `execute`, fetch 28-day window inside try/catch (failure → null, warn-log without payload); in `_buildUserMessage`, append `## upcomingEvents` with trimmed fields `{type,date,daysUntil,symbol,broker,amountUsd}` only when non-empty (FR-005; mirror the concentrationCaps block style)
+- [X] T017 [US2] Pass the calendar use case to GenerateWeeklyAnalysis in `src/application/di/container.js`
+- [X] T018 [P] [US2] Unit tests in `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.upcomingEvents.test.js` — block present with event in window, absent when empty, absent + run succeeds when dep throws, absent when dep null (all existing tests must pass unchanged — optional-dep pattern)
 
 **Checkpoint**: next weekly run sees upcoming maturities.
 
@@ -68,8 +68,8 @@
 
 **Independent test**: month header total = sum of that month's non-null `amountUsd`; excluded count matches null-amount events.
 
-- [ ] T019 [US3] Add `months[]` computation (`{month,totalUsd,excludedFromTotal,eventCount}`) to `src/application/use-cases/calendar/GetCalendarEvents.js` per FR-010 + extend `tests/unit/application/use-cases/calendar/GetCalendarEvents.test.js` (subtotal math, exclusion count)
-- [ ] T020 [US3] Render month-header totals + "N without estimate" note in `dashboard/src/pages/calendar.astro`
+- [X] T019 [US3] Add `months[]` computation (`{month,totalUsd,excludedFromTotal,eventCount}`) to `src/application/use-cases/calendar/GetCalendarEvents.js` per FR-010 + extend `tests/unit/application/use-cases/calendar/GetCalendarEvents.test.js` (subtotal math, exclusion count)
+- [X] T020 [US3] Render month-header totals + "N without estimate" note in `dashboard/src/pages/calendar.astro`
 
 ---
 

@@ -442,7 +442,9 @@ class Container {
       instructionsRepository: this.getInstructionsRepository(),
       // Feature 010: machine-readable allocation targets drive the code-computed
       // drift/cap sections.
-      allocationTargetsRepository: this.getAllocationTargetsRepository()
+      allocationTargetsRepository: this.getAllocationTargetsRepository(),
+      // Feature 017: optional upcoming-events (maturities/dividends) block.
+      getCalendarEvents: this.getGetCalendarEvents()
     });
   }
 

@@ -76,6 +76,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     settingsRepository,
     instructionsRepository,
     allocationTargetsRepository = null,
+    getCalendarEvents = null,
     clock = () => new Date(),
     toolSchema = TOOL_SCHEMA,
   }) {
@@ -91,6 +92,9 @@ class GenerateWeeklyAnalysis extends UseCase {
     // Feature 010: optional — when absent (or no targets row), the code-computed
     // drift/cap sections are simply omitted (FR-001a).
     this._allocationTargetsRepository = allocationTargetsRepository;
+    // Feature 017: optional — when absent (or failing), the upcoming-events
+    // prompt block is simply omitted; the run never depends on it.
+    this._getCalendarEvents = getCalendarEvents;
     this._clock = clock;
     this._toolSchema = toolSchema;
   }
@@ -267,6 +271,28 @@ class GenerateWeeklyAnalysis extends UseCase {
         });
       }
 
+      // Feature 017 (FR-005): upcoming maturities/dividends inside the 28-day
+      // look-ahead so suggestions anticipate incoming cash. Optional and
+      // resilient — absent dep or any failure just omits the block.
+      let upcomingEvents = null;
+      if (this._getCalendarEvents) {
+        try {
+          const calendar = await this._getCalendarEvents.execute({ days: 28 });
+          if (calendar && Array.isArray(calendar.events) && calendar.events.length > 0) {
+            upcomingEvents = calendar.events.map((e) => ({
+              type: e.type,
+              date: e.date,
+              daysUntil: e.daysUntil,
+              symbol: e.symbol,
+              broker: e.broker,
+              amountUsd: e.amountUsd,
+            }));
+          }
+        } catch (calErr) {
+          logger.warn('Upcoming-events lookup failed; omitting prompt block', { errorType: calErr && calErr.name });
+        }
+      }
+
       // 6. Assemble the prompt. Feature 010 (FR-014): the effective system
       //    prompt is the fixed guardrail preamble followed by the owner-edited
       //    instructions body (preamble ⊕ body). The body is still used verbatim;
@@ -282,6 +308,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         administrativePositions,
         duplications,
         concentrationCaps,
+        upcomingEvents,
       });
 
       // 6. Call the LLM. The privacy boundary lives inside this method.
@@ -490,7 +517,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       }));
   }
 
-  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], duplications = null, concentrationCaps = null }) {
+  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], duplications = null, concentrationCaps = null, upcomingEvents = null }) {
     // The full per-position holdings list is delivered separately as an
     // authoritative `currentHoldings` block (below), so it is pulled out of the
     // portfolioSummary aggregates to avoid duplicating it in the prompt.
@@ -582,6 +609,19 @@ class GenerateWeeklyAnalysis extends UseCase {
         'Code-computed concentration status per capped instrument/group (percent of investable holdings vs soft/hard limits). Use these exact figures for cap and escalation reasoning; do not recompute them from holdings.',
         '```json',
         JSON.stringify(concentrationCaps),
+        '```'
+      );
+    }
+    // Feature 017 (FR-005): cash-relevant events inside the next 28 days
+    // (maturities, declared dividends). Omitted entirely when there are none —
+    // an empty section is pure token overhead (011/015 lineage).
+    if (Array.isArray(upcomingEvents) && upcomingEvents.length > 0) {
+      parts.push(
+        '',
+        '## upcomingEvents',
+        'Maturities and declared dividends within the next 28 days (amounts are USD estimates; null = not estimable). Anticipate this incoming cash in your suggestions — e.g. plan reinvestment of a maturity before it lands — instead of discovering it next week.',
+        '```json',
+        JSON.stringify(upcomingEvents),
         '```'
       );
     }
