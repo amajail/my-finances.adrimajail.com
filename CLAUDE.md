@@ -77,24 +77,21 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/016-responsive-dashboard/plan.md` (Phase 1 complete; tasks pending).
+`specs/017-dividend-maturity-calendar/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`. This is a presentation-only frontend feature:
-make all nine Astro dashboard pages usable in phone portrait (target 360px, guard
-320px) with zero horizontal document scroll, without changing the desktop layout.
-Root cause (proven by a Playwright audit): the shared top nav is nine links in one
-non-wrapping flex row (809px) that inflate `<body>` on every page and defeat the
-`overflow-x-auto` table containers 4 of 5 table pages already have. Approach:
-(1) NAV — in `dashboard/src/layouts/Layout.astro`, show the full horizontal `<ul>`
-at `lg+` (≥1024px) and a hamburger-toggled stacked panel below `lg`; mobile links +
-toggle get ≥44px touch targets; minimal vanilla JS (`hidden` class + `aria-expanded`),
-no new dep. (2) TABLES — add a reusable `.table-stack` pattern in
-`dashboard/src/styles/global.css` (`thead` hidden, `tr`→card, `td`→flex row with
-`::before{content:attr(data-label)}`) that reflows to stacked label/value cards below
-`sm` (640px); apply it (+ `data-label` on each `<td>`) to the read-only analytical
-tables (`scorecard.astro`, `analysis.astro`, `analysis-detail.astro`). CRUD tables
-with inline inputs/buttons (`positions.astro` already has `overflow-x-auto`;
-`brokers.astro` gains it) keep the sanctioned horizontal-scroll fallback. No backend,
-domain, data-model, table, or dependency changes; desktop (≥1024px) renders exactly
-as today. Prior plan: `specs/013-administrative-positions/plan.md`.
+`data-model.md`, `quickstart.md`, `contracts/calendar-api.md`. Read-only feature,
+no new dependencies, no new storage: maturity events derived from open positions'
+existing `maturityDate` (bond/bopreal/lecap/on/deposit; estimated amount = the
+position's existing `valueUsd` convention), plus declared dividend events for
+US-listed holdings via the existing `yahoo-finance2` dep (`quoteSummary`
+calendarEvents + summaryDetail; CEDEARs get date-only events — ratio unknown).
+New pieces: `CalendarEventBuilder` domain service (pure), `GetCalendarEvents`
+use case, `IDividendEventsProvider` + `YahooDividendEventsProvider` (per-symbol
+timeboxed, never rejects — total failure sets `sourceAvailable:false` so
+maturities still render with a degraded notice), thin `GET /api/calendar?days=`
+function, `dashboard/src/pages/calendar.astro` (month-grouped cards, 016 mobile
+standards, nav link added to Layout.astro), and an optional `## upcomingEvents`
+prompt block in `GenerateWeeklyAnalysis` (28-day window, omitted when empty —
+same optional-dep resilience pattern as `allocationTargetsRepository`).
+Prior plan: `specs/016-responsive-dashboard/plan.md`.
 <!-- SPECKIT END -->

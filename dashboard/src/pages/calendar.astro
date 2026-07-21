@@ -1,0 +1,147 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Calendar · my-finances" active="calendar">
+  <header class="mb-6">
+    <span class="eyebrow">Calendar</span>
+    <span class="accent-line"></span>
+    <h1 class="text-2xl font-bold">Dividends &amp; maturities</h1>
+    <p class="text-sm text-[var(--color-muted)] mt-1" id="hdr-meta">Loading…</p>
+  </header>
+
+  <!-- FR-007: dividend-source degradation notice (maturities still render). -->
+  <section id="degraded-notice" class="card p-4 mb-6 hidden">
+    <p class="text-sm text-[var(--color-muted)]">
+      Dividend data is temporarily unavailable — showing maturities only.
+    </p>
+  </section>
+
+  <!-- Edge case: open fixed-income positions without a maturity date. -->
+  <section id="missing-dates" class="card p-4 mb-6 hidden">
+    <p class="text-sm text-[var(--color-muted)]" id="missing-dates-text"></p>
+  </section>
+
+  <!-- FR-009: overdue maturities pinned first, visually distinct. -->
+  <section id="overdue-section" class="card mb-6 hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)]">
+      <h2 class="font-semibold pos-negative">Overdue maturities</h2>
+      <p class="text-xs text-[var(--color-muted)]">Past maturity date, position still open — proceeds may need sweeping.</p>
+    </div>
+    <div id="overdue-list"></div>
+  </section>
+
+  <div id="months-container"></div>
+
+  <p id="empty-state" class="card p-4 text-sm text-[var(--color-muted)] hidden">
+    No upcoming events in the selected horizon.
+  </p>
+
+  <p id="error-banner" class="card p-4 pos-negative text-sm hidden"></p>
+</Layout>
+
+<script>
+  import { api } from '../lib/api.js';
+  import { loadInto } from '../lib/load.js';
+  import { escapeHtml, fmtUsd } from '../lib/format.js';
+
+  function show(el) { el.classList.remove('hidden'); }
+
+  const TYPE_LABEL = {
+    'maturity': 'Maturity',
+    'dividend-ex': 'Dividend ex-date',
+    'dividend-payment': 'Dividend payment',
+  };
+
+  function monthLabel(ym) {
+    const [y, m] = ym.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+
+  function amountLabel(e) {
+    if (typeof e.amountUsd === 'number') return fmtUsd(e.amountUsd);
+    if (typeof e.amountNative === 'number' && e.currency) {
+      return `${e.amountNative.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${escapeHtml(e.currency)}`;
+    }
+    return '—';
+  }
+
+  // One stacked card per event: no wide table, so mobile needs no special
+  // handling beyond normal flow (feature-016 zero-horizontal-scroll holds).
+  function eventCard(e) {
+    const days = e.daysUntil < 0
+      ? `<span class="pos-negative">${Math.abs(e.daysUntil)}d overdue</span>`
+      : `in ${e.daysUntil}d`;
+    return `
+      <div class="px-4 py-3 border-b border-[var(--color-border)] last:border-b-0 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <div class="min-w-0 flex-1">
+          <span class="font-semibold">${escapeHtml(e.symbol)}</span>
+          <span class="text-xs text-[var(--color-muted)] ml-2">${escapeHtml(e.broker)} · ${escapeHtml(e.assetType)}</span>
+          <div class="text-xs text-[var(--color-muted)]">${TYPE_LABEL[e.type] || escapeHtml(e.type)} · ${escapeHtml(e.date)} · ${days}</div>
+        </div>
+        <div class="text-right text-sm font-medium whitespace-nowrap" title="Estimated">
+          ${amountLabel(e)}<span class="text-xs text-[var(--color-muted)]"> est.</span>
+        </div>
+      </div>`;
+  }
+
+  function renderMonths(data) {
+    const container = document.getElementById('months-container');
+    const byMonth = new Map();
+    for (const e of data.events.filter((ev) => !ev.overdue)) {
+      const ym = e.date.slice(0, 7);
+      if (!byMonth.has(ym)) byMonth.set(ym, []);
+      byMonth.get(ym).push(e);
+    }
+    const monthMeta = new Map((data.months || []).map((m) => [m.month, m]));
+    container.innerHTML = Array.from(byMonth.entries()).map(([ym, events]) => {
+      const meta = monthMeta.get(ym);
+      // US3 (FR-010): month subtotal + excluded-from-total note.
+      const total = meta && meta.totalUsd > 0 ? `≈ ${fmtUsd(meta.totalUsd)}` : '';
+      const excluded = meta && meta.excludedFromTotal > 0
+        ? `<span class="text-xs text-[var(--color-muted)]">(${meta.excludedFromTotal} without estimate)</span>`
+        : '';
+      return `
+        <section class="card mb-6">
+          <div class="px-4 py-3 border-b border-[var(--color-border)] flex flex-wrap items-baseline justify-between gap-2">
+            <h2 class="font-semibold">${escapeHtml(monthLabel(ym))}</h2>
+            <div class="text-sm">${total} ${excluded}</div>
+          </div>
+          ${events.map(eventCard).join('')}
+        </section>`;
+    }).join('');
+  }
+
+  async function load() {
+    const banner = document.getElementById('error-banner');
+    await loadInto(
+      banner,
+      () => api('/calendar?days=180'),
+      (data) => {
+        document.getElementById('hdr-meta').textContent =
+          `${data.events.length} event${data.events.length === 1 ? '' : 's'} in the next ${data.horizonDays} days — all amounts are estimates.`;
+
+        if (!data.dividendSourceAvailable) show(document.getElementById('degraded-notice'));
+
+        if (data.fixedIncomeWithoutMaturity > 0) {
+          document.getElementById('missing-dates-text').textContent =
+            `${data.fixedIncomeWithoutMaturity} open fixed-income position${data.fixedIncomeWithoutMaturity === 1 ? '' : 's'} without a maturity date — not shown here.`;
+          show(document.getElementById('missing-dates'));
+        }
+
+        const overdue = data.events.filter((e) => e.overdue);
+        if (overdue.length > 0) {
+          document.getElementById('overdue-list').innerHTML = overdue.map(eventCard).join('');
+          show(document.getElementById('overdue-section'));
+        }
+
+        renderMonths(data);
+
+        if (data.events.length === 0) show(document.getElementById('empty-state'));
+      },
+      (err) => `Failed to load the calendar: ${err && err.message ? err.message : err}`
+    );
+  }
+
+  load();
+</script>

@@ -16,7 +16,7 @@ const AzureInstructionsRepository = require('../../infrastructure/repositories/A
 const AzureAllocationTargetsRepository = require('../../infrastructure/repositories/AzureAllocationTargetsRepository');
 
 // Infrastructure providers
-const { YahooFinancePriceProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
+const { YahooFinancePriceProvider, YahooDividendEventsProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
 const ArgentinaDatosRiesgoPaisProvider = require('../../infrastructure/providers/ArgentinaDatosRiesgoPaisProvider');
 const ArgentinaDatosMepProvider = require('../../infrastructure/providers/ArgentinaDatosMepProvider');
 // Feature 006 macro providers.
@@ -45,6 +45,7 @@ const {
   UpdateSetting,
   RefreshPrices,
   GenerateWeeklyAnalysis,
+  GetCalendarEvents,
   SetOrderExecutionStatus,
   GetSuggestionScorecard,
   GetMacroSeries,
@@ -360,6 +361,30 @@ class Container {
     });
   }
 
+  // ==================== Calendar Use Cases ====================
+
+  /**
+   * Get YahooDividendEventsProvider instance (feature 017).
+   * @returns {YahooDividendEventsProvider}
+   */
+  getDividendEventsProvider() {
+    if (!this._singletons.has('dividendEventsProvider')) {
+      this._singletons.set('dividendEventsProvider', new YahooDividendEventsProvider());
+    }
+    return this._singletons.get('dividendEventsProvider');
+  }
+
+  /**
+   * Get GetCalendarEvents use case (feature 017).
+   * @returns {GetCalendarEvents}
+   */
+  getGetCalendarEvents() {
+    return new GetCalendarEvents({
+      getPortfolioSummary: this.getGetPortfolioSummary(),
+      dividendEventsProvider: this.getDividendEventsProvider()
+    });
+  }
+
   // ==================== Settings Use Cases ====================
 
   /**
@@ -417,7 +442,9 @@ class Container {
       instructionsRepository: this.getInstructionsRepository(),
       // Feature 010: machine-readable allocation targets drive the code-computed
       // drift/cap sections.
-      allocationTargetsRepository: this.getAllocationTargetsRepository()
+      allocationTargetsRepository: this.getAllocationTargetsRepository(),
+      // Feature 017: optional upcoming-events (maturities/dividends) block.
+      getCalendarEvents: this.getGetCalendarEvents()
     });
   }
 

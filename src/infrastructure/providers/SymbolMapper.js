@@ -70,6 +70,26 @@ class SymbolMapper {
     // Default: try the symbol bare
     return sym;
   }
+
+  /**
+   * Map a holding to the Yahoo ticker used for DIVIDEND lookups (feature 017).
+   * Differs from toYahoo for CEDEARs: dividend dates come from the US
+   * underlying listing, not the .BA wrapper — CEDEAR symbols in this
+   * portfolio match their US underlying ticker.
+   * @param {{ symbol: string, assetType: string, exchange?: string, currency?: string }} args
+   * @returns {string|null} null = not dividend-lookup-eligible
+   */
+  static toYahooDividendSymbol({ symbol, assetType, exchange, currency }) {
+    if (!symbol) return null;
+    const sym = String(symbol).toUpperCase().trim();
+    if (assetType === 'cedear') {
+      return sym.replace(/\./g, '-'); // US underlying ticker
+    }
+    if (assetType === 'stock' || assetType === 'etf') {
+      return this.toYahoo({ symbol, assetType, exchange, currency });
+    }
+    return null; // fixed income, cash, deposits: never looked up
+  }
 }
 
 module.exports = SymbolMapper;
