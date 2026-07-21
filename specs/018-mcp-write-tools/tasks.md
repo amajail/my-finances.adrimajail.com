@@ -88,9 +88,9 @@
 
 **Independent Test**: Trigger via MCP → response contains refreshed/failed counts; `list_audit_entries` shows a `price_refresh` entry with the summary (spec US4 acceptance 1).
 
-- [ ] T022 [US4] Add optional `auditRepository` dep to `RefreshPrices` in src/application/use-cases/prices/RefreshPrices.js: on completion append `{ operation: 'price_refresh', targetType: 'prices', targetId: 'all-open', changes: [], details: { totalSymbols, succeeded, failed }, source }` (default `'api'`; timer passes `'timer'` via existing container wiring if trivial — otherwise timer stays unaudited-by-source-default); append failure logged + swallowed
-- [ ] T023 [US4] Wire audit into `getRefreshPrices()` in src/application/di/container.js; register `trigger_price_refresh` MCP tool (no args) in src/functions/mcp.js per contracts §4, `_audit: { source: 'mcp' }`
-- [ ] T024 [P] [US4] Tests: extend tests/unit/application/prices/RefreshPrices.test.js — audit entry with summary details, resilience when audit repo throws, no-audit backward compat
+- [X] T022 [US4] Add optional `auditRepository` dep to `RefreshPrices` in src/application/use-cases/prices/RefreshPrices.js: on completion append `{ operation: 'price_refresh', targetType: 'prices', targetId: 'all-open', changes: [], details: { totalSymbols, succeeded, failed }, source }` (default `'api'`; timer passes `'timer'` via existing container wiring if trivial — otherwise timer stays unaudited-by-source-default); append failure logged + swallowed
+- [X] T023 [US4] Wire audit into `getRefreshPrices()` in src/application/di/container.js; register `trigger_price_refresh` MCP tool (no args) in src/functions/mcp.js per contracts §4, `_audit: { source: 'mcp' }`
+- [X] T024 [P] [US4] Tests: extend tests/unit/application/prices/RefreshPrices.test.js — audit entry with summary details, resilience when audit repo throws, no-audit backward compat
 
 **Checkpoint**: All four write tools + audit read tool live.
 

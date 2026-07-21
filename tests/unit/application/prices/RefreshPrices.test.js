@@ -389,3 +389,73 @@ describe('RefreshPrices Use Case', () => {
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('RefreshPrices — audit trail (feature 018)', () => {
+  function build({ auditRepository, positions = [] } = {}) {
+    const position = new Position({
+      brokerId: 'broker1',
+      assetType: 'stock',
+      symbol: 'AAPL',
+      quantity: 10,
+      averageCost: 150,
+      currency: 'USD',
+      exchange: 'NYSE',
+    });
+    const allPositions = positions.length ? positions : [position];
+    const provider = {
+      name: 'yahoo',
+      getQuote: jest.fn().mockResolvedValue({ price: 160, currency: 'USD', providerSymbol: 'AAPL' }),
+    };
+    const useCase = new RefreshPrices({
+      positionRepository: {
+        findOpenWithPriceQuotable: jest.fn().mockResolvedValue(allPositions),
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+      priceRepository: { recordQuote: jest.fn().mockResolvedValue(undefined) },
+      priceProviderRouter: { chainFor: jest.fn().mockReturnValue([provider]) },
+      auditRepository,
+    });
+    return { useCase };
+  }
+
+  it('appends one audit entry with the run summary and the given source', async () => {
+    const auditRepository = { append: jest.fn().mockResolvedValue(undefined) };
+    const { useCase } = build({ auditRepository });
+
+    await useCase.execute({ _audit: { source: 'mcp' } });
+
+    expect(auditRepository.append).toHaveBeenCalledTimes(1);
+    expect(auditRepository.append).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'price_refresh',
+      targetType: 'prices',
+      targetId: 'all-open',
+      changes: [],
+      details: { totalSymbols: 1, succeeded: 1, failed: 0 },
+      source: 'mcp',
+    }));
+  });
+
+  it('audits even a zero-position run and defaults source to api', async () => {
+    const auditRepository = { append: jest.fn().mockResolvedValue(undefined) };
+    const useCase = new RefreshPrices({
+      positionRepository: { findOpenWithPriceQuotable: jest.fn().mockResolvedValue([]) },
+      priceRepository: { recordQuote: jest.fn() },
+      priceProviderRouter: { chainFor: jest.fn() },
+      auditRepository,
+    });
+    await useCase.execute({});
+    expect(auditRepository.append).toHaveBeenCalledWith(expect.objectContaining({
+      details: { totalSymbols: 0, succeeded: 0, failed: 0 },
+      source: 'api',
+    }));
+  });
+
+  it('still returns the summary when the audit append fails, and works without an auditRepository', async () => {
+    const failing = { append: jest.fn().mockRejectedValue(new Error('audit down')) };
+    const { useCase } = build({ auditRepository: failing });
+    await expect(useCase.execute({})).resolves.toMatchObject({ succeeded: 1, failed: 0 });
+
+    const { useCase: bare } = build();
+    await expect(bare.execute({})).resolves.toMatchObject({ succeeded: 1 });
+  });
+});

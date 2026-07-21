@@ -403,6 +403,20 @@ app.mcpTool('mcpSetOrderExecutionStatus', {
 });
 
 // ---------------------------------------------------------------------------
+// trigger_price_refresh (feature 018, US4)
+// ---------------------------------------------------------------------------
+app.mcpTool('mcpTriggerPriceRefresh', {
+  toolName: 'trigger_price_refresh',
+  description:
+    'Refresh current prices for all open positions now (same behavior as the daily scheduled refresh). ' +
+    'May take a while; returns a summary with refreshed and failed instrument counts.',
+  toolProperties: [],
+  handler: tool('trigger_price_refresh', async () => {
+    return container.getRefreshPrices().execute({ _audit: { source: 'mcp' } });
+  }),
+});
+
+// ---------------------------------------------------------------------------
 // list_audit_entries (feature 018, FR-006)
 // ---------------------------------------------------------------------------
 app.mcpTool('mcpListAuditEntries', {

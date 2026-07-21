@@ -8,6 +8,7 @@
 
 const UseCase = require('../UseCase');
 const logger = require('../../../shared/logging');
+const safeAppendAudit = require('../audit/safeAppendAudit');
 
 class RefreshPrices extends UseCase {
   /**
@@ -16,17 +17,19 @@ class RefreshPrices extends UseCase {
    * @param {IPositionRepository} deps.positionRepository - Position repository
    * @param {IPriceRepository} deps.priceRepository - Price repository
    * @param {PriceProviderRouter} deps.priceProviderRouter - Provider router
+   * @param {IAuditRepository} [deps.auditRepository] - Optional write-audit trail (feature 018)
    */
-  constructor({ positionRepository, priceRepository, priceProviderRouter }) {
+  constructor({ positionRepository, priceRepository, priceProviderRouter, auditRepository = null }) {
     super();
     this._positionRepository = positionRepository;
     this._priceRepository = priceRepository;
     this._priceProviderRouter = priceProviderRouter;
+    this._auditRepository = auditRepository;
   }
 
   /**
    * Execute the use case
-   * @param {Object} _input - {} (no input parameters currently used)
+   * @param {Object} _input - { _audit? } (feature 018: optional audit context)
    * @returns {Promise<Object>} { totalSymbols, succeeded, failed, durationMs }
    */
   async execute(_input = {}) {
@@ -41,6 +44,15 @@ class RefreshPrices extends UseCase {
       const positions = await this._positionRepository.findOpenWithPriceQuotable();
       if (!positions || positions.length === 0) {
         logger.info('RefreshPrices: no positions to refresh');
+        await safeAppendAudit(this._auditRepository, {
+          operation: 'price_refresh',
+          targetType: 'prices',
+          targetId: 'all-open',
+          changes: [],
+          details: { totalSymbols: 0, succeeded: 0, failed: 0 },
+          confirmationUsed: false,
+          source: (_input._audit && _input._audit.source) || 'api',
+        });
         return { totalSymbols: 0, succeeded: 0, failed: 0, durationMs: Date.now() - startTime };
       }
 
@@ -139,6 +151,18 @@ class RefreshPrices extends UseCase {
 
       const durationMs = Date.now() - startTime;
       logger.info('RefreshPrices: completed', { totalSymbols, succeeded, failed, durationMs });
+
+      // Feature 018: record the refresh run in the audit trail (summary only —
+      // per-position price changes are system-driven, not field-level edits).
+      await safeAppendAudit(this._auditRepository, {
+        operation: 'price_refresh',
+        targetType: 'prices',
+        targetId: 'all-open',
+        changes: [],
+        details: { totalSymbols, succeeded, failed },
+        confirmationUsed: false,
+        source: (_input._audit && _input._audit.source) || 'api',
+      });
 
       return { totalSymbols, succeeded, failed, durationMs };
 
