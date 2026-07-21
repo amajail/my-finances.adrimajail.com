@@ -14,6 +14,7 @@
 
 const { app } = require('@azure/functions');
 const container = require('../application/di/container');
+const { runTimer } = require('./_shared');
 
 /**
  * Cron expression (NCRONTAB six-field format, evaluated in the Function App's
@@ -29,13 +30,7 @@ const SCHEDULE = '0 30 16 * * 1-5';
 app.timer('refreshPricesTimer', {
   schedule: SCHEDULE,
   handler: async (_myTimer, context) => {
-    try {
-      const useCase = container.getRefreshPrices();
-      const result = await useCase.execute({});
-      context.log('Price refresh complete', result);
-    } catch (err) {
-      context.log.error('Price refresh failed', err.message || err);
-    }
+    await runTimer(context, 'Price refresh', () => container.getRefreshPrices().execute({}));
   },
 });
 
