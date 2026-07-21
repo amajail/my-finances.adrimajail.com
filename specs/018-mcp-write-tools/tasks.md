@@ -98,9 +98,9 @@
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T025 Update the MCP server self-description in host.json (`extensions.mcp.instructions` currently says read-only): describe the write tools, the confirm-flag guardrail, no-delete posture, and audit trail; bump `serverVersion`
-- [ ] T026 Run full suite `npx jest` — all green (pr-checks.yml gate); fix any regression in the same change
-- [ ] T027 Validate quickstart.md end-to-end locally (Azurite + `func start` + an MCP client): walk steps 1–7 with placeholder data only (Constitution I — no real symbols/quantities/PPCs in any committed artifact or output)
+- [X] T025 Update the MCP server self-description in host.json (`extensions.mcp.instructions` currently says read-only): describe the write tools, the confirm-flag guardrail, no-delete posture, and audit trail; bump `serverVersion`
+- [X] T026 Run full suite `npx jest` — all green (pr-checks.yml gate); fix any regression in the same change
+- [X] T027 Validate quickstart.md end-to-end locally (Azurite + `func start` + an MCP client): walk steps 1–7 with placeholder data only (Constitution I — no real symbols/quantities/PPCs in any committed artifact or output)
 
 ---
 

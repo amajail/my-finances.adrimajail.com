@@ -6,9 +6,9 @@
   },
   "extensions": {
     "mcp": {
-      "instructions": "Read-only access to the owner's investment portfolio: positions, portfolio summary, and weekly AI analyses.",
+      "instructions": "Access to the owner's investment portfolio: positions, portfolio summary, and weekly AI analyses (read tools), plus conversational maintenance (write tools): update_position (partial; large quantity changes need confirm=true), create_position, set_order_execution_status (optionally with execution price), and trigger_price_refresh. There is no delete tool \u2014 close a holding via update_position with status 'closed'. Every write is recorded in an audit trail queryable via list_audit_entries.",
       "serverName": "my-finances",
-      "serverVersion": "0.1.0"
+      "serverVersion": "0.2.0"
     }
   }
 }
