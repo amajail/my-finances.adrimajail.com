@@ -14,6 +14,7 @@ const AzurePriceRepository = require('../../infrastructure/repositories/AzurePri
 const AzureAnalysisRepository = require('../../infrastructure/repositories/AzureAnalysisRepository');
 const AzureInstructionsRepository = require('../../infrastructure/repositories/AzureInstructionsRepository');
 const AzureAllocationTargetsRepository = require('../../infrastructure/repositories/AzureAllocationTargetsRepository');
+const AzureAuditRepository = require('../../infrastructure/repositories/AzureAuditRepository');
 
 // Infrastructure providers
 const { YahooFinancePriceProvider, YahooDividendEventsProvider, CohenPriceProvider, IOLPriceProvider, PriceProviderRouter } = require('../../infrastructure/providers');
@@ -54,7 +55,9 @@ const {
   SaveInstructions,
   ListInstructionsHistory,
   GetInstructionsHistoryEntry,
-  RestoreInstructionsVersion
+  RestoreInstructionsVersion,
+  GuardedUpdatePosition,
+  ListAuditEntries
 } = require('../use-cases');
 
 /**
@@ -152,6 +155,19 @@ class Container {
       this._singletons.set('allocationTargetsRepository', repository);
     }
     return this._singletons.get('allocationTargetsRepository');
+  }
+
+  /**
+   * Get AuditRepository instance (feature 018). Append-only write-audit trail
+   * on the `portfolioAudit` table.
+   * @returns {IAuditRepository}
+   */
+  getAuditRepository() {
+    if (!this._singletons.has('auditRepository')) {
+      const repository = new AzureAuditRepository();
+      this._singletons.set('auditRepository', repository);
+    }
+    return this._singletons.get('auditRepository');
   }
 
   // ==================== Providers ====================
@@ -322,7 +338,8 @@ class Container {
   getAddPosition() {
     return new AddPosition({
       brokerRepository: this.getBrokerRepository(),
-      positionRepository: this.getPositionRepository()
+      positionRepository: this.getPositionRepository(),
+      auditRepository: this.getAuditRepository()
     });
   }
 
@@ -332,7 +349,21 @@ class Container {
    */
   getUpdatePosition() {
     return new UpdatePosition({
-      positionRepository: this.getPositionRepository()
+      positionRepository: this.getPositionRepository(),
+      auditRepository: this.getAuditRepository()
+    });
+  }
+
+  /**
+   * Get GuardedUpdatePosition use case (feature 018). MCP-path wrapper around
+   * UpdatePosition: quantity-change guardrail + null-key stripping.
+   * @returns {GuardedUpdatePosition}
+   */
+  getGuardedUpdatePosition() {
+    return new GuardedUpdatePosition({
+      updatePosition: this.getUpdatePosition(),
+      positionRepository: this.getPositionRepository(),
+      settingsRepository: this.getSettingsRepository()
     });
   }
 
@@ -417,7 +448,8 @@ class Container {
     return new RefreshPrices({
       positionRepository: this.getPositionRepository(),
       priceRepository: this.getPriceRepository(),
-      priceProviderRouter: this.getPriceProviderRouter()
+      priceProviderRouter: this.getPriceProviderRouter(),
+      auditRepository: this.getAuditRepository()
     });
   }
 
@@ -455,6 +487,17 @@ class Container {
   getSetOrderExecutionStatus() {
     return new SetOrderExecutionStatus({
       analysisRepository: this.getAnalysisRepository(),
+      auditRepository: this.getAuditRepository(),
+    });
+  }
+
+  /**
+   * Get ListAuditEntries use case (feature 018).
+   * @returns {ListAuditEntries}
+   */
+  getListAuditEntries() {
+    return new ListAuditEntries({
+      auditRepository: this.getAuditRepository(),
     });
   }
 

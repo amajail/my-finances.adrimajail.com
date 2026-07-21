@@ -16,6 +16,7 @@ const IRiesgoPaisProvider = require('./IRiesgoPaisProvider');
 const IMepProvider = require('./IMepProvider');
 const IInstructionsRepository = require('./IInstructionsRepository');
 const IAllocationTargetsRepository = require('./IAllocationTargetsRepository');
+const IAuditRepository = require('./IAuditRepository');
 
 module.exports = {
   IBrokerRepository,
@@ -28,5 +29,6 @@ module.exports = {
   IRiesgoPaisProvider,
   IMepProvider,
   IInstructionsRepository,
-  IAllocationTargetsRepository
+  IAllocationTargetsRepository,
+  IAuditRepository
 };

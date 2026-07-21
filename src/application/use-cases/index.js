@@ -10,7 +10,7 @@ const UseCase = require('./UseCase');
 const { ListBrokers, CreateBroker } = require('./brokers');
 
 // Position use cases
-const { ListPositions, AddPosition, UpdatePosition, DeletePosition } = require('./positions');
+const { ListPositions, AddPosition, UpdatePosition, DeletePosition, GuardedUpdatePosition } = require('./positions');
 
 // Portfolio use cases
 const { GetPortfolioSummary } = require('./portfolio');
@@ -29,6 +29,9 @@ const GetSuggestionScorecard = require('./analysis/GetSuggestionScorecard');
 const GetMacroSeries = require('./analysis/GetMacroSeries');
 const GetPerformanceSeries = require('./analysis/GetPerformanceSeries');
 
+// Audit use cases (feature 018)
+const { ListAuditEntries } = require('./audit');
+
 // Instructions use cases (feature 005)
 const {
   GetActiveInstructions,
@@ -46,6 +49,7 @@ module.exports = {
   AddPosition,
   UpdatePosition,
   DeletePosition,
+  GuardedUpdatePosition,
   GetPortfolioSummary,
   GetSetting,
   UpdateSetting,
@@ -60,5 +64,6 @@ module.exports = {
   SaveInstructions,
   ListInstructionsHistory,
   GetInstructionsHistoryEntry,
-  RestoreInstructionsVersion
+  RestoreInstructionsVersion,
+  ListAuditEntries
 };

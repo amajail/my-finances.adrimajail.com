@@ -1,16 +1,22 @@
 /**
  * MCP (Model Context Protocol) server tools.
  *
- * Exposes read-only portfolio data as MCP tools so remote clients (e.g. Claude
+ * Exposes the owner's portfolio as MCP tools so remote clients (e.g. Claude
  * Desktop custom connectors) can query positions, the portfolio summary, and
- * weekly analyses. Hosted in-process by the Azure Functions MCP extension on the
- * separate `/runtime/webhooks/mcp` endpoint (Streamable HTTP) — the existing
+ * weekly analyses — and, since feature 018, maintain the portfolio via four
+ * write tools (update_position, create_position, set_order_execution_status,
+ * trigger_price_refresh) plus the list_audit_entries read tool. There is
+ * deliberately NO delete tool (spec FR-001): retiring a holding is done via
+ * update_position with status "closed". Hosted in-process by the Azure
+ * Functions MCP extension on the separate `/runtime/webhooks/mcp` endpoint
+ * (Streamable HTTP, behind the platform system key) — the existing
  * `authLevel: 'function'` HTTP API under `/api/*` is untouched.
  *
  * Each tool is thin: read args from `context.triggerMetadata.mcptoolargs`, call
- * the same DI-container use-case the HTTP endpoints use, and return a JSON string
- * (MCP tool results are strings, not the `{ status, jsonBody }` HTTP shape, so we
- * do NOT reuse `_shared.js`'s `ok`/`mapError`).
+ * the same DI-container use-case the HTTP endpoints use (so writes get the
+ * exact same domain validation as the dashboard path, spec FR-003), and return
+ * a JSON string (MCP tool results are strings, not the `{ status, jsonBody }`
+ * HTTP shape, so we do NOT reuse `_shared.js`'s `ok`/`mapError`).
  */
 
 const { app } = require('@azure/functions');
@@ -20,7 +26,10 @@ const logger = require('../shared/logging');
 /**
  * Wrap a tool handler so args are normalized and errors become a JSON `{ error }`
  * string instead of throwing (a thrown error surfaces to the client as an opaque
- * failure; an `{ error }` payload is legible to the model).
+ * failure; an `{ error }` payload is legible to the model). Feature 018 (FR-007):
+ * the payload also carries the error class as `code` and any field-level
+ * `validationErrors` as `details`, so an agent can self-correct a rejected write
+ * without external documentation.
  * @param {string} toolName
  * @param {(args: Object) => Promise<any>} fn - receives the parsed tool args
  */
@@ -32,9 +41,26 @@ function tool(toolName, fn) {
       return JSON.stringify(result);
     } catch (err) {
       logger.error(`MCP tool ${toolName} failed`, { error: err && err.message });
-      return JSON.stringify({ error: (err && err.message) || 'unknown error' });
+      return JSON.stringify({
+        error: (err && err.message) || 'unknown error',
+        code: (err && err.name) || undefined,
+        details: (err && err.validationErrors) || undefined,
+      });
     }
   };
+}
+
+/**
+ * Parse an optionally-string-typed numeric tool arg. MCP toolProperties are
+ * flat, and clients may send numbers as strings — normalize here so use-cases
+ * see real numbers (an unparseable value becomes NaN and is rejected by the
+ * same domain validation as the dashboard path).
+ * @param {*} value
+ * @returns {number|undefined} undefined when the arg was not provided
+ */
+function toNumber(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  return Number(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,11 +185,34 @@ app.mcpTool('mcpGetWeeklyAnalysis', {
         rationale: o.rationale,
         conviction: o.conviction,
         executionStatus: o.executionStatus || 'pending',
+        executionPrice: o.executionPrice != null ? o.executionPrice : null,
       }));
     } else {
       body.errorMessage = analysis.errorMessage;
       body.orders = [];
     }
     return body;
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// list_audit_entries (feature 018, FR-006)
+// ---------------------------------------------------------------------------
+app.mcpTool('mcpListAuditEntries', {
+  toolName: 'list_audit_entries',
+  description:
+    'List recent write-audit entries (newest first). Every write performed through the MCP tools ' +
+    'or the API is recorded with timestamp, operation, target, field-level old/new values, and ' +
+    'whether the over-threshold confirmation flag was used.',
+  toolProperties: [
+    {
+      propertyName: 'limit',
+      propertyType: 'integer',
+      description: 'Maximum number of entries to return (1-100, default 20).',
+      isRequired: false,
+    },
+  ],
+  handler: tool('list_audit_entries', async (args) => {
+    return container.getListAuditEntries().execute({ limit: args.limit });
   }),
 });
