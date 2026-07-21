@@ -3,39 +3,24 @@
  *
  * Implementation of IPositionRepository using Azure Table Storage.
  * Handles persistence of Position entities.
+ *
+ * @implements {IPositionRepository}
  */
 
-const IPositionRepository = require('../../application/interfaces/IPositionRepository');
 const Position = require('../../domain/entities/Position');
 const BrokerId = require('../../domain/value-objects/BrokerId');
 const AssetType = require('../../domain/value-objects/AssetType');
 const logger = require('../../shared/logging');
-const { InfrastructureError } = require('../../shared/errors');
+const AzureTableRepository = require('./AzureTableRepository');
 
-class AzurePositionRepository extends IPositionRepository {
+class AzurePositionRepository extends AzureTableRepository {
   /**
    * Create a new AzurePositionRepository
    * @param {AzureTableDatabase} [database=null] - Database instance
    *                              If null, creates a new instance
    */
   constructor(database = null) {
-    super();
-    this._database = database;
-    this._initialized = false;
-  }
-
-  /**
-   * Lazy initialize database if not provided in constructor
-   * @private
-   * @returns {Promise<void>}
-   */
-  async _ensureInitialized() {
-    if (!this._initialized && !this._database) {
-      const AzureTableDatabase = require('../../database/AzureTableDatabase');
-      this._database = new AzureTableDatabase();
-      await this._database.initialize();
-      this._initialized = true;
-    }
+    super(database);
   }
 
   /**
@@ -48,19 +33,14 @@ class AzurePositionRepository extends IPositionRepository {
     await this._ensureInitialized();
 
     const entity = this._toDatabase(position);
-    try {
-      await this._database.positionsClient.createEntity(entity);
-      logger.debug(`Position saved: ${position.brokerId.value}/${position.id()}`);
-      return position;
-    } catch (error) {
-      if (error.statusCode === 409) {
-        const msg = `Position already exists: ${position.brokerId.value}/${position.id()}`;
-        logger.error(`Failed to save position: ${msg}`, error);
-        throw new InfrastructureError(msg);
-      }
-      logger.error(`Failed to save position: ${position.brokerId.value}/${position.id()}`, error);
-      throw error;
-    }
+    const label = `${position.brokerId.value}/${position.id()}`;
+    await this._create(this._database.positionsClient, entity, {
+      conflictMessage: `Position already exists: ${label}`,
+      conflictLogMessage: `Failed to save position: Position already exists: ${label}`,
+      errorLogMessage: `Failed to save position: ${label}`,
+    });
+    logger.debug(`Position saved: ${label}`);
+    return position;
   }
 
   /**
@@ -73,18 +53,17 @@ class AzurePositionRepository extends IPositionRepository {
     await this._ensureInitialized();
 
     const brokerIdStr = this._resolveId(brokerId);
-    try {
-      const entity = await this._database.positionsClient.getEntity(brokerIdStr, rowKey);
-      logger.debug(`Position found: ${brokerIdStr}/${rowKey}`);
-      return this._fromDatabase(entity);
-    } catch (error) {
-      if (error.statusCode === 404) {
-        logger.debug(`Position not found: ${brokerIdStr}/${rowKey}`);
-        return null;
-      }
-      logger.error(`Failed to find position: ${brokerIdStr}/${rowKey}`, error);
-      throw error;
+    const entity = await this._withNotFound(
+      () => this._database.positionsClient.getEntity(brokerIdStr, rowKey),
+      null,
+      `Failed to find position: ${brokerIdStr}/${rowKey}`
+    );
+    if (entity === null) {
+      logger.debug(`Position not found: ${brokerIdStr}/${rowKey}`);
+      return null;
     }
+    logger.debug(`Position found: ${brokerIdStr}/${rowKey}`);
+    return this._fromDatabase(entity);
   }
 
   /**
@@ -96,18 +75,14 @@ class AzurePositionRepository extends IPositionRepository {
     await this._ensureInitialized();
 
     const brokerIdStr = this._resolveId(brokerId);
-    const positions = [];
-    try {
-      const filter = `PartitionKey eq '${brokerIdStr}'`;
-      for await (const entity of this._database.positionsClient.listEntities({ queryOptions: { filter } })) {
-        positions.push(this._fromDatabase(entity));
-      }
-      logger.debug(`Found ${positions.length} positions for broker: ${brokerIdStr}`);
-      return positions;
-    } catch (error) {
-      logger.error(`Failed to list positions for broker: ${brokerIdStr}`, error);
-      throw error;
-    }
+    const filter = `PartitionKey eq '${brokerIdStr}'`;
+    const positions = await this._collect(
+      this._database.positionsClient.listEntities({ queryOptions: { filter } }),
+      (entity) => this._fromDatabase(entity),
+      `Failed to list positions for broker: ${brokerIdStr}`
+    );
+    logger.debug(`Found ${positions.length} positions for broker: ${brokerIdStr}`);
+    return positions;
   }
 
   /**
@@ -120,32 +95,28 @@ class AzurePositionRepository extends IPositionRepository {
   async findAll(filter = {}) {
     await this._ensureInitialized();
 
-    const positions = [];
-    try {
-      for await (const entity of this._database.positionsClient.listEntities()) {
-        positions.push(this._fromDatabase(entity));
-      }
+    const positions = await this._collect(
+      this._database.positionsClient.listEntities(),
+      (entity) => this._fromDatabase(entity),
+      'Failed to list all positions'
+    );
 
-      // Apply JS-level filters
-      let filtered = positions;
+    // Apply JS-level filters
+    let filtered = positions;
 
-      // Filter by status
-      const status = filter.status || 'all';
-      if (status !== 'all') {
-        filtered = filtered.filter(p => p.status === status);
-      }
-
-      // Filter by assetType
-      if (filter.assetType) {
-        filtered = filtered.filter(p => p.assetType === filter.assetType);
-      }
-
-      logger.debug(`Found ${filtered.length} positions (total: ${positions.length}) with filters: ${JSON.stringify(filter)}`);
-      return filtered;
-    } catch (error) {
-      logger.error('Failed to list all positions', error);
-      throw error;
+    // Filter by status
+    const status = filter.status || 'all';
+    if (status !== 'all') {
+      filtered = filtered.filter(p => p.status === status);
     }
+
+    // Filter by assetType
+    if (filter.assetType) {
+      filtered = filtered.filter(p => p.assetType === filter.assetType);
+    }
+
+    logger.debug(`Found ${filtered.length} positions (total: ${positions.length}) with filters: ${JSON.stringify(filter)}`);
+    return filtered;
   }
 
   /**
@@ -157,14 +128,13 @@ class AzurePositionRepository extends IPositionRepository {
     await this._ensureInitialized();
 
     const entity = this._toDatabase(position);
-    try {
-      await this._database.positionsClient.upsertEntity(entity, 'Replace');
-      logger.debug(`Position updated: ${position.brokerId.value}/${position.id()}`);
-      return position;
-    } catch (error) {
-      logger.error(`Failed to update position: ${position.brokerId.value}/${position.id()}`, error);
-      throw error;
-    }
+    const label = `${position.brokerId.value}/${position.id()}`;
+    await this._run(
+      () => this._database.positionsClient.upsertEntity(entity, 'Replace'),
+      `Failed to update position: ${label}`
+    );
+    logger.debug(`Position updated: ${label}`);
+    return position;
   }
 
   /**
@@ -177,18 +147,18 @@ class AzurePositionRepository extends IPositionRepository {
     await this._ensureInitialized();
 
     const brokerIdStr = this._resolveId(brokerId);
-    try {
-      await this._database.positionsClient.deleteEntity(brokerIdStr, rowKey);
-      logger.debug(`Position deleted: ${brokerIdStr}/${rowKey}`);
-      return true;
-    } catch (error) {
-      if (error.statusCode === 404) {
-        logger.debug(`Position not found for deletion: ${brokerIdStr}/${rowKey}`);
-        return false;
-      }
-      logger.error(`Failed to delete position: ${brokerIdStr}/${rowKey}`, error);
-      throw error;
-    }
+    const deleted = await this._withNotFound(
+      async () => {
+        await this._database.positionsClient.deleteEntity(brokerIdStr, rowKey);
+        return true;
+      },
+      false,
+      `Failed to delete position: ${brokerIdStr}/${rowKey}`
+    );
+    logger.debug(deleted
+      ? `Position deleted: ${brokerIdStr}/${rowKey}`
+      : `Position not found for deletion: ${brokerIdStr}/${rowKey}`);
+    return deleted;
   }
 
   /**
@@ -265,10 +235,7 @@ class AzurePositionRepository extends IPositionRepository {
    * @returns {string} Broker ID string value
    */
   _resolveId(brokerId) {
-    if (brokerId instanceof BrokerId) {
-      return brokerId.value;
-    }
-    return String(brokerId);
+    return super._resolveId(brokerId, BrokerId);
   }
 }
 

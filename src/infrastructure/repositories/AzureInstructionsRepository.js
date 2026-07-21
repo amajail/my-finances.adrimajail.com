@@ -12,9 +12,8 @@
  * place, orphaned and non-destructively.
  */
 
-const IInstructionsRepository = require('../../application/interfaces/IInstructionsRepository');
 const InstructionsHistoryEntry = require('../../domain/entities/InstructionsHistoryEntry');
-const logger = require('../../shared/logging');
+const AzureTableRepository = require('./AzureTableRepository');
 
 const SETTINGS_PARTITION = 'settings';
 const SETTINGS_ROWKEY = 'analysis.instructionsV1';
@@ -66,25 +65,15 @@ function getChunked(entity, base) {
   return out;
 }
 
-class AzureInstructionsRepository extends IInstructionsRepository {
+/**
+ * @implements {IInstructionsRepository}
+ */
+class AzureInstructionsRepository extends AzureTableRepository {
   /**
    * @param {AzureTableDatabase} [database=null] - Database instance; lazy-created when null.
    */
   constructor(database = null) {
-    super();
-    this._database = database;
-    this._initialized = false;
-  }
-
-  async _ensureInitialized() {
-    if (!this._initialized) {
-      if (!this._database) {
-        const AzureTableDatabase = require('../../database/AzureTableDatabase');
-        this._database = new AzureTableDatabase();
-      }
-      await this._database.initialize();
-      this._initialized = true;
-    }
+    super(database, { alwaysInitializeProvidedDatabase: true });
   }
 
   /**
@@ -93,23 +82,17 @@ class AzureInstructionsRepository extends IInstructionsRepository {
   async getActive() {
     await this._ensureInitialized();
 
-    try {
-      const entity = await this._database.settingsClient.getEntity(
-        SETTINGS_PARTITION,
-        SETTINGS_ROWKEY
-      );
-      return {
-        content: getChunked(entity, 'value'),
-        historyRowKey: entity.historyRowKey || null,
-        updatedAt: entity.updatedAt || null,
-      };
-    } catch (error) {
-      if (error.statusCode === 404) {
-        return null;
-      }
-      logger.error('Failed to read active instructions', error);
-      throw error;
-    }
+    const entity = await this._withNotFound(
+      () => this._database.settingsClient.getEntity(SETTINGS_PARTITION, SETTINGS_ROWKEY),
+      null,
+      'Failed to read active instructions'
+    );
+    if (entity === null) return null;
+    return {
+      content: getChunked(entity, 'value'),
+      historyRowKey: entity.historyRowKey || null,
+      updatedAt: entity.updatedAt || null,
+    };
   }
 
   /**
@@ -155,30 +138,26 @@ class AzureInstructionsRepository extends IInstructionsRepository {
       historyEntity.restoreOfRowKey = entry.restoreOfRowKey;
     }
 
-    try {
-      await this._database.instructionsHistoryClient.createEntity(historyEntity);
-    } catch (error) {
-      logger.error('Failed to write instructions history entry', error);
-      throw error;
-    }
+    await this._run(
+      () => this._database.instructionsHistoryClient.createEntity(historyEntity),
+      'Failed to write instructions history entry'
+    );
 
     // 2) Upsert the active settings row to point at the new history row.
     //    Merge mode preserves any unrelated properties on the settings row.
-    try {
-      const settingsEntity = {
-        partitionKey: SETTINGS_PARTITION,
-        rowKey: SETTINGS_ROWKEY,
-        historyRowKey: entry.id,
-        updatedAt: entry.timestamp,
-      };
-      setChunked(settingsEntity, 'value', entry.content);
-      await this._database.settingsClient.upsertEntity(settingsEntity, 'Merge');
-    } catch (error) {
-      // Orphan-history scenario: history row exists but settings row is not
-      // pointing at it. Caller surfaces as 500; next save reconciles.
-      logger.error('Failed to update active instructions settings row', error);
-      throw error;
-    }
+    // Orphan-history scenario on failure: history row exists but settings row
+    // is not pointing at it. Caller surfaces as 500; next save reconciles.
+    const settingsEntity = {
+      partitionKey: SETTINGS_PARTITION,
+      rowKey: SETTINGS_ROWKEY,
+      historyRowKey: entry.id,
+      updatedAt: entry.timestamp,
+    };
+    setChunked(settingsEntity, 'value', entry.content);
+    await this._run(
+      () => this._database.settingsClient.upsertEntity(settingsEntity, 'Merge'),
+      'Failed to update active instructions settings row'
+    );
 
     return entry;
   }
@@ -191,9 +170,9 @@ class AzureInstructionsRepository extends IInstructionsRepository {
     await this._ensureInitialized();
 
     const safeLimit = Math.max(1, Math.min(200, parseInt(limit, 10) || 50));
-    const out = [];
 
-    try {
+    return this._run(async () => {
+      const out = [];
       for await (const entity of this._database.instructionsHistoryClient.listEntities({
         queryOptions: { filter: `PartitionKey eq '${HISTORY_PARTITION}'` },
       })) {
@@ -211,10 +190,7 @@ class AzureInstructionsRepository extends IInstructionsRepository {
         }
       }
       return out;
-    } catch (error) {
-      logger.error('Failed to list instructions history', error);
-      throw error;
-    }
+    }, 'Failed to list instructions history');
   }
 
   /**
@@ -224,23 +200,20 @@ class AzureInstructionsRepository extends IInstructionsRepository {
   async getHistoryEntry(rowKey) {
     await this._ensureInitialized();
 
-    try {
-      const entity = await this._database.instructionsHistoryClient.getEntity(HISTORY_PARTITION, rowKey);
-      return new InstructionsHistoryEntry({
-        id: entity.rowKey,
-        content: getChunked(entity, 'content'),
-        timestamp: entity.timestamp,
-        changeNote: entity.changeNote || null,
-        source: entity.source || 'edit',
-        restoreOfRowKey: entity.restoreOfRowKey || null,
-      });
-    } catch (error) {
-      if (error.statusCode === 404) {
-        return null;
-      }
-      logger.error(`Failed to fetch instructions history entry: ${rowKey}`, error);
-      throw error;
-    }
+    const entity = await this._withNotFound(
+      () => this._database.instructionsHistoryClient.getEntity(HISTORY_PARTITION, rowKey),
+      null,
+      `Failed to fetch instructions history entry: ${rowKey}`
+    );
+    if (entity === null) return null;
+    return new InstructionsHistoryEntry({
+      id: entity.rowKey,
+      content: getChunked(entity, 'content'),
+      timestamp: entity.timestamp,
+      changeNote: entity.changeNote || null,
+      source: entity.source || 'edit',
+      restoreOfRowKey: entity.restoreOfRowKey || null,
+    });
   }
 }
 

@@ -12,31 +12,21 @@
  * Feature: 002-weekly-rebalance-analysis.
  */
 
-const IAnalysisRepository = require('../../application/interfaces/IAnalysisRepository');
 const WeeklyAnalysis = require('../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../domain/entities/SuggestedOrder');
 const logger = require('../../shared/logging');
 const { NotFoundError } = require('../../shared/errors');
+const AzureTableRepository = require('./AzureTableRepository');
 
-class AzureAnalysisRepository extends IAnalysisRepository {
+/**
+ * @implements {IAnalysisRepository}
+ */
+class AzureAnalysisRepository extends AzureTableRepository {
   /**
    * @param {AzureTableDatabase} [database=null] - Database instance; lazy-created when null.
    */
   constructor(database = null) {
-    super();
-    this._database = database;
-    this._initialized = false;
-  }
-
-  async _ensureInitialized() {
-    if (!this._initialized) {
-      if (!this._database) {
-        const AzureTableDatabase = require('../../database/AzureTableDatabase');
-        this._database = new AzureTableDatabase();
-      }
-      await this._database.initialize();
-      this._initialized = true;
-    }
+    super(database, { alwaysInitializeProvidedDatabase: true });
   }
 
   /**
@@ -47,22 +37,18 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     await this._ensureInitialized();
 
     const safeLimit = Math.max(1, Math.min(200, parseInt(limit, 10) || 20));
-    const rows = [];
-    try {
-      // Single-partition design: PartitionKey is always 'weekly'. Pull all and
-      // sort newest first; row count per year is tiny (~52), so we don't
-      // bother with server-side ranges.
-      for await (const entity of this._database.analysisClient.listEntities({
+    // Single-partition design: PartitionKey is always 'weekly'. Pull all and
+    // sort newest first; row count per year is tiny (~52), so we don't
+    // bother with server-side ranges.
+    const rows = await this._collect(
+      this._database.analysisClient.listEntities({
         queryOptions: { filter: "PartitionKey eq 'weekly'" },
-      })) {
-        rows.push(this._analysisFromEntity(entity));
-      }
-      rows.sort((a, b) => b.date.localeCompare(a.date));
-      return rows.slice(0, safeLimit);
-    } catch (error) {
-      logger.error('Failed to list weekly analyses', error);
-      throw error;
-    }
+      }),
+      (entity) => this._analysisFromEntity(entity),
+      'Failed to list weekly analyses'
+    );
+    rows.sort((a, b) => b.date.localeCompare(a.date));
+    return rows.slice(0, safeLimit);
   }
 
   /**
@@ -72,29 +58,23 @@ class AzureAnalysisRepository extends IAnalysisRepository {
   async getByDate(date) {
     await this._ensureInitialized();
 
-    let analysisEntity;
-    try {
-      analysisEntity = await this._database.analysisClient.getEntity('weekly', date);
-    } catch (error) {
-      if (error.statusCode === 404) {
-        return null;
-      }
-      logger.error(`Failed to fetch analysis for ${date}`, error);
-      throw error;
+    const analysisEntity = await this._withNotFound(
+      () => this._database.analysisClient.getEntity('weekly', date),
+      null,
+      `Failed to fetch analysis for ${date}`
+    );
+    if (analysisEntity === null) {
+      return null;
     }
 
-    const orders = [];
-    try {
-      for await (const entity of this._database.ordersClient.listEntities({
+    const orders = await this._collect(
+      this._database.ordersClient.listEntities({
         queryOptions: { filter: `PartitionKey eq '${date}'` },
-      })) {
-        orders.push(this._orderFromEntity(entity));
-      }
-      orders.sort((a, b) => a.index - b.index);
-    } catch (error) {
-      logger.error(`Failed to fetch orders for ${date}`, error);
-      throw error;
-    }
+      }),
+      (entity) => this._orderFromEntity(entity),
+      `Failed to fetch orders for ${date}`
+    );
+    orders.sort((a, b) => a.index - b.index);
 
     return {
       analysis: this._analysisFromEntity(analysisEntity),
@@ -111,7 +91,7 @@ class AzureAnalysisRepository extends IAnalysisRepository {
     await this._ensureInitialized();
 
     // 1. Delete prior orders for this date (replace semantics, FR-021).
-    try {
+    await this._run(async () => {
       const priorRowKeys = [];
       for await (const entity of this._database.ordersClient.listEntities({
         queryOptions: { filter: `PartitionKey eq '${weeklyAnalysis.date}'` },
@@ -125,33 +105,26 @@ class AzureAnalysisRepository extends IAnalysisRepository {
           if (delErr.statusCode !== 404) throw delErr;
         }
       }
-    } catch (error) {
-      logger.error(`Failed to clear prior orders for ${weeklyAnalysis.date}`, error);
-      throw error;
-    }
+    }, `Failed to clear prior orders for ${weeklyAnalysis.date}`);
 
     // 2. Upsert the analysis row.
-    try {
-      await this._database.analysisClient.upsertEntity(
+    await this._run(
+      () => this._database.analysisClient.upsertEntity(
         this._analysisToEntity(weeklyAnalysis),
         'Replace'
-      );
-    } catch (error) {
-      logger.error(`Failed to upsert analysis for ${weeklyAnalysis.date}`, error);
-      throw error;
-    }
+      ),
+      `Failed to upsert analysis for ${weeklyAnalysis.date}`
+    );
 
     // 3. Write the new orders.
     for (const order of suggestedOrders) {
-      try {
-        await this._database.ordersClient.upsertEntity(
+      await this._run(
+        () => this._database.ordersClient.upsertEntity(
           this._orderToEntity(order),
           'Replace'
-        );
-      } catch (error) {
-        logger.error(`Failed to upsert order ${order.index} for ${weeklyAnalysis.date}`, error);
-        throw error;
-      }
+        ),
+        `Failed to upsert order ${order.index} for ${weeklyAnalysis.date}`
+      );
     }
 
     logger.debug(`Persisted weekly analysis ${weeklyAnalysis.date} with ${suggestedOrders.length} orders`);

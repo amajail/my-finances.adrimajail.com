@@ -17,6 +17,7 @@
 
 const { app } = require('@azure/functions');
 const container = require('../application/di/container');
+const { runTimer } = require('./_shared');
 
 /**
  * NCRONTAB six-field format evaluated in the Function App's local TZ:
@@ -29,20 +30,16 @@ const SCHEDULE = '0 0 17 * * 5';
 app.timer('weeklyAnalysisTimer', {
   schedule: SCHEDULE,
   handler: async (_myTimer, context) => {
-    try {
-      const useCase = container.getGenerateWeeklyAnalysis();
-      const result = await useCase.execute({});
-      context.log('Weekly analysis run complete', {
-        date: result.date,
-        status: result.status,
-        durationMs: result.durationMs,
-      });
-    } catch (err) {
-      // The use-case already persisted a `failed` row before re-throwing
-      // unexpected errors. We only log the type/message here, never any
-      // payload (FR-029).
-      context.log.error('Weekly analysis run failed', err && err.message ? err.message : String(err));
-    }
+    // The use-case already persisted a `failed` row before re-throwing
+    // unexpected errors. On failure we only log the type/message here, never
+    // any payload (FR-029) — `runTimer`'s default failure logging already
+    // does exactly that.
+    await runTimer(
+      context,
+      'Weekly analysis run',
+      () => container.getGenerateWeeklyAnalysis().execute({}),
+      (result) => ({ date: result.date, status: result.status, durationMs: result.durationMs })
+    );
   },
 });
 

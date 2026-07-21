@@ -3,7 +3,7 @@
  * Tests error mapping from domain errors to HTTP responses
  */
 
-const { mapError, ok, created, noContent, fail, corsHeaders } = require('../../../src/functions/_shared');
+const { mapError, ok, created, noContent, fail, corsHeaders, runTimer } = require('../../../src/functions/_shared');
 const {
   AppError,
   ValidationError,
@@ -137,6 +137,52 @@ describe('_shared.js response helpers', () => {
       const err = new NotFoundError('Not found');
       const response = mapError(err);
       expect(response.status).toBe(404);
+    });
+  });
+
+  describe('runTimer', () => {
+    let context;
+
+    beforeEach(() => {
+      context = { log: Object.assign(jest.fn(), { error: jest.fn() }) };
+    });
+
+    it('logs "<label> complete" with the task result on success', async () => {
+      const result = await runTimer(context, 'Price refresh', async () => ({ updated: 3 }));
+      expect(result).toEqual({ updated: 3 });
+      expect(context.log).toHaveBeenCalledWith('Price refresh complete', { updated: 3 });
+      expect(context.log.error).not.toHaveBeenCalled();
+    });
+
+    it('applies formatSuccess to project the logged success payload', async () => {
+      await runTimer(
+        context,
+        'Weekly analysis run',
+        async () => ({ date: '2026-07-17', status: 'ok', durationMs: 42, secretPayload: 'x' }),
+        (result) => ({ date: result.date, status: result.status, durationMs: result.durationMs })
+      );
+      expect(context.log).toHaveBeenCalledWith('Weekly analysis run complete', {
+        date: '2026-07-17',
+        status: 'ok',
+        durationMs: 42,
+      });
+    });
+
+    it('never throws: logs "<label> failed" with the error message and swallows it', async () => {
+      const err = new Error('boom');
+      const result = await runTimer(context, 'Price refresh', async () => {
+        throw err;
+      });
+      expect(result).toBeUndefined();
+      expect(context.log.error).toHaveBeenCalledWith('Price refresh failed', 'boom');
+      expect(context.log).not.toHaveBeenCalled();
+    });
+
+    it('falls back to String(err) when the thrown value has no message', async () => {
+      await runTimer(context, 'Price refresh', async () => {
+        throw 'not an Error instance';
+      });
+      expect(context.log.error).toHaveBeenCalledWith('Price refresh failed', 'not an Error instance');
     });
   });
 });

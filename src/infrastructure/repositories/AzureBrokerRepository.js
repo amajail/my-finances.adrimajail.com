@@ -3,38 +3,23 @@
  *
  * Implementation of IBrokerRepository using Azure Table Storage.
  * Handles persistence of Broker entities.
+ *
+ * @implements {IBrokerRepository}
  */
 
-const IBrokerRepository = require('../../application/interfaces/IBrokerRepository');
 const Broker = require('../../domain/entities/Broker');
 const BrokerId = require('../../domain/value-objects/BrokerId');
 const logger = require('../../shared/logging');
-const { InfrastructureError } = require('../../shared/errors');
+const AzureTableRepository = require('./AzureTableRepository');
 
-class AzureBrokerRepository extends IBrokerRepository {
+class AzureBrokerRepository extends AzureTableRepository {
   /**
    * Create a new AzureBrokerRepository
    * @param {AzureTableDatabase} [database=null] - Database instance
    *                              If null, creates a new instance
    */
   constructor(database = null) {
-    super();
-    this._database = database;
-    this._initialized = false;
-  }
-
-  /**
-   * Lazy initialize database if not provided in constructor
-   * @private
-   * @returns {Promise<void>}
-   */
-  async _ensureInitialized() {
-    if (!this._initialized && !this._database) {
-      const AzureTableDatabase = require('../../database/AzureTableDatabase');
-      this._database = new AzureTableDatabase();
-      await this._database.initialize();
-      this._initialized = true;
-    }
+    super(database);
   }
 
   /**
@@ -47,19 +32,13 @@ class AzureBrokerRepository extends IBrokerRepository {
     await this._ensureInitialized();
 
     const entity = this._toDatabase(broker);
-    try {
-      await this._database.brokersClient.createEntity(entity);
-      logger.debug(`Broker saved: ${broker.idValue}`);
-      return broker;
-    } catch (error) {
-      if (error.statusCode === 409) {
-        const msg = `Broker already exists: ${broker.idValue}`;
-        logger.error(`Failed to save broker: ${msg}`, error);
-        throw new InfrastructureError(msg);
-      }
-      logger.error(`Failed to save broker: ${broker.idValue}`, error);
-      throw error;
-    }
+    await this._create(this._database.brokersClient, entity, {
+      conflictMessage: `Broker already exists: ${broker.idValue}`,
+      conflictLogMessage: `Failed to save broker: Broker already exists: ${broker.idValue}`,
+      errorLogMessage: `Failed to save broker: ${broker.idValue}`,
+    });
+    logger.debug(`Broker saved: ${broker.idValue}`);
+    return broker;
   }
 
   /**
@@ -71,18 +50,17 @@ class AzureBrokerRepository extends IBrokerRepository {
     await this._ensureInitialized();
 
     const idValue = this._resolveId(brokerId);
-    try {
-      const entity = await this._database.brokersClient.getEntity('broker', idValue);
-      logger.debug(`Broker found: ${idValue}`);
-      return this._fromDatabase(entity);
-    } catch (error) {
-      if (error.statusCode === 404) {
-        logger.debug(`Broker not found: ${idValue}`);
-        return null;
-      }
-      logger.error(`Failed to find broker: ${idValue}`, error);
-      throw error;
+    const entity = await this._withNotFound(
+      () => this._database.brokersClient.getEntity('broker', idValue),
+      null,
+      `Failed to find broker: ${idValue}`
+    );
+    if (entity === null) {
+      logger.debug(`Broker not found: ${idValue}`);
+      return null;
     }
+    logger.debug(`Broker found: ${idValue}`);
+    return this._fromDatabase(entity);
   }
 
   /**
@@ -92,17 +70,13 @@ class AzureBrokerRepository extends IBrokerRepository {
   async findAll() {
     await this._ensureInitialized();
 
-    const brokers = [];
-    try {
-      for await (const entity of this._database.brokersClient.listEntities()) {
-        brokers.push(this._fromDatabase(entity));
-      }
-      logger.debug(`Found ${brokers.length} brokers`);
-      return brokers.sort((a, b) => a.displayName.localeCompare(b.displayName));
-    } catch (error) {
-      logger.error('Failed to list all brokers', error);
-      throw error;
-    }
+    const brokers = await this._collect(
+      this._database.brokersClient.listEntities(),
+      (entity) => this._fromDatabase(entity),
+      'Failed to list all brokers'
+    );
+    logger.debug(`Found ${brokers.length} brokers`);
+    return brokers.sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
 
   /**
@@ -114,14 +88,12 @@ class AzureBrokerRepository extends IBrokerRepository {
     await this._ensureInitialized();
 
     const entity = this._toDatabase(broker);
-    try {
-      await this._database.brokersClient.upsertEntity(entity, 'Replace');
-      logger.debug(`Broker updated: ${broker.idValue}`);
-      return broker;
-    } catch (error) {
-      logger.error(`Failed to update broker: ${broker.idValue}`, error);
-      throw error;
-    }
+    await this._run(
+      () => this._database.brokersClient.upsertEntity(entity, 'Replace'),
+      `Failed to update broker: ${broker.idValue}`
+    );
+    logger.debug(`Broker updated: ${broker.idValue}`);
+    return broker;
   }
 
   /**
@@ -133,18 +105,16 @@ class AzureBrokerRepository extends IBrokerRepository {
     await this._ensureInitialized();
 
     const idValue = this._resolveId(brokerId);
-    try {
-      await this._database.brokersClient.deleteEntity('broker', idValue);
-      logger.debug(`Broker deleted: ${idValue}`);
-      return true;
-    } catch (error) {
-      if (error.statusCode === 404) {
-        logger.debug(`Broker not found for deletion: ${idValue}`);
-        return false;
-      }
-      logger.error(`Failed to delete broker: ${idValue}`, error);
-      throw error;
-    }
+    const deleted = await this._withNotFound(
+      async () => {
+        await this._database.brokersClient.deleteEntity('broker', idValue);
+        return true;
+      },
+      false,
+      `Failed to delete broker: ${idValue}`
+    );
+    logger.debug(deleted ? `Broker deleted: ${idValue}` : `Broker not found for deletion: ${idValue}`);
+    return deleted;
   }
 
   /**
@@ -191,10 +161,7 @@ class AzureBrokerRepository extends IBrokerRepository {
    * @returns {string} Broker ID string value
    */
   _resolveId(brokerId) {
-    if (brokerId instanceof BrokerId) {
-      return brokerId.value;
-    }
-    return String(brokerId);
+    return super._resolveId(brokerId, BrokerId);
   }
 }
 

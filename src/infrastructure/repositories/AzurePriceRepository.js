@@ -3,35 +3,21 @@
  *
  * Implementation of IPriceRepository using Azure Table Storage.
  * Handles persistence of price quotes with reverse-time ordering.
+ *
+ * @implements {IPriceRepository}
  */
 
-const IPriceRepository = require('../../application/interfaces/IPriceRepository');
 const logger = require('../../shared/logging');
+const AzureTableRepository = require('./AzureTableRepository');
 
-class AzurePriceRepository extends IPriceRepository {
+class AzurePriceRepository extends AzureTableRepository {
   /**
    * Create a new AzurePriceRepository
    * @param {AzureTableDatabase} [database=null] - Database instance
    *                              If null, creates a new instance
    */
   constructor(database = null) {
-    super();
-    this._database = database;
-    this._initialized = false;
-  }
-
-  /**
-   * Lazy initialize database if not provided in constructor
-   * @private
-   * @returns {Promise<void>}
-   */
-  async _ensureInitialized() {
-    if (!this._initialized && !this._database) {
-      const AzureTableDatabase = require('../../database/AzureTableDatabase');
-      this._database = new AzureTableDatabase();
-      await this._database.initialize();
-      this._initialized = true;
-    }
+    super(database);
   }
 
   /**
@@ -100,7 +86,7 @@ class AzurePriceRepository extends IPriceRepository {
     await this._ensureInitialized();
 
     const symbolUpper = String(symbol).toUpperCase();
-    try {
+    return this._run(async () => {
       const filter = `PartitionKey eq '${symbolUpper}' and success eq true`;
       for await (const entity of this._database.pricesClient.listEntities({ queryOptions: { filter } })) {
         // Since rowKey is reverse-time, first entity is latest
@@ -108,10 +94,7 @@ class AzurePriceRepository extends IPriceRepository {
       }
       logger.debug(`No successful quotes found for symbol: ${symbolUpper}`);
       return null;
-    } catch (error) {
-      logger.error(`Failed to get latest quote for symbol: ${symbolUpper}`, error);
-      throw error;
-    }
+    }, `Failed to get latest quote for symbol: ${symbolUpper}`);
   }
 
   /**
@@ -123,22 +106,18 @@ class AzurePriceRepository extends IPriceRepository {
   async getRecent(limit = 100) {
     await this._ensureInitialized();
 
-    const quotes = [];
-    try {
-      for await (const entity of this._database.pricesClient.listEntities()) {
-        quotes.push(this._quoteFromEntity(entity));
-      }
+    const quotes = await this._collect(
+      this._database.pricesClient.listEntities(),
+      (entity) => this._quoteFromEntity(entity),
+      'Failed to get recent quotes'
+    );
 
-      // Sort by fetchedAt descending (most recent first)
-      quotes.sort((a, b) => new Date(b.fetchedAt) - new Date(a.fetchedAt));
+    // Sort by fetchedAt descending (most recent first)
+    quotes.sort((a, b) => new Date(b.fetchedAt) - new Date(a.fetchedAt));
 
-      const result = quotes.slice(0, limit);
-      logger.debug(`Retrieved ${result.length} recent quotes (from ${quotes.length} total)`);
-      return result;
-    } catch (error) {
-      logger.error('Failed to get recent quotes', error);
-      throw error;
-    }
+    const result = quotes.slice(0, limit);
+    logger.debug(`Retrieved ${result.length} recent quotes (from ${quotes.length} total)`);
+    return result;
   }
 
   /**
