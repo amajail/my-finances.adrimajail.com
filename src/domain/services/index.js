@@ -5,7 +5,9 @@
  */
 
 const PortfolioCalculator = require('./PortfolioCalculator');
+const QuantityChangeGuard = require('./QuantityChangeGuard');
 
 module.exports = {
-  PortfolioCalculator
+  PortfolioCalculator,
+  QuantityChangeGuard
 };

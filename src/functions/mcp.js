@@ -196,6 +196,80 @@ app.mcpTool('mcpGetWeeklyAnalysis', {
 });
 
 // ---------------------------------------------------------------------------
+// update_position (feature 018, US2)
+// ---------------------------------------------------------------------------
+app.mcpTool('mcpUpdatePosition', {
+  toolName: 'update_position',
+  description:
+    'Partially update an existing position. Only the provided fields change; omitted or null fields ' +
+    'keep their stored values (a null averageCost never overwrites the stored cost basis). ' +
+    'Quantity changes beyond the configured threshold (default 50%), including any reduction to zero, ' +
+    'are rejected unless confirm is "true". To retire a holding set status to "closed" — there is no delete tool.',
+  toolProperties: [
+    {
+      propertyName: 'broker',
+      propertyType: 'string',
+      description: 'Broker slug the position belongs to: galicia | iol | ibkr | bullmarket | cash.',
+      isRequired: true,
+    },
+    {
+      propertyName: 'rowKey',
+      propertyType: 'string',
+      description: 'Position row key: {assetType}__{symbol} (e.g. "cedear__GOOGL", "bond__GD35"; see list_positions ids).',
+      isRequired: true,
+    },
+    {
+      propertyName: 'quantity',
+      propertyType: 'string',
+      description: 'New quantity (non-negative number). Large changes require confirm: "true".',
+      isRequired: false,
+    },
+    {
+      propertyName: 'averageCost',
+      propertyType: 'string',
+      description: 'New average cost per unit (PPC, non-negative number). Omit to preserve the stored value.',
+      isRequired: false,
+    },
+    {
+      propertyName: 'notes',
+      propertyType: 'string',
+      description: 'Free-form notes for the position.',
+      isRequired: false,
+    },
+    {
+      propertyName: 'status',
+      propertyType: 'string',
+      description: 'Position status: open | closed.',
+      isRequired: false,
+    },
+    {
+      propertyName: 'maturityDate',
+      propertyType: 'string',
+      description: 'Maturity date (ISO YYYY-MM-DD) for fixed-income positions.',
+      isRequired: false,
+    },
+    {
+      propertyName: 'confirm',
+      propertyType: 'string',
+      description: 'Set to "true" to confirm an over-threshold quantity change intentionally.',
+      isRequired: false,
+    },
+  ],
+  handler: tool('update_position', async (args) => {
+    return container.getGuardedUpdatePosition().execute({
+      brokerId: args.broker,
+      rowKey: args.rowKey,
+      quantity: toNumber(args.quantity),
+      averageCost: toNumber(args.averageCost),
+      notes: args.notes !== undefined && args.notes !== null ? args.notes : undefined,
+      status: args.status || undefined,
+      maturityDate: args.maturityDate || undefined,
+      confirm: args.confirm === true || String(args.confirm).toLowerCase() === 'true',
+    });
+  }),
+});
+
+// ---------------------------------------------------------------------------
 // set_order_execution_status (feature 018, US1)
 // ---------------------------------------------------------------------------
 app.mcpTool('mcpSetOrderExecutionStatus', {

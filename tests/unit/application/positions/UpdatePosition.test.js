@@ -111,3 +111,67 @@ describe('UpdatePosition Use Case', () => {
     expect(mockRepository.update).toHaveBeenCalled();
   });
 });
+
+describe('UpdatePosition — audit trail (feature 018)', () => {
+  function build({ auditRepository } = {}) {
+    const position = new Position({
+      brokerId: 'broker1',
+      assetType: 'stock',
+      symbol: 'AAPL',
+      quantity: 10,
+      averageCost: 150,
+      currency: 'USD',
+    });
+    const mockRepository = {
+      findById: jest.fn().mockResolvedValue(position),
+      update: jest.fn().mockImplementation(async (p) => p),
+    };
+    const useCase = new UpdatePosition({ positionRepository: mockRepository, auditRepository });
+    return { useCase, mockRepository };
+  }
+
+  it('appends an audit entry with field-level old/new for changed fields only', async () => {
+    const auditRepository = { append: jest.fn().mockResolvedValue(undefined) };
+    const { useCase } = build({ auditRepository });
+
+    await useCase.execute({
+      brokerId: 'broker1',
+      rowKey: 'stock__AAPL',
+      quantity: 12,
+      averageCost: 150, // unchanged — must NOT appear in changes
+      _audit: { source: 'mcp', confirmationUsed: true },
+    });
+
+    expect(auditRepository.append).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'update_position',
+      targetType: 'position',
+      targetId: 'broker1/stock__AAPL',
+      source: 'mcp',
+      confirmationUsed: true,
+      changes: [{ field: 'quantity', old: 10, new: 12 }],
+    }));
+  });
+
+  it('defaults the audit source to api when no context is passed (dashboard path)', async () => {
+    const auditRepository = { append: jest.fn().mockResolvedValue(undefined) };
+    const { useCase } = build({ auditRepository });
+    await useCase.execute({ brokerId: 'broker1', rowKey: 'stock__AAPL', notes: 'hola' });
+    expect(auditRepository.append).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'api', confirmationUsed: false })
+    );
+  });
+
+  it('still succeeds when the audit append fails', async () => {
+    const auditRepository = { append: jest.fn().mockRejectedValue(new Error('audit down')) };
+    const { useCase, mockRepository } = build({ auditRepository });
+    const result = await useCase.execute({ brokerId: 'broker1', rowKey: 'stock__AAPL', quantity: 12 });
+    expect(result.quantity).toBe(12);
+    expect(mockRepository.update).toHaveBeenCalled();
+  });
+
+  it('works without an auditRepository (backward compatible)', async () => {
+    const { useCase } = build();
+    const result = await useCase.execute({ brokerId: 'broker1', rowKey: 'stock__AAPL', quantity: 12 });
+    expect(result.quantity).toBe(12);
+  });
+});
