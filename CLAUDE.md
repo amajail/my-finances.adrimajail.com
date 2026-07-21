@@ -77,21 +77,22 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/017-dividend-maturity-calendar/plan.md` (Phase 1 complete; tasks pending).
+`specs/018-mcp-write-tools/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/calendar-api.md`. Read-only feature,
-no new dependencies, no new storage: maturity events derived from open positions'
-existing `maturityDate` (bond/bopreal/lecap/on/deposit; estimated amount = the
-position's existing `valueUsd` convention), plus declared dividend events for
-US-listed holdings via the existing `yahoo-finance2` dep (`quoteSummary`
-calendarEvents + summaryDetail; CEDEARs get date-only events — ratio unknown).
-New pieces: `CalendarEventBuilder` domain service (pure), `GetCalendarEvents`
-use case, `IDividendEventsProvider` + `YahooDividendEventsProvider` (per-symbol
-timeboxed, never rejects — total failure sets `sourceAvailable:false` so
-maturities still render with a degraded notice), thin `GET /api/calendar?days=`
-function, `dashboard/src/pages/calendar.astro` (month-grouped cards, 016 mobile
-standards, nav link added to Layout.astro), and an optional `## upcomingEvents`
-prompt block in `GenerateWeeklyAnalysis` (28-day window, omitted when empty —
-same optional-dep resilience pattern as `allocationTargetsRepository`).
-Prior plan: `specs/016-responsive-dashboard/plan.md`.
+`data-model.md`, `quickstart.md`, `contracts/mcp-tools.md`. Backend-only,
+no new npm deps, no new auth: extends `src/functions/mcp.js` with write tools
+(`update_position`, `create_position`, `set_order_execution_status` + optional
+`executionPrice`, `trigger_price_refresh`) plus read tool `list_audit_entries`.
+All writes delegate to container use cases (validation parity with dashboard).
+New pieces: `QuantityChangeGuard` pure domain service (>50% or to-zero quantity
+changes need `confirm: true`; threshold setting `mcpQuantityChangeThresholdPct`),
+`GuardedUpdatePosition` wrapper (guard + strips null/undefined patch keys so
+null averageCost preserves stored PPC — plain `UpdatePosition` would throw),
+`IAuditRepository`/`AzureAuditRepository` on new append-only `portfolioAudit`
+table (PK `'audit'`, RK inverted-timestamp → newest first), audit wired into
+UpdatePosition/AddPosition/SetOrderExecutionStatus/RefreshPrices as optional
+dep (dashboard writes audited too; append failure never fails the write).
+`AddPosition` gains duplicate pre-check (DomainError pointing at existing);
+`SuggestedOrder` gains optional `executionPrice` (stored, not scored).
+No delete tool anywhere. Prior plan: `specs/017-dividend-maturity-calendar/plan.md`.
 <!-- SPECKIT END -->
