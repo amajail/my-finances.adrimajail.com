@@ -25,7 +25,7 @@ const unusedVarsRule = [
 
 module.exports = [
   {
-    ignores: ['node_modules/**', 'coverage/**', 'dashboard/**', '.specify/**', 'specs/**'],
+    ignores: ['node_modules/**', 'coverage/**', 'dashboard/**', '.specify/**', 'specs/**', '.claude/**', 'scripts/*.local.js'],
   },
   js.configs.recommended,
   // Root-level tooling config files (this file, jest.config.js, ...) — plain CommonJS.
