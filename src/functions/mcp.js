@@ -270,6 +270,86 @@ app.mcpTool('mcpUpdatePosition', {
 });
 
 // ---------------------------------------------------------------------------
+// create_position (feature 018, US3)
+// ---------------------------------------------------------------------------
+app.mcpTool('mcpCreatePosition', {
+  toolName: 'create_position',
+  description:
+    'Create a new position at a broker with full validation. Rejects duplicates of an existing ' +
+    'position (same broker + assetType + symbol) with a pointer to the existing record.',
+  toolProperties: [
+    {
+      propertyName: 'broker',
+      propertyType: 'string',
+      description: 'Broker slug: galicia | iol | ibkr | bullmarket | cash.',
+      isRequired: true,
+    },
+    {
+      propertyName: 'assetType',
+      propertyType: 'string',
+      description: 'Asset type: stock | etf | bond | cedear | cash | deposit | bopreal | lecap | on.',
+      isRequired: true,
+    },
+    {
+      propertyName: 'symbol',
+      propertyType: 'string',
+      description: 'Instrument symbol (e.g. "GOOGL", "GD35").',
+      isRequired: true,
+    },
+    {
+      propertyName: 'quantity',
+      propertyType: 'string',
+      description: 'Quantity held (non-negative number).',
+      isRequired: true,
+    },
+    {
+      propertyName: 'averageCost',
+      propertyType: 'string',
+      description: 'Average cost per unit (PPC, non-negative number). Bonds/BOPREAL are quoted per 100 nominales.',
+      isRequired: true,
+    },
+    {
+      propertyName: 'currency',
+      propertyType: 'string',
+      description: 'Position currency (e.g. USD, ARS).',
+      isRequired: true,
+    },
+    {
+      propertyName: 'displayName',
+      propertyType: 'string',
+      description: 'Optional human-friendly name for the position.',
+      isRequired: false,
+    },
+    {
+      propertyName: 'maturityDate',
+      propertyType: 'string',
+      description: 'Optional maturity date (ISO YYYY-MM-DD) for fixed-income positions.',
+      isRequired: false,
+    },
+    {
+      propertyName: 'notes',
+      propertyType: 'string',
+      description: 'Optional free-form notes.',
+      isRequired: false,
+    },
+  ],
+  handler: tool('create_position', async (args) => {
+    return container.getAddPosition().execute({
+      brokerId: args.broker,
+      assetType: args.assetType,
+      symbol: args.symbol,
+      quantity: toNumber(args.quantity),
+      averageCost: toNumber(args.averageCost),
+      currency: args.currency,
+      displayName: args.displayName || undefined,
+      maturityDate: args.maturityDate || undefined,
+      notes: args.notes || undefined,
+      _audit: { source: 'mcp' },
+    });
+  }),
+});
+
+// ---------------------------------------------------------------------------
 // set_order_execution_status (feature 018, US1)
 // ---------------------------------------------------------------------------
 app.mcpTool('mcpSetOrderExecutionStatus', {

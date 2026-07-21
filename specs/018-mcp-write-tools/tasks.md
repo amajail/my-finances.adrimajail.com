@@ -74,9 +74,9 @@
 
 **Independent Test**: Create a valid position via MCP → appears in `list_positions` with audit entry; create the same broker/assetType/symbol again → rejected with pointer to the existing position (spec US3 acceptance 1–2).
 
-- [ ] T019 [US3] Extend `AddPosition` in src/application/use-cases/positions/AddPosition.js: pre-check `positionRepository.findById(brokerId, rowKey)` — if an open position exists throw `DomainError` naming `{brokerId}/{assetType}__{symbol}` and suggesting `update_position` (FR-009, research R6; storage 409 stays as race backstop); add optional `auditRepository` dep — on success append `{ operation: 'create_position', changes: provided fields with old: null, source }`
-- [ ] T020 [US3] Wire audit into `getAddPosition()` in src/application/di/container.js; register `create_position` MCP tool in src/functions/mcp.js per contracts §2 (required broker/assetType/symbol/quantity/averageCost/currency + optional displayName/maturityDate/notes; parse numerics; `_audit: { source: 'mcp' }`)
-- [ ] T021 [P] [US3] Tests: extend tests/unit/application/positions/AddPosition.test.js — duplicate open position → DomainError with pointer message, closed existing position allows re-create (open/closed lifecycle), audit entry on create, missing-field ValidationError unchanged
+- [X] T019 [US3] Extend `AddPosition` in src/application/use-cases/positions/AddPosition.js: pre-check `positionRepository.findById(brokerId, rowKey)` — if an open position exists throw `DomainError` naming `{brokerId}/{assetType}__{symbol}` and suggesting `update_position` (FR-009, research R6; storage 409 stays as race backstop); add optional `auditRepository` dep — on success append `{ operation: 'create_position', changes: provided fields with old: null, source }`
+- [X] T020 [US3] Wire audit into `getAddPosition()` in src/application/di/container.js; register `create_position` MCP tool in src/functions/mcp.js per contracts §2 (required broker/assetType/symbol/quantity/averageCost/currency + optional displayName/maturityDate/notes; parse numerics; `_audit: { source: 'mcp' }`)
+- [X] T021 [P] [US3] Tests: extend tests/unit/application/positions/AddPosition.test.js — duplicate open position → DomainError with pointer message, closed existing position allows re-create (open/closed lifecycle), audit entry on create, missing-field ValidationError unchanged
 
 **Checkpoint**: All position writes conversational; no delete tool anywhere (FR-001 — closing = `update_position` status `closed`).
 

@@ -8,7 +8,8 @@
 const UseCase = require('../UseCase');
 const Position = require('../../../domain/entities/Position');
 const logger = require('../../../shared/logging');
-const { ValidationError, NotFoundError } = require('../../../shared/errors');
+const { ValidationError, NotFoundError, DomainError } = require('../../../shared/errors');
+const safeAppendAudit = require('../audit/safeAppendAudit');
 
 class AddPosition extends UseCase {
   /**
@@ -16,11 +17,13 @@ class AddPosition extends UseCase {
    * @param {Object} deps - Dependencies
    * @param {IBrokerRepository} deps.brokerRepository - Broker repository
    * @param {IPositionRepository} deps.positionRepository - Position repository
+   * @param {IAuditRepository} [deps.auditRepository] - Optional write-audit trail (feature 018)
    */
-  constructor({ brokerRepository, positionRepository }) {
+  constructor({ brokerRepository, positionRepository, auditRepository = null }) {
     super();
     this._brokerRepository = brokerRepository;
     this._positionRepository = positionRepository;
+    this._auditRepository = auditRepository;
   }
 
   /**
@@ -62,6 +65,20 @@ class AddPosition extends UseCase {
       throw new NotFoundError('Broker', input.brokerId);
     }
 
+    // Feature 018 (FR-009): reject duplicates explicitly, pointing at the
+    // existing record — the storage-level 409 remains as a race backstop but
+    // surfaces as an opaque 502.
+    const rowKey = `${input.assetType}__${input.symbol}`;
+    const existing = await this._positionRepository.findById(input.brokerId, rowKey);
+    if (existing) {
+      const existingStatus = existing.toJSON().status;
+      throw new DomainError(
+        existingStatus === 'open'
+          ? `Position already exists: ${input.brokerId}/${rowKey} (open). Use update_position (PUT) to modify it instead of creating a duplicate.`
+          : `A closed position already exists at ${input.brokerId}/${rowKey}. Reopen it via update_position (status: "open") instead of creating a new one.`
+      );
+    }
+
     const position = new Position({
       brokerId: input.brokerId,
       assetType: input.assetType,
@@ -81,7 +98,22 @@ class AddPosition extends UseCase {
 
     const saved = await this._positionRepository.save(position);
     logger.info('Position added', { brokerId: input.brokerId, positionId: saved.id() });
-    return { ...saved.toJSON(), id: saved.id() };
+
+    // Feature 018: audit the creation (every provided field, old = null).
+    const savedData = saved.toJSON();
+    const changes = Object.entries(savedData)
+      .filter(([, value]) => value !== null && value !== undefined)
+      .map(([field, value]) => ({ field, old: null, new: value }));
+    await safeAppendAudit(this._auditRepository, {
+      operation: 'create_position',
+      targetType: 'position',
+      targetId: `${input.brokerId}/${saved.id()}`,
+      changes,
+      confirmationUsed: false,
+      source: (input._audit && input._audit.source) || 'api',
+    });
+
+    return { ...savedData, id: saved.id() };
   }
 }
 
