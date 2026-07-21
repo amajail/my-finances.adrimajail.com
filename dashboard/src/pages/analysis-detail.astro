@@ -253,330 +253,21 @@ import Layout from '../layouts/Layout.astro';
   import { api } from '../lib/api.js';
   import { marked } from 'marked';
   import DOMPurify from 'dompurify';
-
-  function escapeHtml(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  import { escapeHtml } from '../lib/format.js';
+  import { loadInto } from '../lib/load.js';
+  import { renderMacro, renderTotals, renderChanges } from '../lib/analysis-detail/overview.js';
+  import { renderAdministrative, renderDuplications } from '../lib/analysis-detail/holdings.js';
+  import {
+    renderMacroWow, renderDrift, renderCaps, renderWatchlist, renderWeekOverWeek, renderAmendments,
+  } from '../lib/analysis-detail/drift.js';
+  import { renderOrders } from '../lib/analysis-detail/orders.js';
 
   function show(el) { el.classList.remove('hidden'); }
-
-  // ---- Feature 006: macro / totals / changes rendering ----
-
-  const MACRO_GROUPS = [
-    { title: 'Argentina', items: [
-      { key: 'riesgoPais', label: 'Riesgo país', unit: 'bp' },
-      { key: 'fxGap', label: 'MEP/official gap', unit: '%' },
-      { key: 'bcraReserves', label: 'BCRA reserves', unit: 'USD M' },
-      { key: 'argInflation', label: 'Monthly inflation', unit: '%' },
-      { key: 'argInterestRate', label: 'Policy rate', unit: '%' },
-    ] },
-    { title: 'United States', items: [
-      { key: 'usaInflation', label: 'CPI (YoY)', unit: '%' },
-      { key: 'usaInterestRate', label: 'Fed funds (upper)', unit: '%' },
-    ] },
-    { title: 'Global / program', items: [
-      { key: 'sp500Drawdown', label: 'S&P 500 drawdown', unit: '%' },
-      { key: 'imfReviewStatus', label: 'IMF review', unit: '' },
-    ] },
-  ];
-
-  function fmtReading(r, unit) {
-    if (!r || r.available === false || r.value === null || r.value === undefined) {
-      return '<span class="text-[var(--color-muted)]">unavailable</span>';
-    }
-    const val = typeof r.value === 'number' ? r.value.toLocaleString() : escapeHtml(String(r.value));
-    const basis = r.basis ? ` <span class="text-[var(--color-muted)]">(${escapeHtml(r.basis)})</span>` : '';
-    const unitStr = unit ? ` ${escapeHtml(unit)}` : '';
-    const asOf = r.asOf ? `<span class="text-xs text-[var(--color-muted)]"> · ${escapeHtml(r.asOf)}</span>` : '';
-    return `<span class="num-mono">${val}${unitStr}</span>${basis}${asOf}`;
-  }
-
-  function renderMacro(macro) {
-    if (!macro) return;
-    const container = document.getElementById('macro-groups');
-    container.innerHTML = MACRO_GROUPS.map((g) => `
-      <div>
-        <h3 class="text-xs uppercase text-[var(--color-muted)] mb-2">${escapeHtml(g.title)}</h3>
-        <dl class="space-y-1">
-          ${g.items.map((it) => `
-            <div class="flex justify-between gap-3 text-sm">
-              <dt class="text-[var(--color-muted)]">${escapeHtml(it.label)}</dt>
-              <dd class="text-right">${fmtReading(macro[it.key], it.unit)}</dd>
-            </div>
-          `).join('')}
-        </dl>
-      </div>
-    `).join('');
-    show(document.getElementById('macro-section'));
-  }
-
-  function money(v) {
-    return typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—';
-  }
-
-  function renderTotals(t) {
-    if (!t) return;
-    const rows = [
-      { label: 'Total USD', val: `USD ${money(t.totalUsd)}` },
-      { label: 'Total ARS', val: `ARS ${money(t.totalArs)}` },
-      { label: 'Grand total (USD)', val: `USD ${money(t.grandTotalUsd)}` },
-      { label: 'Unrealized P&L USD', val: `USD ${money(t.unrealizedPnlUsd)}` },
-      { label: 'Unrealized P&L ARS', val: `ARS ${money(t.unrealizedPnlArs)}` },
-      { label: 'MEP rate', val: `${money(t.mepRate)}${t.mepRateAsOf ? ' · ' + escapeHtml(t.mepRateAsOf) : ''}` },
-    ];
-    document.getElementById('totals-grid').innerHTML = rows.map((r) => `
-      <div>
-        <div class="text-xs uppercase text-[var(--color-muted)]">${escapeHtml(r.label)}</div>
-        <div class="num-mono">${r.val}</div>
-      </div>
-    `).join('');
-    show(document.getElementById('totals-section'));
-  }
-
-  function renderChanges(changes) {
-    // null = unknown (no prior snapshot); [] = no changes; array = the deltas.
-    if (changes === undefined) return;
-    const note = document.getElementById('changes-note');
-    const tbody = document.getElementById('changes-tbody');
-    if (changes === null) {
-      note.textContent = 'not available (no prior week to compare)';
-    } else if (changes.length === 0) {
-      note.textContent = 'no positions changed this week';
-    } else {
-      note.textContent = `${changes.length} changed`;
-      const badge = (c) => (c === 'added' || c === 'increased') ? 'badge-success' : 'badge-pending';
-      tbody.innerHTML = changes.map((c) => `
-        <tr class="border-t border-[var(--color-border)]">
-          <td class="px-4 py-2" data-label="Broker">${escapeHtml(c.broker)}</td>
-          <td class="px-4 py-2 num-mono" data-label="Symbol">${escapeHtml(c.symbol)}</td>
-          <td class="px-4 py-2" data-label="Change"><span class="badge ${badge(c.change)}">${escapeHtml(c.change)}</span></td>
-          <td class="px-4 py-2 text-right num-mono" data-label="Before">${escapeHtml(String(c.quantityBefore))}</td>
-          <td class="px-4 py-2 text-right num-mono" data-label="After">${escapeHtml(String(c.quantityAfter))}</td>
-          <td class="px-4 py-2 text-right num-mono" data-label="Δ">${escapeHtml(String(c.deltaQuantity))}</td>
-        </tr>
-      `).join('');
-    }
-    show(document.getElementById('changes-section'));
-  }
-
-  // ---- Feature 013: administrative / non-investable positions ----
-
-  function renderAdministrative(rows) {
-    // [] / absent / malformed → omit the section entirely (FR-009).
-    if (!Array.isArray(rows) || rows.length === 0) return;
-    document.getElementById('admin-note').textContent = `${rows.length} excluded (value ≤ 0)`;
-    document.getElementById('admin-tbody').innerHTML = rows.map((p) => `
-      <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2" data-label="Broker">${escapeHtml(p.broker)}</td>
-        <td class="px-4 py-2" data-label="Type">${escapeHtml(p.assetType)}</td>
-        <td class="px-4 py-2 num-mono" data-label="Symbol">${escapeHtml(p.symbol)}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Qty">${escapeHtml(String(p.quantity))}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Value USD">${escapeHtml(String(p.valueUsd))}</td>
-      </tr>
-    `).join('');
-    show(document.getElementById('admin-section'));
-  }
-
-  // ---- Feature 014: cross-broker duplicate holdings ----
-
-  function renderDuplications(groups) {
-    // null / [] / absent / malformed → omit the section entirely (FR-011).
-    if (!Array.isArray(groups) || groups.length === 0) return;
-    document.getElementById('dups-note').textContent = `${groups.length} duplicated`;
-    document.getElementById('dups-tbody').innerHTML = groups.map((g) => {
-      const placements = (g.placements || [])
-        .map((p) => `${escapeHtml(p.broker)}/${escapeHtml(p.assetType)} (${escapeHtml(String(p.quantity))})`)
-        .join(', ');
-      const label = g.label && g.label !== g.symbol
-        ? `${escapeHtml(g.symbol)} <span class="text-[var(--color-muted)]">${escapeHtml(g.label)}</span>`
-        : escapeHtml(g.symbol);
-      return `
-        <tr class="border-t border-[var(--color-border)]">
-          <td class="px-4 py-2 num-mono">${label}</td>
-          <td class="px-4 py-2">${placements}</td>
-          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(g.placementCount))}</td>
-          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(g.totalValueUsd))}</td>
-        </tr>`;
-    }).join('');
-    show(document.getElementById('dups-section'));
-  }
-
-  // ---- Feature 012: deterministic macro week-over-week ----
-
-  function renderMacroWow(rows) {
-    // Absent / empty / malformed → omit the section (FR-008).
-    if (!Array.isArray(rows) || rows.length === 0) return;
-    const num = (v) => (typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—');
-    const deltaCell = (n) => {
-      if (typeof n !== 'number') return '<span class="num-mono">—</span>';
-      const cls = n > 0 ? 'pos-positive' : (n < 0 ? 'pos-negative' : '');
-      const sign = n > 0 ? '+' : '';
-      return `<span class="num-mono ${cls}">${sign}${num(n)}</span>`;
-    };
-    const pctCell = (n) => {
-      if (typeof n !== 'number') return '<span class="num-mono">—</span>';
-      const cls = n > 0 ? 'pos-positive' : (n < 0 ? 'pos-negative' : '');
-      const sign = n > 0 ? '+' : '';
-      return `<span class="num-mono ${cls}">${sign}${n.toFixed(2)}%</span>`;
-    };
-    document.getElementById('macro-wow-tbody').innerHTML = rows.map((r) => `
-      <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2" data-label="Indicator">${escapeHtml(r.label)}${r.unit ? ` <span class="text-xs text-[var(--color-muted)]">${escapeHtml(r.unit)}</span>` : ''}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Prior">${num(r.priorValue)}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Current">${num(r.currentValue)}</td>
-        <td class="px-4 py-2 text-right" data-label="Δ">${deltaCell(r.deltaAbs)}</td>
-        <td class="px-4 py-2 text-right" data-label="%">${pctCell(r.deltaPct)}</td>
-      </tr>`).join('');
-    show(document.getElementById('macro-wow-section'));
-  }
-
-  // ---- Feature 010: code-computed drift tables ----
-
-  function renderDrift(rows, tbodyId, sectionId, firstColLabel) {
-    // Absent / empty / malformed → omit the section (FR-008).
-    if (!Array.isArray(rows) || rows.length === 0) return;
-    const pctCell = (n) => (typeof n === 'number' ? n.toFixed(2) + '%' : '—');
-    const driftCell = (n) => {
-      if (typeof n !== 'number') return '<span class="num-mono">—</span>';
-      const cls = n > 0 ? 'pos-positive' : (n < 0 ? 'pos-negative' : '');
-      const sign = n > 0 ? '+' : '';
-      return `<span class="num-mono ${cls}">${sign}${n.toFixed(2)}%</span>`;
-    };
-    document.getElementById(tbodyId).innerHTML = rows.map((r) => `
-      <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2" data-label="${firstColLabel}">${escapeHtml(r.label)}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Target %">${pctCell(r.targetPct)}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Current %">${pctCell(r.currentPct)}</td>
-        <td class="px-4 py-2 text-right" data-label="Drift">${driftCell(r.driftPct)}</td>
-      </tr>`).join('');
-    show(document.getElementById(sectionId));
-  }
-
-  function renderCaps(rows) {
-    if (!Array.isArray(rows) || rows.length === 0) return;
-    const pctCell = (n) => (typeof n === 'number' ? n.toFixed(2) + '%' : '—');
-    const breachBadge = (b) => {
-      if (b === 'hard') return '<span class="badge badge-pending pos-negative">hard</span>';
-      if (b === 'soft') return '<span class="badge badge-pending">soft</span>';
-      return '<span class="badge badge-success">ok</span>';
-    };
-    document.getElementById('caps-tbody').innerHTML = rows.map((c) => `
-      <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2" data-label="Cap">${escapeHtml(c.label)}</td>
-        <td class="px-4 py-2" data-label="Scope">${escapeHtml(c.scope)}${c.bucketKey ? ' · ' + escapeHtml(c.bucketKey) : ''}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Soft %">${pctCell(c.softPct)}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Hard %">${pctCell(c.hardPct)}</td>
-        <td class="px-4 py-2 text-right num-mono" data-label="Current %">${pctCell(c.currentPct)}</td>
-        <td class="px-4 py-2" data-label="Breach">${breachBadge(c.breach)}</td>
-      </tr>`).join('');
-    show(document.getElementById('caps-section'));
-  }
-
-  function renderWatchlist(rows) {
-    if (!Array.isArray(rows) || rows.length === 0) return;
-    document.getElementById('watchlist-tbody').innerHTML = rows.map((w) => `
-      <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2" data-label="Item">${escapeHtml(w.item)}</td>
-        <td class="px-4 py-2" data-label="Trigger">${escapeHtml(w.trigger)}</td>
-        <td class="px-4 py-2" data-label="Severity">${w.severity ? escapeHtml(w.severity) : '—'}</td>
-      </tr>`).join('');
-    show(document.getElementById('watchlist-section'));
-  }
-
-  function renderWeekOverWeek(rows) {
-    if (!Array.isArray(rows) || rows.length === 0) return;
-    document.getElementById('wow-tbody').innerHTML = rows.map((d) => `
-      <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2" data-label="Metric">${escapeHtml(d.metric)}</td>
-        <td class="px-4 py-2 num-mono" data-label="Prior">${escapeHtml(String(d.prior))}</td>
-        <td class="px-4 py-2 num-mono" data-label="Current">${escapeHtml(String(d.current))}</td>
-        <td class="px-4 py-2" data-label="Direction">${escapeHtml(d.direction || '')}</td>
-      </tr>`).join('');
-    show(document.getElementById('wow-section'));
-  }
-
-  function renderAmendments(rows) {
-    if (!Array.isArray(rows) || rows.length === 0) return;
-    document.getElementById('amendments-tbody').innerHTML = rows.map((a) => `
-      <tr class="border-t border-[var(--color-border)]">
-        <td class="px-4 py-2 align-top" data-label="Proposal">${escapeHtml(a.proposal)}</td>
-        <td class="px-4 py-2 align-top text-[var(--color-text-primary)]" data-label="Rationale">${escapeHtml(a.rationale)}</td>
-      </tr>`).join('');
-    show(document.getElementById('amendments-section'));
-  }
 
   function getDateFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const date = params.get('date') || '';
     return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
-  }
-
-  // ---- Feature 007: order execution status controls ----
-
-  const EXEC_STATUSES = ['pending', 'executed', 'partial', 'skipped'];
-
-  function renderOrders(detail, date) {
-    show(document.getElementById('orders-section'));
-    const frozenNote = detail.frozen ? ' · frozen' : '';
-    document.getElementById('orders-count').textContent = `${detail.orders.length} suggested${frozenNote}`;
-
-    document.getElementById('orders-tbody').innerHTML = detail.orders.map((o) => {
-      const sel = EXEC_STATUSES.map((s) =>
-        `<option value="${s}" ${s === o.executionStatus ? 'selected' : ''}>${s}</option>`).join('');
-      const proposal = (o.executionStatus === 'pending' && o.proposedStatus)
-        ? `<div class="text-xs text-[var(--color-muted)] mt-1">proposed: <button type="button" class="underline accept-one" data-index="${o.index}" data-proposed="${o.proposedStatus}">${escapeHtml(o.proposedStatus)}</button></div>`
-        : '';
-      const note = o.executionNote ? escapeHtml(o.executionNote) : '';
-      return `
-        <tr class="border-t border-[var(--color-border)]">
-          <td class="px-4 py-2">${escapeHtml(o.broker)}</td>
-          <td class="px-4 py-2 num-mono">${escapeHtml(o.symbol)}</td>
-          <td class="px-4 py-2"><span class="badge ${o.side === 'buy' ? 'badge-success' : 'badge-pending'}">${escapeHtml(o.side)}</span></td>
-          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(o.quantity))}</td>
-          <td class="px-4 py-2">${escapeHtml(o.conviction)}</td>
-          <td class="px-4 py-2">
-            <select class="exec-status text-sm bg-[var(--color-surface-2)] rounded px-1 py-0.5" data-index="${o.index}">${sel}</select>
-            <input class="exec-note text-sm bg-[var(--color-surface-2)] rounded px-1 py-0.5 ml-1 w-32" data-index="${o.index}" maxlength="500" placeholder="note" value="${note}" />
-            <button type="button" class="exec-save badge badge-pending ml-1" data-index="${o.index}">save</button>
-            ${proposal}
-          </td>
-          <td class="px-4 py-2 text-[var(--color-text-primary)]">${escapeHtml(o.rationale)}</td>
-        </tr>`;
-    }).join('');
-
-    const saveFor = async (index, status, note) => {
-      try {
-        await api(`/analysis/weekly/${encodeURIComponent(date)}/orders/${index}`, {
-          method: 'PATCH', body: { status, note },
-        });
-        load(); // reload to reflect saved status + frozen state authoritatively
-      } catch (err) {
-        const banner = document.getElementById('error-banner');
-        banner.textContent = `Could not save status: ${err.message}`;
-        show(banner);
-      }
-    };
-
-    document.querySelectorAll('.exec-save').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const i = btn.getAttribute('data-index');
-        const status = document.querySelector(`.exec-status[data-index="${i}"]`).value;
-        const note = document.querySelector(`.exec-note[data-index="${i}"]`).value;
-        saveFor(i, status, note);
-      });
-    });
-    document.querySelectorAll('.accept-one').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const i = btn.getAttribute('data-index');
-        const note = document.querySelector(`.exec-note[data-index="${i}"]`).value;
-        saveFor(i, btn.getAttribute('data-proposed'), note);
-      });
-    });
   }
 
   async function load() {
@@ -589,78 +280,75 @@ import Layout from '../layouts/Layout.astro';
     }
     document.getElementById('hdr-title').textContent = `Weekly analysis — ${date}`;
 
-    let detail;
-    try {
-      detail = await api(`/analysis/weekly/${encodeURIComponent(date)}`);
-    } catch (err) {
-      const banner = document.getElementById('error-banner');
-      banner.textContent = err.status === 404
+    await loadInto(
+      document.getElementById('error-banner'),
+      () => api(`/analysis/weekly/${encodeURIComponent(date)}`),
+      (detail) => {
+        const meta = [];
+        if (detail.modelUsed) meta.push(`model: ${detail.modelUsed}`);
+        if (detail.promptVersion) meta.push(`prompt: ${detail.promptVersion}`);
+        if (typeof detail.costUsd === 'number') meta.push(`cost: USD ${detail.costUsd.toFixed(4)}`);
+        if (detail.tokensIn) meta.push(`tokens in: ${detail.tokensIn}`);
+        if (detail.tokensOut) meta.push(`tokens out: ${detail.tokensOut}`);
+        if (detail.riesgoPaisBp != null) meta.push(`riesgo país: ${detail.riesgoPaisBp} bp (${detail.riesgoPaisAsOf || '—'})`);
+        document.getElementById('hdr-meta').textContent = meta.join(' · ');
+
+        // Feature 005 (FR-013): instructions version badge with link. Falls back
+        // to the legacy feature-004 framework reference for pre-005 analyses.
+        const fwBadge = document.getElementById('framework-version-badge');
+        if (fwBadge) {
+          if (detail.instructionsHistoryRowKey) {
+            fwBadge.innerHTML = `Instructions version: <a class="underline hover:text-[var(--color-text-primary)]" href="/instructions#${encodeURIComponent(detail.instructionsHistoryRowKey)}">view ${escapeHtml(detail.instructionsHistoryRowKey.slice(-8))}</a>`;
+          } else if (detail.frameworkHistoryRowKey) {
+            fwBadge.textContent = `Instructions version: (legacy framework ${detail.frameworkHistoryRowKey.slice(-8)})`;
+          } else {
+            fwBadge.textContent = 'Instructions version: (pre-history seed)';
+          }
+        }
+
+        // Feature 006: macro panel, portfolio totals, and position changes — shown
+        // for completed AND failed runs (they may have been captured before a
+        // failure). Absent on pre-feature analyses.
+        renderMacro(detail.macroContext);
+        renderTotals(detail.portfolioTotals);
+        renderChanges(detail.positionChanges);
+        // Feature 013: administrative / non-investable positions (omitted when none).
+        renderAdministrative(detail.administrativePositions);
+        // Feature 014: cross-broker duplicate holdings (omitted when none).
+        renderDuplications(detail.duplications);
+        // Feature 012: deterministic macro week-over-week (absent on first run /
+        // pre-feature rows).
+        renderMacroWow(detail.macroChanges);
+        // Feature 010: code-computed drift tables (shown on completed AND failed
+        // rows when captured; omitted when absent/empty).
+        renderDrift(detail.driftByBucket, 'drift-bucket-tbody', 'drift-bucket-section', 'Bucket');
+        renderDrift(detail.driftByAssetClass, 'drift-class-tbody', 'drift-class-section', 'Asset class');
+        renderCaps(detail.concentrationCaps);
+        renderWatchlist(detail.watchlist);
+        renderWeekOverWeek(detail.weekOverWeek);
+        renderAmendments(detail.frameworkAmendments);
+
+        if (detail.status === 'failed') {
+          document.getElementById('failed-reason').textContent = detail.errorMessage || 'No reason recorded.';
+          show(document.getElementById('failed-banner'));
+          return;
+        }
+
+        if (Array.isArray(detail.orders) && detail.orders.length > 0) {
+          renderOrders(detail, date, load);
+        }
+
+        if (detail.markdownBody) {
+          const raw = marked.parse(detail.markdownBody, { gfm: true, breaks: false });
+          const safe = DOMPurify.sanitize(raw);
+          document.getElementById('narrative-body').innerHTML = safe;
+          show(document.getElementById('narrative-section'));
+        }
+      },
+      (err) => err.status === 404
         ? `No analysis exists for ${date}.`
-        : `Failed to load: ${err.message}`;
-      show(banner);
-      return;
-    }
-
-    const meta = [];
-    if (detail.modelUsed) meta.push(`model: ${detail.modelUsed}`);
-    if (detail.promptVersion) meta.push(`prompt: ${detail.promptVersion}`);
-    if (typeof detail.costUsd === 'number') meta.push(`cost: USD ${detail.costUsd.toFixed(4)}`);
-    if (detail.tokensIn) meta.push(`tokens in: ${detail.tokensIn}`);
-    if (detail.tokensOut) meta.push(`tokens out: ${detail.tokensOut}`);
-    if (detail.riesgoPaisBp != null) meta.push(`riesgo país: ${detail.riesgoPaisBp} bp (${detail.riesgoPaisAsOf || '—'})`);
-    document.getElementById('hdr-meta').textContent = meta.join(' · ');
-
-    // Feature 005 (FR-013): instructions version badge with link. Falls back
-    // to the legacy feature-004 framework reference for pre-005 analyses.
-    const fwBadge = document.getElementById('framework-version-badge');
-    if (fwBadge) {
-      if (detail.instructionsHistoryRowKey) {
-        fwBadge.innerHTML = `Instructions version: <a class="underline hover:text-[var(--color-text-primary)]" href="/instructions#${encodeURIComponent(detail.instructionsHistoryRowKey)}">view ${escapeHtml(detail.instructionsHistoryRowKey.slice(-8))}</a>`;
-      } else if (detail.frameworkHistoryRowKey) {
-        fwBadge.textContent = `Instructions version: (legacy framework ${detail.frameworkHistoryRowKey.slice(-8)})`;
-      } else {
-        fwBadge.textContent = 'Instructions version: (pre-history seed)';
-      }
-    }
-
-    // Feature 006: macro panel, portfolio totals, and position changes — shown
-    // for completed AND failed runs (they may have been captured before a
-    // failure). Absent on pre-feature analyses.
-    renderMacro(detail.macroContext);
-    renderTotals(detail.portfolioTotals);
-    renderChanges(detail.positionChanges);
-    // Feature 013: administrative / non-investable positions (omitted when none).
-    renderAdministrative(detail.administrativePositions);
-    // Feature 014: cross-broker duplicate holdings (omitted when none).
-    renderDuplications(detail.duplications);
-    // Feature 012: deterministic macro week-over-week (absent on first run /
-    // pre-feature rows).
-    renderMacroWow(detail.macroChanges);
-    // Feature 010: code-computed drift tables (shown on completed AND failed
-    // rows when captured; omitted when absent/empty).
-    renderDrift(detail.driftByBucket, 'drift-bucket-tbody', 'drift-bucket-section', 'Bucket');
-    renderDrift(detail.driftByAssetClass, 'drift-class-tbody', 'drift-class-section', 'Asset class');
-    renderCaps(detail.concentrationCaps);
-    renderWatchlist(detail.watchlist);
-    renderWeekOverWeek(detail.weekOverWeek);
-    renderAmendments(detail.frameworkAmendments);
-
-    if (detail.status === 'failed') {
-      document.getElementById('failed-reason').textContent = detail.errorMessage || 'No reason recorded.';
-      show(document.getElementById('failed-banner'));
-      return;
-    }
-
-    if (Array.isArray(detail.orders) && detail.orders.length > 0) {
-      renderOrders(detail, date);
-    }
-
-    if (detail.markdownBody) {
-      const raw = marked.parse(detail.markdownBody, { gfm: true, breaks: false });
-      const safe = DOMPurify.sanitize(raw);
-      document.getElementById('narrative-body').innerHTML = safe;
-      show(document.getElementById('narrative-section'));
-    }
+        : `Failed to load: ${err.message}`,
+    );
   }
 
   load();
