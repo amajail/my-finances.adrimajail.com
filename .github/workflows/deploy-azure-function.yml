@@ -75,9 +75,7 @@ jobs:
             --exclude "scripts/*" \
             --exclude ".env*" \
             --exclude "local.settings.json" \
-            --exclude "logs/*" \
-            --exclude "NEXT_STEPS.md" \
-            --exclude "PROJECT_STATUS.md"
+            --exclude "logs/*"
           echo "Zip size: $(du -sh deploy.zip | cut -f1)"
 
       - name: Deploy to Azure Functions
