@@ -1,5 +1,6 @@
 @import "@amajail/ui/fonts";
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @import "@amajail/ui/styles";
 
 @layer components {

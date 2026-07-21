@@ -238,7 +238,12 @@ import Layout from '../layouts/Layout.astro';
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Narrative</h2>
     </div>
-    <article id="narrative-body" class="prose prose-sm max-w-none p-6"></article>
+    <!-- overflow-x-auto: GFM tables in LLM-authored markdown aren't annotated
+         with `.table-stack`/`data-label`, so they keep the sanctioned
+         horizontal-scroll fallback (feature 016) instead of reflowing. -->
+    <div class="overflow-x-auto">
+      <article id="narrative-body" class="prose prose-sm max-w-none p-6"></article>
+    </div>
   </section>
 
   <p id="error-banner" class="card p-4 pos-negative text-sm hidden"></p>
