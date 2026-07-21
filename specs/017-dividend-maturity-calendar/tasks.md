@@ -75,7 +75,7 @@
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T021 Full gates: `npm test`, `npm run test:coverage` (floors 65/58/59/65 must hold), `npx eslint .` (root + dashboard), dashboard build — all green
+- [X] T021 Full gates: `npm test`, `npm run test:coverage` (floors 65/58/59/65 must hold), `npx eslint .` (root + dashboard), dashboard build — all green
 - [ ] T022 Owner verification per `specs/017-dividend-maturity-calendar/quickstart.md` (local `func start` probe against real data; NEVER commit output/screenshots — privacy)
 
 ---
