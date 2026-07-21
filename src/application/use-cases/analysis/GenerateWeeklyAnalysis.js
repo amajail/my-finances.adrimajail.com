@@ -281,6 +281,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         positionChanges,
         administrativePositions,
         duplications,
+        concentrationCaps,
       });
 
       // 6. Call the LLM. The privacy boundary lives inside this method.
@@ -489,7 +490,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       }));
   }
 
-  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], duplications = null }) {
+  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], duplications = null, concentrationCaps = null }) {
     // The full per-position holdings list is delivered separately as an
     // authoritative `currentHoldings` block (below), so it is pulled out of the
     // portfolioSummary aggregates to avoid duplicating it in the prompt.
@@ -566,6 +567,21 @@ class GenerateWeeklyAnalysis extends UseCase {
         'These cross-broker duplicate holdings (the same underlying held in 2+ broker/wrapper placements) were detected deterministically and are shown to the owner as a separate table. Reference them if relevant, but do NOT re-list each placement — the table already enumerates them.',
         '```json',
         JSON.stringify(dupGroups),
+        '```'
+      );
+    }
+    // Feature 010 follow-up: the code-computed concentration-cap status was
+    // persisted for the dashboard but never delivered to the model, forcing it
+    // to re-derive cap percentages from raw holdings (and making escalation
+    // rules in the instructions document unenforceable). Delivered compact,
+    // exact figures; omitted when targets are unavailable (null/[]).
+    if (Array.isArray(concentrationCaps) && concentrationCaps.length > 0) {
+      parts.push(
+        '',
+        '## concentrationCaps',
+        'Code-computed concentration status per capped instrument/group (percent of investable holdings vs soft/hard limits). Use these exact figures for cap and escalation reasoning; do not recompute them from holdings.',
+        '```json',
+        JSON.stringify(concentrationCaps),
         '```'
       );
     }
