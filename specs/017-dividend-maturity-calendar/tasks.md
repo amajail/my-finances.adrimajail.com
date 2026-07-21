@@ -10,7 +10,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `src/application/use-cases/calendar/` directory and confirm baseline green (`npm test`, `npx eslint .`) on branch `017-dividend-maturity-calendar`
+- [X] T001 Create `src/application/use-cases/calendar/` directory and confirm baseline green (`npm test`, `npx eslint .`) on branch `017-dividend-maturity-calendar`
 
 ---
 
@@ -18,14 +18,14 @@
 
 **Purpose**: the event-computation core — provider, builder, use case, wiring.
 
-- [ ] T002 [P] Define `IDividendEventsProvider` in `src/application/interfaces/IDividendEventsProvider.js` — `getUpcomingDividends(symbols)` → `{ facts, failedSymbols, sourceAvailable }`, never rejects (data-model.md "DividendFacts")
-- [ ] T003 [P] Implement `CalendarEventBuilder` in `src/domain/services/CalendarEventBuilder.js` — pure static: (openPositions, dividendFacts, horizonDays, today) → sorted `CalendarEvent[]`; maturity derivation for bond/bopreal/lecap/on/deposit with parseable `maturityDate`; overdue flag (FR-009); native amount via `faceValue/100` convention; USD via the position's existing `valueUsd` (research D3); CEDEAR dividend events date-only (D2); count `fixedIncomeWithoutMaturity`
-- [ ] T004 [P] Unit tests in `tests/unit/domain/services/CalendarEventBuilder.test.js` — maturity in/out of horizon, overdue-first ordering, unparseable date counted not thrown, cedear date-only, null-amount events kept (FR-008), fake data only
-- [ ] T005 Implement `YahooDividendEventsProvider` in `src/infrastructure/providers/YahooDividendEventsProvider.js` — injected client, `quoteSummary(symbol, {modules:['calendarEvents','summaryDetail']})` per research D1, per-symbol ~3s timebox, parallel, per-symbol failure → `failedSymbols`, total failure → `sourceAvailable:false`; export from `src/infrastructure/providers/index.js`
-- [ ] T006 [P] Unit tests in `tests/unit/infrastructure/providers/YahooDividendEventsProvider.test.js` — mocked client: dates+rate mapping, missing rate → null estimate, one-symbol failure isolation, all-fail → sourceAvailable false, never rejects
-- [ ] T007 Implement `GetCalendarEvents` in `src/application/use-cases/calendar/GetCalendarEvents.js` — deps: getPortfolioSummary, dividendEventsProvider (optional); input `{days}` (default 180, clamp 1–400); open positions → builder; response shape per data-model.md (without `months` — added in US3)
-- [ ] T008 [P] Unit tests in `tests/unit/application/use-cases/calendar/GetCalendarEvents.test.js` — horizon filtering, provider-absent still returns maturities, `dividendSourceAvailable` propagation, days clamping
-- [ ] T009 Wire provider + use case in `src/application/di/container.js` (follow the existing `getGetPortfolioSummary` singleton pattern)
+- [X] T002 [P] Define `IDividendEventsProvider` in `src/application/interfaces/IDividendEventsProvider.js` — `getUpcomingDividends(symbols)` → `{ facts, failedSymbols, sourceAvailable }`, never rejects (data-model.md "DividendFacts")
+- [X] T003 [P] Implement `CalendarEventBuilder` in `src/domain/services/CalendarEventBuilder.js` — pure static: (openPositions, dividendFacts, horizonDays, today) → sorted `CalendarEvent[]`; maturity derivation for bond/bopreal/lecap/on/deposit with parseable `maturityDate`; overdue flag (FR-009); native amount via `faceValue/100` convention; USD via the position's existing `valueUsd` (research D3); CEDEAR dividend events date-only (D2); count `fixedIncomeWithoutMaturity`
+- [X] T004 [P] Unit tests in `tests/unit/domain/services/CalendarEventBuilder.test.js` — maturity in/out of horizon, overdue-first ordering, unparseable date counted not thrown, cedear date-only, null-amount events kept (FR-008), fake data only
+- [X] T005 Implement `YahooDividendEventsProvider` in `src/infrastructure/providers/YahooDividendEventsProvider.js` — injected client, `quoteSummary(symbol, {modules:['calendarEvents','summaryDetail']})` per research D1, per-symbol ~3s timebox, parallel, per-symbol failure → `failedSymbols`, total failure → `sourceAvailable:false`; export from `src/infrastructure/providers/index.js`
+- [X] T006 [P] Unit tests in `tests/unit/infrastructure/providers/YahooDividendEventsProvider.test.js` — mocked client: dates+rate mapping, missing rate → null estimate, one-symbol failure isolation, all-fail → sourceAvailable false, never rejects
+- [X] T007 Implement `GetCalendarEvents` in `src/application/use-cases/calendar/GetCalendarEvents.js` — deps: getPortfolioSummary, dividendEventsProvider (optional); input `{days}` (default 180, clamp 1–400); open positions → builder; response shape per data-model.md (without `months` — added in US3)
+- [X] T008 [P] Unit tests in `tests/unit/application/use-cases/calendar/GetCalendarEvents.test.js` — horizon filtering, provider-absent still returns maturities, `dividendSourceAvailable` propagation, days clamping
+- [X] T009 Wire provider + use case in `src/application/di/container.js` (follow the existing `getGetPortfolioSummary` singleton pattern)
 
 **Checkpoint**: `npm test` green — compute core complete, no HTTP/UI yet.
 
@@ -37,12 +37,12 @@
 
 **Independent test**: with maturity-dated open positions in the store, `/calendar` lists each under the right month with date/days-until/estimated amount; a dividend-paying US holding shows its dates; 360px viewport has zero horizontal scroll.
 
-- [ ] T010 [US1] Implement `GET /api/calendar` in `src/functions/calendar.js` — thin: parse `days`, 400 on invalid (contract), use-case, `ok/mapError` from `src/functions/_shared.js`, `authLevel: 'function'`
-- [ ] T011 [US1] Register the function in `src/functions/index.js`
-- [ ] T012 [P] [US1] Smoke tests in `tests/unit/functions/calendar.test.js` — the 3 cases from contracts/calendar-api.md (200 shape, days=0 → 400, provider-throw → 200 degraded)
-- [ ] T013 [US1] Create `dashboard/src/pages/calendar.astro` — client fetch via `dashboard/src/lib/api.js` + `dashboard/src/lib/load.js`; month-grouped stacked cards (no wide table); overdue section pinned first with distinct styling (FR-009); degraded-dividends notice from `dividendSourceAvailable` (FR-007); `fixedIncomeWithoutMaturity` note; escape all strings via `lib/format.js` `escapeHtml`
-- [ ] T014 [US1] Add Calendar nav link in `dashboard/src/layouts/Layout.astro` — verify the 10-link desktop row still fits at 1024px; hamburger handles below `lg`
-- [ ] T015 [US1] Verify FR-004/SC-004: `cd dashboard && npx eslint . && npm run build` (placeholder env vars) + Playwright 360×800 check `document.documentElement.scrollWidth <= 360` on /calendar
+- [X] T010 [US1] Implement `GET /api/calendar` in `src/functions/calendar.js` — thin: parse `days`, 400 on invalid (contract), use-case, `ok/mapError` from `src/functions/_shared.js`, `authLevel: 'function'`
+- [X] T011 [US1] Register the function in `src/functions/index.js`
+- [X] T012 [P] [US1] Smoke tests in `tests/unit/functions/calendar.test.js` — the 3 cases from contracts/calendar-api.md (200 shape, days=0 → 400, provider-throw → 200 degraded)
+- [X] T013 [US1] Create `dashboard/src/pages/calendar.astro` — client fetch via `dashboard/src/lib/api.js` + `dashboard/src/lib/load.js`; month-grouped stacked cards (no wide table); overdue section pinned first with distinct styling (FR-009); degraded-dividends notice from `dividendSourceAvailable` (FR-007); `fixedIncomeWithoutMaturity` note; escape all strings via `lib/format.js` `escapeHtml`
+- [X] T014 [US1] Add Calendar nav link in `dashboard/src/layouts/Layout.astro` — verify the 10-link desktop row still fits at 1024px; hamburger handles below `lg`
+- [X] T015 [US1] Verify FR-004/SC-004: `cd dashboard && npx eslint . && npm run build` (placeholder env vars) + Playwright 360×800 check `document.documentElement.scrollWidth <= 360` on /calendar
 
 **Checkpoint**: MVP shippable — calendar visible and mobile-safe.
 
