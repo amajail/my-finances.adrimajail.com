@@ -55,6 +55,7 @@ import Layout from '../layouts/Layout.astro';
   // extension makes Vite's commonjs plugin handle it; import the default
   // (module.exports) and destructure.
   import charts from '../lib/charts.cjs';
+  import { loadInto } from '../lib/load.js';
   const {
     METRIC_CATALOGUE, PORTFOLIO_KEYS, MACRO_NUMERIC_KEYS,
     buildSeries, pointsForSource, sliceLastN, imfChangePoints,
@@ -138,33 +139,31 @@ import Layout from '../layouts/Layout.astro';
   }
 
   async function load() {
-    let data;
-    try {
-      data = await api('/analysis/macro-series?weeks=60');
-    } catch (err) {
-      const b = document.getElementById('error-banner');
-      b.textContent = `Failed to load series: ${err.message}`;
-      show(b);
-      return;
-    }
-    allPoints = data.points || [];
-    document.getElementById('hdr-meta').textContent =
-      `${allPoints.length} weekly ${allPoints.length === 1 ? 'analysis' : 'analyses'}`;
-    fillOverlaySelects();
-    render();
-
-    document.getElementById('range').addEventListener('change', render);
-    document.getElementById('ov-left').addEventListener('change', render);
-    document.getElementById('ov-right').addEventListener('change', render);
-    document.querySelectorAll('#mode-toggle button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        mode = btn.getAttribute('data-mode');
-        document.querySelectorAll('#mode-toggle button').forEach((b) => {
-          b.className = `badge ${b.getAttribute('data-mode') === mode ? 'badge-success' : 'badge-pending'}`;
-        });
+    await loadInto(
+      document.getElementById('error-banner'),
+      () => api('/analysis/macro-series?weeks=60'),
+      (data) => {
+        allPoints = data.points || [];
+        document.getElementById('hdr-meta').textContent =
+          `${allPoints.length} weekly ${allPoints.length === 1 ? 'analysis' : 'analyses'}`;
+        fillOverlaySelects();
         render();
-      });
-    });
+
+        document.getElementById('range').addEventListener('change', render);
+        document.getElementById('ov-left').addEventListener('change', render);
+        document.getElementById('ov-right').addEventListener('change', render);
+        document.querySelectorAll('#mode-toggle button').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            mode = btn.getAttribute('data-mode');
+            document.querySelectorAll('#mode-toggle button').forEach((b) => {
+              b.className = `badge ${b.getAttribute('data-mode') === mode ? 'badge-success' : 'badge-pending'}`;
+            });
+            render();
+          });
+        });
+      },
+      (err) => `Failed to load series: ${err.message}`,
+    );
   }
 
   load();

@@ -94,6 +94,8 @@ import Layout from '../layouts/Layout.astro';
   import { api } from '../lib/api.js';
   import { marked } from 'marked';
   import DOMPurify from 'dompurify';
+  import { escapeHtml, fmtTimestamp, fmtBytes } from '../lib/format.js';
+  import { attempt } from '../lib/load.js';
 
   const $ = (id) => document.getElementById(id);
 
@@ -120,15 +122,6 @@ import Layout from '../layouts/Layout.astro';
     /** @type {Map<string, string>} cached full content per rowKey */ contentCache: new Map(),
     /** @type {'edit'|'preview'} */ mode: 'edit',
   };
-
-  function fmtTimestamp(iso) {
-    if (!iso) return '—';
-    try {
-      return new Date(iso).toLocaleString();
-    } catch {
-      return iso;
-    }
-  }
 
   function byteLength(s) {
     return new TextEncoder().encode(s ?? '').byteLength;
@@ -184,25 +177,7 @@ import Layout from '../layouts/Layout.astro';
   }
 
   async function loadActive() {
-    try {
-      const data = await api('/instructions');
-      state.maxBytes = data.maxBytes || state.maxBytes;
-      ui.byteCap.textContent = state.maxBytes.toLocaleString();
-      // Feature 010 (FR-017): show the fixed preamble (read-only) + editing
-      // guide. textContent keeps them inert — the owner can read but not edit.
-      const preEl = document.getElementById('preamble-block');
-      if (preEl) preEl.textContent = data.preamble || '(no preamble configured)';
-      const guideEl = document.getElementById('editing-guide');
-      if (guideEl) guideEl.textContent = data.editingGuide || '';
-      ui.textarea.value = data.content || '';
-      ui.textarea.disabled = false;
-      ui.note.disabled = false;
-      state.lastSavedContent = ui.textarea.value;
-      ui.activeMeta.textContent = data.historyRowKey
-        ? `Last saved: ${fmtTimestamp(data.updatedAt)}`
-        : 'Last saved: (seeded — no history row)';
-      recomputeSaveState();
-    } catch (err) {
+    const data = await attempt(() => api('/instructions'), (err) => {
       if (err?.status === 404) {
         ui.activeMeta.textContent = 'Not configured';
         ui.textarea.disabled = false;
@@ -213,20 +188,40 @@ import Layout from '../layouts/Layout.astro';
         return;
       }
       setToast(`Failed to load: ${err?.message || err}`, 'error');
-    }
+    });
+    if (data === undefined) return;
+    state.maxBytes = data.maxBytes || state.maxBytes;
+    ui.byteCap.textContent = state.maxBytes.toLocaleString();
+    // Feature 010 (FR-017): show the fixed preamble (read-only) + editing
+    // guide. textContent keeps them inert — the owner can read but not edit.
+    const preEl = document.getElementById('preamble-block');
+    if (preEl) preEl.textContent = data.preamble || '(no preamble configured)';
+    const guideEl = document.getElementById('editing-guide');
+    if (guideEl) guideEl.textContent = data.editingGuide || '';
+    ui.textarea.value = data.content || '';
+    ui.textarea.disabled = false;
+    ui.note.disabled = false;
+    state.lastSavedContent = ui.textarea.value;
+    ui.activeMeta.textContent = data.historyRowKey
+      ? `Last saved: ${fmtTimestamp(data.updatedAt)}`
+      : 'Last saved: (seeded — no history row)';
+    recomputeSaveState();
   }
 
   async function save() {
     ui.saveBtn.disabled = true;
     setToast('Saving…');
-    try {
-      const result = await api('/instructions', {
+    const result = await attempt(
+      () => api('/instructions', {
         method: 'PUT',
         body: {
           content: ui.textarea.value,
           changeNote: ui.note.value.trim() || null,
         },
-      });
+      }),
+      (err) => setToast(`Save failed: ${err?.message || err}`, 'error'),
+    );
+    if (result !== undefined) {
       if (result.noop) {
         setToast('No changes to save (content matches active version).', 'info');
       } else {
@@ -236,16 +231,8 @@ import Layout from '../layouts/Layout.astro';
         ui.activeMeta.textContent = `Last saved: ${fmtTimestamp(result.timestamp)}`;
         // History will load in US2 (Phase 4).
       }
-    } catch (err) {
-      setToast(`Save failed: ${err?.message || err}`, 'error');
-    } finally {
-      recomputeSaveState();
     }
-  }
-
-  function fmtBytes(n) {
-    if (n < 1024) return `${n} B`;
-    return `${(n / 1024).toFixed(1)} KB`;
+    recomputeSaveState();
   }
 
   function renderHistoryRow(entry) {
@@ -294,28 +281,21 @@ import Layout from '../layouts/Layout.astro';
       body.classList.remove('hidden');
       header.querySelector('.toggle-caret').textContent = '▾';
       const codeEl = body.querySelector('.entry-content');
-      try {
-        let content = state.contentCache.get(entry.rowKey);
-        if (content === undefined) {
-          const data = await api(`/instructions/history/${encodeURIComponent(entry.rowKey)}`);
-          content = data.content || '';
-          state.contentCache.set(entry.rowKey, content);
-        }
-        codeEl.textContent = content;
-      } catch (err) {
-        codeEl.textContent = `Failed to load: ${err?.message || err}`;
-      }
+      const content = await attempt(async () => {
+        const cached = state.contentCache.get(entry.rowKey);
+        if (cached !== undefined) return cached;
+        const data = await api(`/instructions/history/${encodeURIComponent(entry.rowKey)}`);
+        const fetched = data.content || '';
+        state.contentCache.set(entry.rowKey, fetched);
+        return fetched;
+      }, (err) => { codeEl.textContent = `Failed to load: ${err?.message || err}`; });
+      if (content === undefined) return;
+      codeEl.textContent = content;
     });
 
     li.appendChild(header);
     li.appendChild(body);
     return li;
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
   }
 
   function shortKey(k) {
@@ -331,20 +311,20 @@ import Layout from '../layouts/Layout.astro';
     if (!ok) return;
 
     setToast('Restoring…');
-    try {
-      const result = await api(`/instructions/history/${encodeURIComponent(entry.rowKey)}/restore`, {
+    const result = await attempt(
+      () => api(`/instructions/history/${encodeURIComponent(entry.rowKey)}/restore`, {
         method: 'POST',
         body: {},
-      });
-      if (result.noop) {
-        setToast('Already active — no new entry created.', 'info');
-      } else {
-        setToast(`Restored — new entry at ${fmtTimestamp(result.timestamp)}.`, 'success');
-        state.contentCache.clear();
-        await Promise.all([loadActive(), loadHistory()]);
-      }
-    } catch (err) {
-      setToast(`Restore failed: ${err?.message || err}`, 'error');
+      }),
+      (err) => setToast(`Restore failed: ${err?.message || err}`, 'error'),
+    );
+    if (result === undefined) return;
+    if (result.noop) {
+      setToast('Already active — no new entry created.', 'info');
+    } else {
+      setToast(`Restored — new entry at ${fmtTimestamp(result.timestamp)}.`, 'success');
+      state.contentCache.clear();
+      await Promise.all([loadActive(), loadHistory()]);
     }
   }
 
@@ -352,22 +332,22 @@ import Layout from '../layouts/Layout.astro';
     ui.historyLoading.classList.remove('hidden');
     ui.historyEmpty.classList.add('hidden');
     ui.historyList.innerHTML = '';
-    try {
-      const data = await api('/instructions/history?limit=50');
-      ui.historyLoading.classList.add('hidden');
-      if (!data.count) {
-        ui.historyEmpty.classList.remove('hidden');
-        return;
-      }
-      for (const entry of data.entries) {
-        ui.historyList.appendChild(renderHistoryRow(entry));
-      }
-      // After rendering, honor any URL hash deep-link from /analysis pages
-      // (Feature 004 / FR-016): #<rowKey> → scroll to + auto-expand that row.
-      await maybeOpenHashTarget();
-    } catch (err) {
-      ui.historyLoading.textContent = `Failed to load history: ${err?.message || err}`;
+    const data = await attempt(
+      () => api('/instructions/history?limit=50'),
+      (err) => { ui.historyLoading.textContent = `Failed to load history: ${err?.message || err}`; },
+    );
+    if (data === undefined) return;
+    ui.historyLoading.classList.add('hidden');
+    if (!data.count) {
+      ui.historyEmpty.classList.remove('hidden');
+      return;
     }
+    for (const entry of data.entries) {
+      ui.historyList.appendChild(renderHistoryRow(entry));
+    }
+    // After rendering, honor any URL hash deep-link from /analysis pages
+    // (Feature 004 / FR-016): #<rowKey> → scroll to + auto-expand that row.
+    await maybeOpenHashTarget();
   }
 
   async function maybeOpenHashTarget() {

@@ -90,6 +90,7 @@ import Layout from '../layouts/Layout.astro';
 
 <script>
   import { api } from '../lib/api.js';
+  import { attempt, loadInto } from '../lib/load.js';
 
   let allPositions = [];
   let brokers = [];
@@ -98,35 +99,31 @@ import Layout from '../layouts/Layout.astro';
   let editingKey = null;
 
   async function loadBrokers() {
-    try {
-      const res = await api('/brokers');
-      brokers = res.brokers || [];
+    const res = await attempt(() => api('/brokers'), (err) => console.error('Failed to load brokers:', err));
+    if (res === undefined) return;
+    brokers = res.brokers || [];
 
-      const brokerSelect = document.getElementById('broker-select');
-      brokerSelect.innerHTML = brokers.map(b => `<option value="${b.id}">${b.displayName}</option>`).join('');
-      if (brokers.length > 0) {
-        brokerSelect.value = brokers[0].id;
-      }
-
-      const brokerFilter = document.getElementById('broker-filter');
-      brokerFilter.innerHTML = '<option value="all">All brokers</option>' + brokers.map(b => `<option value="${b.id}">${b.displayName}</option>`).join('');
-      brokerFilter.value = 'all';
-    } catch (err) {
-      console.error('Failed to load brokers:', err);
+    const brokerSelect = document.getElementById('broker-select');
+    brokerSelect.innerHTML = brokers.map(b => `<option value="${b.id}">${b.displayName}</option>`).join('');
+    if (brokers.length > 0) {
+      brokerSelect.value = brokers[0].id;
     }
+
+    const brokerFilter = document.getElementById('broker-filter');
+    brokerFilter.innerHTML = '<option value="all">All brokers</option>' + brokers.map(b => `<option value="${b.id}">${b.displayName}</option>`).join('');
+    brokerFilter.value = 'all';
   }
 
   async function loadPositions() {
-    try {
-      const params = new URLSearchParams();
-      if (currentStatusFilter) params.append('status', currentStatusFilter);
-      const res = await api(`/positions?${params}`);
-      allPositions = res.positions || [];
-      renderPositions();
-    } catch (err) {
-      document.getElementById('positions-tbody').innerHTML =
-        `<tr><td colspan="8" class="px-4 py-4 text-sm pos-negative">Failed to load: ${err.message}</td></tr>`;
-    }
+    const params = new URLSearchParams();
+    if (currentStatusFilter) params.append('status', currentStatusFilter);
+    await loadInto(
+      document.getElementById('positions-tbody'),
+      () => api(`/positions?${params}`),
+      (res) => { allPositions = res.positions || []; renderPositions(); },
+      (err) => `<tr><td colspan="8" class="px-4 py-4 text-sm pos-negative">Failed to load: ${err.message}</td></tr>`,
+      { mode: 'html' },
+    );
   }
 
   function renderPositions() {
@@ -187,14 +184,13 @@ import Layout from '../layouts/Layout.astro';
       btn.addEventListener('click', async (e) => {
         const broker = e.target.dataset.broker;
         const rowkey = e.target.dataset.rowkey;
-        if (confirm('Delete this position?')) {
-          try {
-            await api(`/positions/${broker}/${rowkey}`, { method: 'DELETE' });
-            loadPositions();
-          } catch (err) {
-            alert(`Failed: ${err.message}`);
-          }
-        }
+        if (!confirm('Delete this position?')) return;
+        const result = await attempt(
+          () => api(`/positions/${broker}/${rowkey}`, { method: 'DELETE' }),
+          (err) => alert(`Failed: ${err.message}`),
+        );
+        if (result === undefined) return;
+        loadPositions();
       });
     });
 
@@ -202,15 +198,15 @@ import Layout from '../layouts/Layout.astro';
       btn.addEventListener('click', async (e) => {
         const broker = e.target.dataset.broker;
         const rowkey = e.target.dataset.rowkey;
-        try {
-          await api(`/positions/${broker}/${rowkey}`, {
+        const result = await attempt(
+          () => api(`/positions/${broker}/${rowkey}`, {
             method: 'PUT',
             body: { status: 'closed', realizedPnl: 0 }
-          });
-          loadPositions();
-        } catch (err) {
-          alert(`Failed: ${err.message}`);
-        }
+          }),
+          (err) => alert(`Failed: ${err.message}`),
+        );
+        if (result === undefined) return;
+        loadPositions();
       });
     });
 
@@ -239,17 +235,16 @@ import Layout from '../layouts/Layout.astro';
           return;
         }
         e.target.disabled = true;
-        try {
-          await api(`/positions/${broker}/${rowkey}`, {
+        const result = await attempt(
+          () => api(`/positions/${broker}/${rowkey}`, {
             method: 'PUT',
             body: { quantity, averageCost }
-          });
-          editingKey = null;
-          loadPositions();
-        } catch (err) {
-          alert(`Failed: ${err.message}`);
-          e.target.disabled = false;
-        }
+          }),
+          (err) => { alert(`Failed: ${err.message}`); e.target.disabled = false; },
+        );
+        if (result === undefined) return;
+        editingKey = null;
+        loadPositions();
       });
     });
   }
@@ -277,16 +272,15 @@ import Layout from '../layouts/Layout.astro';
     msg.className = 'mt-2 text-sm';
     msg.textContent = 'Saving…';
 
-    try {
-      await api('/positions', { method: 'POST', body: data });
-      msg.className = 'mt-2 text-sm pos-positive';
-      msg.textContent = 'Position added.';
-      form.reset();
-      loadPositions();
-    } catch (err) {
-      msg.className = 'mt-2 text-sm pos-negative';
-      msg.textContent = err.message;
-    }
+    const result = await attempt(
+      () => api('/positions', { method: 'POST', body: data }),
+      (err) => { msg.className = 'mt-2 text-sm pos-negative'; msg.textContent = err.message; },
+    );
+    if (result === undefined) return;
+    msg.className = 'mt-2 text-sm pos-positive';
+    msg.textContent = 'Position added.';
+    form.reset();
+    loadPositions();
   });
 
   loadBrokers();
