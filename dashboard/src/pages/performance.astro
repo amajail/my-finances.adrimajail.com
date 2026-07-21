@@ -51,6 +51,7 @@ import Layout from '../layouts/Layout.astro';
 <script>
   import { api } from '../lib/api.js';
   import charts from '../lib/charts.cjs';
+  import { loadInto } from '../lib/load.js';
   const { indexTo100, growthPct, sliceLastN, multiLineSvg } = charts;
 
   function show(el) { el.classList.remove('hidden'); }
@@ -122,21 +123,19 @@ import Layout from '../layouts/Layout.astro';
   }
 
   async function load() {
-    let data;
-    try {
-      data = await api('/analysis/performance?weeks=60');
-    } catch (err) {
-      const b = document.getElementById('error-banner');
-      b.textContent = `Failed to load performance series: ${err.message}`;
-      show(b);
-      return;
-    }
-    allPoints = data.points || [];
-    avail = data.benchmarksAvailable || {};
-    document.getElementById('hdr-meta').textContent = `${allPoints.length} weekly ${allPoints.length === 1 ? 'analysis' : 'analyses'}`;
-    buildToggles();
-    render();
-    document.getElementById('range').addEventListener('change', render);
+    await loadInto(
+      document.getElementById('error-banner'),
+      () => api('/analysis/performance?weeks=60'),
+      (data) => {
+        allPoints = data.points || [];
+        avail = data.benchmarksAvailable || {};
+        document.getElementById('hdr-meta').textContent = `${allPoints.length} weekly ${allPoints.length === 1 ? 'analysis' : 'analyses'}`;
+        buildToggles();
+        render();
+        document.getElementById('range').addEventListener('change', render);
+      },
+      (err) => `Failed to load performance series: ${err.message}`,
+    );
   }
 
   load();

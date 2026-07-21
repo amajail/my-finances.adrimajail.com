@@ -34,15 +34,8 @@ import Layout from '../layouts/Layout.astro';
 
 <script>
   import { api } from '../lib/api.js';
-
-  function escapeHtml(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  import { escapeHtml } from '../lib/format.js';
+  import { loadInto } from '../lib/load.js';
 
   function formatCost(n) {
     if (typeof n !== 'number') return '—';
@@ -83,16 +76,19 @@ import Layout from '../layouts/Layout.astro';
 
   async function loadList() {
     const tbody = document.getElementById('analysis-tbody');
-    try {
-      const { items } = await api('/analysis/weekly?limit=52');
-      if (!items || items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No analyses yet. The next Friday at 17:00 ET will create the first one.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = items.map(renderRow).join('');
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-4 text-sm pos-negative">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
-    }
+    await loadInto(
+      tbody,
+      () => api('/analysis/weekly?limit=52'),
+      ({ items }) => {
+        if (!items || items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No analyses yet. The next Friday at 17:00 ET will create the first one.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = items.map(renderRow).join('');
+      },
+      (err) => `<tr><td colspan="7" class="px-4 py-4 text-sm pos-negative">Failed to load: ${escapeHtml(err.message)}</td></tr>`,
+      { mode: 'html' },
+    );
   }
 
   loadList();

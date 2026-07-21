@@ -41,6 +41,7 @@ import Layout from '../layouts/Layout.astro';
 
 <script>
   import { api } from '../lib/api.js';
+  import { loadInto } from '../lib/load.js';
 
   function show(el) { el.classList.remove('hidden'); }
 
@@ -64,28 +65,25 @@ import Layout from '../layouts/Layout.astro';
   }
 
   async function load() {
-    let data;
-    try {
-      data = await api('/analysis/scorecard');
-    } catch (err) {
-      const banner = document.getElementById('error-banner');
-      banner.textContent = `Failed to load scorecard: ${err.message}`;
-      show(banner);
-      return;
-    }
+    await loadInto(
+      document.getElementById('error-banner'),
+      () => api('/analysis/scorecard'),
+      (data) => {
+        document.getElementById('hdr-meta').textContent =
+          `${data.analysesCount} completed ${data.analysesCount === 1 ? 'analysis' : 'analyses'}` +
+          (data.sufficientData ? '' : ' · insufficient data for reliable rates');
+        if (!data.sufficientData) show(document.getElementById('insufficient'));
 
-    document.getElementById('hdr-meta').textContent =
-      `${data.analysesCount} completed ${data.analysesCount === 1 ? 'analysis' : 'analyses'}` +
-      (data.sufficientData ? '' : ' · insufficient data for reliable rates');
-    if (!data.sufficientData) show(document.getElementById('insufficient'));
-
-    const bc = data.byConviction || {};
-    document.getElementById('scorecard-tbody').innerHTML = [
-      row('<strong>Overall</strong>', data.overall),
-      row('High conviction', bc.high),
-      row('Medium conviction', bc.medium),
-      row('Low conviction', bc.low),
-    ].join('');
+        const bc = data.byConviction || {};
+        document.getElementById('scorecard-tbody').innerHTML = [
+          row('<strong>Overall</strong>', data.overall),
+          row('High conviction', bc.high),
+          row('Medium conviction', bc.medium),
+          row('Low conviction', bc.low),
+        ].join('');
+      },
+      (err) => `Failed to load scorecard: ${err.message}`,
+    );
   }
 
   load();

@@ -43,32 +43,35 @@ import Layout from '../layouts/Layout.astro';
 
 <script>
   import { api } from '../lib/api.js';
+  import { attempt, loadInto } from '../lib/load.js';
 
   const TYPE_LABELS = { broker: 'Broker', cash_holder: 'Cash holder' };
 
   async function loadBrokers() {
-    try {
-      const { brokers } = await api('/brokers');
-      document.getElementById('brokers-tbody').innerHTML = brokers.length
-        ? brokers.map(b => `
-            <tr class="border-t border-[var(--color-border)]">
-              <td class="px-4 py-2 num-mono" data-label="ID">${b.id}</td>
-              <td class="px-4 py-2" data-label="Name">
-                ${b.accentColor ? `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${b.accentColor};margin-right:6px;vertical-align:middle"></span>` : ''}
-                ${b.displayName}
-              </td>
-              <td class="px-4 py-2" data-label="Type">
-                <span class="badge ${b.type === 'cash_holder' ? 'badge-pending' : 'badge-success'}">${TYPE_LABELS[b.type] || b.type}</span>
-              </td>
-              <td class="px-4 py-2 text-[var(--color-muted)] text-xs" data-label="Notes">${b.notes || ''}</td>
-              <td class="px-4 py-2 text-right text-xs text-[var(--color-muted)]" data-label="Actions">—</td>
-            </tr>
-          `).join('')
-        : '<tr><td colspan="5" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No brokers yet.</td></tr>';
-    } catch (err) {
-      document.getElementById('brokers-tbody').innerHTML =
-        `<tr><td colspan="5" class="px-4 py-4 text-sm pos-negative">Failed: ${err.message}</td></tr>`;
-    }
+    await loadInto(
+      document.getElementById('brokers-tbody'),
+      () => api('/brokers'),
+      ({ brokers }) => {
+        document.getElementById('brokers-tbody').innerHTML = brokers.length
+          ? brokers.map(b => `
+              <tr class="border-t border-[var(--color-border)]">
+                <td class="px-4 py-2 num-mono" data-label="ID">${b.id}</td>
+                <td class="px-4 py-2" data-label="Name">
+                  ${b.accentColor ? `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${b.accentColor};margin-right:6px;vertical-align:middle"></span>` : ''}
+                  ${b.displayName}
+                </td>
+                <td class="px-4 py-2" data-label="Type">
+                  <span class="badge ${b.type === 'cash_holder' ? 'badge-pending' : 'badge-success'}">${TYPE_LABELS[b.type] || b.type}</span>
+                </td>
+                <td class="px-4 py-2 text-[var(--color-muted)] text-xs" data-label="Notes">${b.notes || ''}</td>
+                <td class="px-4 py-2 text-right text-xs text-[var(--color-muted)]" data-label="Actions">—</td>
+              </tr>
+            `).join('')
+          : '<tr><td colspan="5" class="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No brokers yet.</td></tr>';
+      },
+      (err) => `<tr><td colspan="5" class="px-4 py-4 text-sm pos-negative">Failed: ${err.message}</td></tr>`,
+      { mode: 'html' },
+    );
   }
 
   document.getElementById('add-form').addEventListener('submit', async (e) => {
@@ -80,16 +83,15 @@ import Layout from '../layouts/Layout.astro';
     const msg = document.getElementById('form-msg');
     msg.className = 'mt-2 text-sm';
     msg.textContent = 'Saving…';
-    try {
-      await api('/brokers', { method: 'POST', body: data });
-      msg.className = 'mt-2 text-sm pos-positive';
-      msg.textContent = 'Saved.';
-      form.reset();
-      loadBrokers();
-    } catch (err) {
-      msg.className = 'mt-2 text-sm pos-negative';
-      msg.textContent = err.message;
-    }
+    const result = await attempt(
+      () => api('/brokers', { method: 'POST', body: data }),
+      (err) => { msg.className = 'mt-2 text-sm pos-negative'; msg.textContent = err.message; },
+    );
+    if (result === undefined) return;
+    msg.className = 'mt-2 text-sm pos-positive';
+    msg.textContent = 'Saved.';
+    form.reset();
+    loadBrokers();
   });
 
   loadBrokers();
