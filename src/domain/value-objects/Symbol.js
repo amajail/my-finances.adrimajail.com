@@ -120,7 +120,7 @@ class Symbol {
     if (typeof json === 'string') {
       return new Symbol(json);
     }
-    if (json && typeof json === 'object' && json.hasOwnProperty('value')) {
+    if (json && typeof json === 'object' && Object.prototype.hasOwnProperty.call(json, 'value')) {
       return new Symbol(json.value);
     }
     throw ValidationError.forField('json', 'JSON must be a string or object with value property');

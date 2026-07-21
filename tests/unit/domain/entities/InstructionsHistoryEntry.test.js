@@ -111,13 +111,8 @@ describe('InstructionsHistoryEntry', () => {
   });
 
   it('throws DomainError for invalid input', () => {
-    try {
-      // eslint-disable-next-line no-new
-      new InstructionsHistoryEntry(fixture({ content: '' }));
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(DomainError);
-    }
+    expect(() => new InstructionsHistoryEntry(fixture({ content: '' })))
+      .toThrow(DomainError);
   });
 
   it('is immutable (frozen)', () => {

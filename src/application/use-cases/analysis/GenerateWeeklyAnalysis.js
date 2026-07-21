@@ -495,7 +495,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     // `topPerformers`/`bottomPerformers` from this destructured omit-list.
     const summaryForPrompt = portfolioSummary
       ? (() => {
-          const { positions, topPerformers, bottomPerformers, ...rest } = portfolioSummary;
+          const { positions: _positions, topPerformers: _topPerformers, bottomPerformers: _bottomPerformers, ...rest } = portfolioSummary;
           return rest;
         })()
       : portfolioSummary;
@@ -506,7 +506,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     // positionChanges. We keep the prior summary, orders and macro panel so the
     // model still has week-over-week continuity (FR-010).
     const previousForPrompt = previousAnalysis
-      ? (() => { const { markdownBody, portfolioSnapshot, ...rest } = previousAnalysis; return rest; })()
+      ? (() => { const { markdownBody: _markdownBody, portfolioSnapshot: _portfolioSnapshot, ...rest } = previousAnalysis; return rest; })()
       : previousAnalysis;
     const parts = [
       '## generatedAt',

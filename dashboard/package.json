@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@amajail/ui": "github:amajail/amajail-ui#master",
@@ -14,5 +15,13 @@
     "marked": "^18.0.3",
     "tailwindcss": "^4.1.4",
     "vite": "^7.3.2"
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^8.65.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^1.7.0",
+    "globals": "^17.7.0",
+    "typescript": "^5.9.3"
   }
 }

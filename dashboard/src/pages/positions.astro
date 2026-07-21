@@ -138,7 +138,6 @@ import Layout from '../layouts/Layout.astro';
     const tbody = document.getElementById('positions-tbody');
     tbody.innerHTML = filtered.length
       ? filtered.map(p => {
-          const brokerName = brokers.find(b => b.id === p.brokerId)?.displayName || p.brokerId;
           const inputCls = 'w-24 text-right border border-[var(--color-border)] rounded-md px-2 py-1 text-sm num-mono';
           if (`${p.brokerId}/${p.id}` === editingKey) {
             return `
