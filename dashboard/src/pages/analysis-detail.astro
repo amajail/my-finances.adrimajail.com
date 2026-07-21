@@ -74,6 +74,26 @@ import Layout from '../layouts/Layout.astro';
     </table>
   </section>
 
+  <!-- Feature 014: cross-broker duplicate holdings (same underlying in 2+
+       broker/wrapper placements). Deterministic. Omitted when there are none. -->
+  <section id="dups-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-baseline justify-between">
+      <h2 class="font-semibold">Duplicate holdings (cross-broker)</h2>
+      <span class="text-xs text-[var(--color-muted)]" id="dups-note"></span>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Underlying</th>
+          <th class="text-left px-4 py-2">Placements</th>
+          <th class="text-right px-4 py-2">#</th>
+          <th class="text-right px-4 py-2">Total USD</th>
+        </tr>
+      </thead>
+      <tbody id="dups-tbody"></tbody>
+    </table>
+  </section>
+
   <section id="macro-wow-section" class="card mb-6 overflow-x-auto hidden">
     <div class="px-4 py-3 border-b border-[var(--color-border)]">
       <h2 class="font-semibold">Macro — week over week</h2>
@@ -357,6 +377,30 @@ import Layout from '../layouts/Layout.astro';
     show(document.getElementById('admin-section'));
   }
 
+  // ---- Feature 014: cross-broker duplicate holdings ----
+
+  function renderDuplications(groups) {
+    // null / [] / absent / malformed → omit the section entirely (FR-011).
+    if (!Array.isArray(groups) || groups.length === 0) return;
+    document.getElementById('dups-note').textContent = `${groups.length} duplicated`;
+    document.getElementById('dups-tbody').innerHTML = groups.map((g) => {
+      const placements = (g.placements || [])
+        .map((p) => `${escapeHtml(p.broker)}/${escapeHtml(p.assetType)} (${escapeHtml(String(p.quantity))})`)
+        .join(', ');
+      const label = g.label && g.label !== g.symbol
+        ? `${escapeHtml(g.symbol)} <span class="text-[var(--color-muted)]">${escapeHtml(g.label)}</span>`
+        : escapeHtml(g.symbol);
+      return `
+        <tr class="border-t border-[var(--color-border)]">
+          <td class="px-4 py-2 num-mono">${label}</td>
+          <td class="px-4 py-2">${placements}</td>
+          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(g.placementCount))}</td>
+          <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(g.totalValueUsd))}</td>
+        </tr>`;
+    }).join('');
+    show(document.getElementById('dups-section'));
+  }
+
   // ---- Feature 012: deterministic macro week-over-week ----
 
   function renderMacroWow(rows) {
@@ -582,6 +626,8 @@ import Layout from '../layouts/Layout.astro';
     renderChanges(detail.positionChanges);
     // Feature 013: administrative / non-investable positions (omitted when none).
     renderAdministrative(detail.administrativePositions);
+    // Feature 014: cross-broker duplicate holdings (omitted when none).
+    renderDuplications(detail.duplications);
     // Feature 012: deterministic macro week-over-week (absent on first run /
     // pre-feature rows).
     renderMacroWow(detail.macroChanges);

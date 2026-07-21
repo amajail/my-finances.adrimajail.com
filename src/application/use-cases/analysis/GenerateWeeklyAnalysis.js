@@ -24,6 +24,7 @@ const WeeklyAnalysis = require('../../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../../domain/entities/SuggestedOrder');
 const PositionChangeCalculator = require('../../../domain/services/PositionChangeCalculator');
 const MacroChangeCalculator = require('../../../domain/services/MacroChangeCalculator');
+const DuplicateHoldingsDetector = require('../../../domain/services/DuplicateHoldingsDetector');
 const AllocationDriftCalculator = require('../../../domain/services/AllocationDriftCalculator');
 const { buildSystemPrompt } = require('./prompts/guardrails');
 const logger = require('../../../shared/logging');
@@ -147,6 +148,8 @@ class GenerateWeeklyAnalysis extends UseCase {
     let positionChanges = null;
     // Feature 012: deterministic macro week-over-week (null = no prior panel).
     let macroChanges = null;
+    // Feature 014: cross-broker duplicate-holdings groups (null until computed).
+    let duplications = null;
     let riesgoPaisBp = null;
     let riesgoPaisAsOf = null;
     // Feature 010 code-computed sections (null = targets unavailable → omitted).
@@ -174,6 +177,10 @@ class GenerateWeeklyAnalysis extends UseCase {
       // disappears (FR-002..FR-004).
       const investableSnapshot = portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) > 0);
       administrativePositions = portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) <= 0);
+
+      // Feature 014: deterministic cross-broker duplicate-holdings detection over
+      // the investable set (stateless — no prior needed; [] when none).
+      duplications = DuplicateHoldingsDetector.detect(investableSnapshot);
 
       // Feature 010: code-computed bucket / asset-class drift from the holdings
       // snapshot + machine-readable targets. Resilient — a missing targets row
@@ -273,6 +280,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         portfolioTotals,
         positionChanges,
         administrativePositions,
+        duplications,
       });
 
       // 6. Call the LLM. The privacy boundary lives inside this method.
@@ -289,7 +297,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       } catch (err) {
         // Feature 006: all capture buffers ride onto the failed row (FR-014).
         const captured = {
-          targetDate, startedAt, model, portfolioSnapshot, administrativePositions,
+          targetDate, startedAt, model, portfolioSnapshot, administrativePositions, duplications,
           macroContext, macroUsage, portfolioTotals, positionChanges, macroChanges,
           riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
         };
@@ -326,6 +334,8 @@ class GenerateWeeklyAnalysis extends UseCase {
         // Feature 013: zero/negative-value administrative positions (excluded
         // from drift/caps; [] when none).
         administrativePositions,
+        // Feature 014: cross-broker duplicate-holdings groups ([] when none).
+        duplications,
         macroContext,
         portfolioTotals,
         positionChanges,
@@ -389,6 +399,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     targetDate, startedAt, model, portfolioSnapshot, errorMessage,
     instructionsHistoryRowKey = null,
     administrativePositions = [],
+    duplications = null,
     macroContext = null, macroUsage = null, portfolioTotals = null,
     positionChanges = null, macroChanges = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
   }) {
@@ -404,6 +415,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       promptVersion: INSTRUCTIONS_PROMPT_VERSION,
       portfolioSnapshot,
       administrativePositions,
+      duplications,
       macroContext,
       portfolioTotals,
       positionChanges,
@@ -477,7 +489,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       }));
   }
 
-  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [] }) {
+  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], duplications = null }) {
     // The full per-position holdings list is delivered separately as an
     // authoritative `currentHoldings` block (below), so it is pulled out of the
     // portfolioSummary aggregates to avoid duplicating it in the prompt.
@@ -488,6 +500,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       ? portfolioSummary.positions.filter((p) => (Number(p.valueUsd) || 0) > 0)
       : null;
     const adminPositions = Array.isArray(administrativePositions) ? administrativePositions : [];
+    const dupGroups = Array.isArray(duplications) ? duplications : [];
     // Feature 011 (FR-002): also strip topPerformers/bottomPerformers from the
     // prompt copy — they are derivable from currentHoldings and pure token
     // overhead. PortfolioCalculator.summary() is unchanged, so the dashboard
@@ -503,10 +516,13 @@ class GenerateWeeklyAnalysis extends UseCase {
     // back into the prompt: the narrative is a contamination vector (any
     // instrument the model once mentioned gets carried forward indefinitely,
     // even if never held), and the snapshot is redundant with currentHoldings +
-    // positionChanges. We keep the prior summary, orders and macro panel so the
-    // model still has week-over-week continuity (FR-010).
+    // positionChanges. Feature 015 (FR-003): the prior macro panel is also
+    // dropped here — the deterministic macro week-over-week comparison (feature
+    // 012, `## macroChanges`) already expresses the prior→current macro deltas,
+    // so re-sending the raw prior panel is redundant. We keep the prior summary
+    // and orders (with status) for week-over-week continuity (FR-010).
     const previousForPrompt = previousAnalysis
-      ? (() => { const { markdownBody: _markdownBody, portfolioSnapshot: _portfolioSnapshot, ...rest } = previousAnalysis; return rest; })()
+      ? (() => { const { markdownBody: _markdownBody, portfolioSnapshot: _portfolioSnapshot, macroContext: _priorMacro, ...rest } = previousAnalysis; return rest; })()
       : previousAnalysis;
     const parts = [
       '## generatedAt',
@@ -536,6 +552,20 @@ class GenerateWeeklyAnalysis extends UseCase {
         'These are excluded zero-value/legacy stubs (computed value <= 0, no recoverable price). They are deliberately excluded from allocation drift and concentration caps. Do NOT flag them for review or suggest orders for them; they are listed only for awareness.',
         '```json',
         JSON.stringify(adminPositions),
+        '```'
+      );
+    }
+    // Feature 014: cross-broker duplicate-holdings groups, detected
+    // deterministically and rendered as their own table. Labeled so the model
+    // references them but does NOT re-enumerate them item-by-item (FR-012).
+    // Omitted when there are none.
+    if (dupGroups.length > 0) {
+      parts.push(
+        '',
+        '## duplications',
+        'These cross-broker duplicate holdings (the same underlying held in 2+ broker/wrapper placements) were detected deterministically and are shown to the owner as a separate table. Reference them if relevant, but do NOT re-list each placement — the table already enumerates them.',
+        '```json',
+        JSON.stringify(dupGroups),
         '```'
       );
     }
@@ -577,7 +607,13 @@ class GenerateWeeklyAnalysis extends UseCase {
     }
     parts.push('', '## macroContext');
     if (macroContext) {
-      parts.push('```json', JSON.stringify(macroContext), '```');
+      // Feature 015 (FR-004): omit indicators flagged unavailable instead of
+      // sending `{value:null, available:false}` placeholders — they carry no
+      // signal and only cost tokens. When all are available this is a no-op.
+      const availableMacro = Object.fromEntries(
+        Object.entries(macroContext).filter(([, v]) => !(v && typeof v === 'object' && v.available === false))
+      );
+      parts.push('```json', JSON.stringify(availableMacro), '```');
     } else {
       parts.push('unavailable');
     }
