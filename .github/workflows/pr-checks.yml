@@ -73,7 +73,7 @@ jobs:
 
       - name: Install dashboard dependencies
         working-directory: dashboard
-        run: npm install
+        run: npm ci
 
       - name: Build dashboard
         working-directory: dashboard
