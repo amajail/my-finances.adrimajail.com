@@ -39,9 +39,10 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
-          app_location: dashboard
-          output_location: dist
           # We build ourselves (npm ci, above) so the deploy uses the exact
           # pinned lockfile/build rather than the Oryx container's own
-          # (floating) install + build.
+          # (floating) install + build. With skip_app_build, app_location
+          # must point at the prebuilt output itself.
+          app_location: dashboard/dist
+          output_location: ''
           skip_app_build: true
