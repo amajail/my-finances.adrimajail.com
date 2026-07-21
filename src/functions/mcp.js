@@ -196,6 +196,59 @@ app.mcpTool('mcpGetWeeklyAnalysis', {
 });
 
 // ---------------------------------------------------------------------------
+// set_order_execution_status (feature 018, US1)
+// ---------------------------------------------------------------------------
+app.mcpTool('mcpSetOrderExecutionStatus', {
+  toolName: 'set_order_execution_status',
+  description:
+    'Record what happened with a suggested order from a weekly analysis: pending | executed | partial | skipped, ' +
+    'with an optional execution price (kept for future outcome-P&L scoring) and note. ' +
+    'Identifies the order by analysis date + 0-based index (see get_weekly_analysis).',
+  toolProperties: [
+    {
+      propertyName: 'date',
+      propertyType: 'string',
+      description: 'The analysis date in YYYY-MM-DD format.',
+      isRequired: true,
+    },
+    {
+      propertyName: 'index',
+      propertyType: 'integer',
+      description: 'The 0-based index of the order within that analysis.',
+      isRequired: true,
+    },
+    {
+      propertyName: 'status',
+      propertyType: 'string',
+      description: 'Execution outcome: pending | executed | partial | skipped.',
+      isRequired: true,
+    },
+    {
+      propertyName: 'executionPrice',
+      propertyType: 'string',
+      description: 'Optional price actually obtained (positive number, e.g. "42.50").',
+      isRequired: false,
+    },
+    {
+      propertyName: 'note',
+      propertyType: 'string',
+      description: 'Optional note (max 500 chars), e.g. why an order was skipped.',
+      isRequired: false,
+    },
+  ],
+  handler: tool('set_order_execution_status', async (args) => {
+    return container.getSetOrderExecutionStatus().execute({
+      date: args.date,
+      index: args.index,
+      status: args.status,
+      executionPrice: toNumber(args.executionPrice),
+      note: args.note || undefined,
+      _audit: { source: 'mcp' },
+    });
+  }),
+});
+
+// ---------------------------------------------------------------------------
 // list_audit_entries (feature 018, FR-006)
 // ---------------------------------------------------------------------------
 app.mcpTool('mcpListAuditEntries', {

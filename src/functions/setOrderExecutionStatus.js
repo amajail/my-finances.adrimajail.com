@@ -25,6 +25,7 @@ app.http('setOrderExecutionStatus', {
         index,
         status: body.status,
         note: body.note,
+        executionPrice: body.executionPrice,
       });
       return ok(result);
     } catch (err) {
