@@ -102,7 +102,12 @@ class GetPortfolioSummary extends UseCase {
         currentPrice: p.currentPrice,
         currency: p.currency,
         valueUsd,
-        status: p.status
+        status: p.status,
+        // Feature 017: calendar derivation needs the maturity date and the
+        // exchange (Yahoo symbol mapping). Additive — every existing consumer
+        // whitelists the fields it reads.
+        maturityDate: p.maturityDate || null,
+        exchange: p.exchange || null
       };
     });
 
