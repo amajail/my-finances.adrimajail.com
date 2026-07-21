@@ -5,8 +5,8 @@
   "main": "src/functions/index.js",
   "scripts": {
     "start": "func start",
-    "test": "jest --passWithNoTests",
-    "test:watch": "jest --watch",
+    "test": "jest",
+    "test:watch": "jest --watch --passWithNoTests",
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit --passWithNoTests",
     "test:integration": "jest tests/integration --passWithNoTests",
