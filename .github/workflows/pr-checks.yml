@@ -22,8 +22,41 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint backend (src/, tests/, scripts/)
+        run: npm run lint
+
+      - name: Set up Node.js (dashboard)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dashboard dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Lint dashboard
+        working-directory: dashboard
+        run: npm run lint
 
   build-dashboard:
     name: Dashboard build
@@ -40,7 +73,7 @@ jobs:
 
       - name: Install dashboard dependencies
         working-directory: dashboard
-        run: npm install
+        run: npm ci
 
       - name: Build dashboard
         working-directory: dashboard

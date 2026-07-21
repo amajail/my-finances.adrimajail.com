@@ -4,15 +4,24 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "@amajail/ui": "github:amajail/amajail-ui#master",
+    "@amajail/ui": "github:amajail/amajail-ui#f83141b1c17d93392af66ca16cda85243860f74a",
     "@tailwindcss/vite": "^4.1.4",
     "astro": "^6.3.1",
     "dompurify": "^3.4.3",
     "marked": "^18.0.3",
     "tailwindcss": "^4.1.4",
     "vite": "^7.3.2"
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^8.65.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^1.7.0",
+    "globals": "^17.7.0",
+    "typescript": "^5.9.3"
   }
 }

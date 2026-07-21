@@ -8,7 +8,6 @@
  */
 
 const { DomainError, ValidationError } = require('../../shared/errors');
-const { AmountValidator } = require('../../shared/validation/validators');
 const currencyUtils = require('../../shared/utils/currency.utils');
 
 class Money {
@@ -257,10 +256,10 @@ class Money {
 
   /**
    * Format as string
-   * @param {Object} options - Format options
+   * @param {Object} _options - Format options (currently unused; reserved for future formatting controls)
    * @returns {string}
    */
-  format(options = {}) {
+  format(_options = {}) {
     return currencyUtils.formatCurrencyAmount(this._amount, this._currency);
   }
 
@@ -328,7 +327,7 @@ class Money {
     if (!json || typeof json !== 'object') {
       throw ValidationError.forField('json', 'Invalid JSON object');
     }
-    if (!json.hasOwnProperty('amount') || !json.hasOwnProperty('currency')) {
+    if (!Object.prototype.hasOwnProperty.call(json, 'amount') || !Object.prototype.hasOwnProperty.call(json, 'currency')) {
       throw ValidationError.forField('json', 'JSON must have amount and currency properties');
     }
     return new Money(json.amount, json.currency);

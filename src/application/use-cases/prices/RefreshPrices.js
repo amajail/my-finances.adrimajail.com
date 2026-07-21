@@ -26,10 +26,10 @@ class RefreshPrices extends UseCase {
 
   /**
    * Execute the use case
-   * @param {Object} input - {} (no input parameters currently used)
+   * @param {Object} _input - {} (no input parameters currently used)
    * @returns {Promise<Object>} { totalSymbols, succeeded, failed, durationMs }
    */
-  async execute(input = {}) {
+  async execute(_input = {}) {
     const startTime = Date.now();
     logger.info('RefreshPrices: starting price refresh');
 

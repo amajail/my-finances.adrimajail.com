@@ -26,7 +26,6 @@ const ArgentinaDatosInflationProvider = require('../../infrastructure/providers/
 const FredProvider = require('../../infrastructure/providers/FredProvider');
 const StooqSp500Provider = require('../../infrastructure/providers/StooqSp500Provider'); // keyless fallback (Stooq now JS-gated)
 const FredSp500DrawdownProvider = require('../../infrastructure/providers/FredSp500DrawdownProvider');
-const ImfStatusProvider = require('../../infrastructure/providers/ImfStatusProvider'); // RSS-based (kept as fallback)
 const WebSearchImfStatusProvider = require('../../infrastructure/providers/WebSearchImfStatusProvider');
 const MacroContextProvider = require('../../infrastructure/providers/MacroContextProvider');
 

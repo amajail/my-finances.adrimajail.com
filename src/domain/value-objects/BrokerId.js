@@ -122,7 +122,7 @@ class BrokerId {
     if (typeof json === 'string') {
       return new BrokerId(json);
     }
-    if (json && typeof json === 'object' && json.hasOwnProperty('value')) {
+    if (json && typeof json === 'object' && Object.prototype.hasOwnProperty.call(json, 'value')) {
       return new BrokerId(json.value);
     }
     throw ValidationError.forField('json', 'JSON must be a string or object with value property');

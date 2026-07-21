@@ -72,7 +72,7 @@ function buildUseCase({ repository = mockRepoEmpty(), portfolioSummary = summary
 
 describe('GenerateWeeklyAnalysis — feature 013 administrative positions', () => {
   it('classifies value<=0 positions as administrative; investable set keeps positive value', async () => {
-    const { useCase, repository } = buildUseCase();
+    const { useCase } = buildUseCase();
     const result = await useCase.execute({ targetDate: '2026-06-20' });
 
     const adminSymbols = result.administrativePositions.map((p) => p.symbol).sort();
@@ -139,7 +139,7 @@ describe('GenerateWeeklyAnalysis — feature 013 administrative positions', () =
     const s = summaryWithStubs();
     // cash-style holding: null price but positive value (valued from quantity).
     s.positions.push({ brokerId: 'cash', assetType: 'cash', symbol: 'USDCASH', quantity: 1000, averageCost: 1, currentPrice: null, currency: 'USD', valueUsd: 1000, status: 'open' });
-    const { useCase, repository } = buildUseCase({ portfolioSummary: s });
+    const { useCase } = buildUseCase({ portfolioSummary: s });
     const result = await useCase.execute({ targetDate: '2026-06-20' });
 
     expect(result.administrativePositions.map((p) => p.symbol)).not.toContain('USDCASH');

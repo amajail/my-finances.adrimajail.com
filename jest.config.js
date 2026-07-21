@@ -5,17 +5,20 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/cli.js',
-    '!src/index.js',
-    '!src/functions/**'
+    '!src/index.js'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
+  // Ratchet baseline, not an aspirational target: set a few points below the
+  // actuals measured on 2026-07-21 (statements 67.63, branches 61.07,
+  // functions 61.9, lines 67.92) so CI fails on real regressions but doesn't
+  // block on day-to-day noise. Raise these as coverage genuinely improves.
   coverageThreshold: {
     global: {
-      branches: 0,
-      functions: 0,
-      lines: 0,
-      statements: 0
+      branches: 58,
+      functions: 59,
+      lines: 65,
+      statements: 65
     }
   },
   testMatch: [

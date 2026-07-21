@@ -5,7 +5,6 @@
 const AzurePositionRepository = require('../../../../src/infrastructure/repositories/AzurePositionRepository');
 const Position = require('../../../../src/domain/entities/Position');
 const BrokerId = require('../../../../src/domain/value-objects/BrokerId');
-const AssetType = require('../../../../src/domain/value-objects/AssetType');
 const { createMockTableClient } = require('../../../helpers/mock-table-client');
 const { InfrastructureError } = require('../../../../src/shared/errors');
 
