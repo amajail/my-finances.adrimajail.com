@@ -10,7 +10,9 @@
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit --passWithNoTests",
     "test:integration": "jest tests/integration --passWithNoTests",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "type": "commonjs",
   "engines": {

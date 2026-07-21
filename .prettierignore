@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+dashboard/node_modules/
+
+# Build output
+dist/
+dashboard/dist/
+dashboard/.astro/
+coverage/
+
+# Lockfiles (machine-generated)
+package-lock.json
+dashboard/package-lock.json
+
+# Local/private data (gitignored anyway, but keep prettier out of them too)
+scripts/positions.json
+scripts/positions.local.json
+*.local.js
+
+# Spec-kit generated artifacts — not reformatted as part of this PR
+specs/
+.specify/
