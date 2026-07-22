@@ -43,7 +43,9 @@ const TOOL_SCHEMA = require('../../../../specs/002-weekly-rebalance-analysis/con
 // `promptVersion` field and to mark which prompt-assembly regime produced it.
 // Feature 010 (FR-014): the effective prompt is now preamble ⊕ body; the marker
 // records that the fixed guardrail preamble was applied for this run.
-const INSTRUCTIONS_PROMPT_VERSION = 'editable-instructions-v1+guardrail-v1';
+// guardrail-v2: required-section names are no longer hardcoded in the preamble —
+// the instructions document defines its own output sections (framework v3.1 §9).
+const INSTRUCTIONS_PROMPT_VERSION = 'editable-instructions-v1+guardrail-v2';
 
 const DEFAULTS = {
   model: 'claude-opus-4-7',

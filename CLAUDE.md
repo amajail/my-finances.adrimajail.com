@@ -22,6 +22,10 @@ Personal investments tracker. Azure Functions (Node) backend + Astro dashboard f
 
 Positions are keyed by `partitionKey = brokerId`, `rowKey = ${assetType}__${symbol}` (see `Position.id()` in `src/domain/entities/Position.js:240`).
 
+Strategic-plan tables (versioned per `docs/metaprompt-rebalance-plan.md` §2/§7; models in `src/domain/plan/plan-entities.d.ts`): `portfolioTargetAllocations`, `portfolioDeployRules`, `portfolioPlanVersions` (pk `versions`, exactly one row `isActive`). Written by `scripts/seed-plan-version.js` from gitignored `scripts/plan-version.local.json`; nothing in the app consumes them yet (future rebalance evaluator). The weekly analysis drift/caps read a separate document: `portfolioSettings` row `analysis.allocationTargetsV1` (feature 010 schema, seeded from `scripts/allocation-targets.local.json`).
+
+The weekly-analysis system prompt is the editable instructions document (`portfolioSettings` row `analysis.instructionsV1` + `portfolioInstructionsHistory`); since 2026-07-22 its content is the owner's portfolio framework v3.1 (kept locally at `docs/portfolio-framework-v3.md`, untracked — real strategy data, never commit).
+
 ## Position schema (key fields)
 `brokerId`, `assetType` (stock|etf|bond|cedear|cash|deposit|bopreal|lecap|on), `symbol`, `displayName`, `quantity`, `averageCost` (PPC), `currency`, `currentPrice`, `currentPriceUpdatedAt`, `exchange`, `maturityDate`, `status` (open|closed), `realizedPnl`, `notes`.
 
