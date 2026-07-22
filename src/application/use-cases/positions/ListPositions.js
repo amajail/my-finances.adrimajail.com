@@ -29,6 +29,10 @@ class ListPositions extends UseCase {
     let positions;
     if (input.broker) {
       positions = await this._positionRepository.findByBroker(input.broker);
+      const status = input.status || 'all';
+      if (status !== 'all') {
+        positions = positions.filter(p => p.status === status);
+      }
     } else {
       positions = await this._positionRepository.findAll(input.status ? { status: input.status } : undefined);
     }
