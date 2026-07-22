@@ -132,17 +132,21 @@ class AzureAnalysisRepository extends AzureTableRepository {
 
   /**
    * Feature 007: Merge-patch the execution status columns on one order row.
+   * Feature 018: optionally records an execution price (Merge preserves a
+   * previously stored price when the new patch omits it), and returns the
+   * pre-change values under `previous` so callers can audit old→new.
    * @param {string} date
    * @param {number} index
-   * @param {{ status: string, note?: string|null, updatedAt: string }} patch
+   * @param {{ status: string, note?: string|null, updatedAt: string, executionPrice?: number|null }} patch
    */
-  async setOrderExecutionStatus(date, index, { status, note, updatedAt }) {
+  async setOrderExecutionStatus(date, index, { status, note, updatedAt, executionPrice }) {
     await this._ensureInitialized();
     const id = SuggestedOrder.id(date, index);
 
     // Confirm the order exists (404 → NotFoundError).
+    let existing;
     try {
-      await this._database.ordersClient.getEntity(id.partitionKey, id.rowKey);
+      existing = await this._database.ordersClient.getEntity(id.partitionKey, id.rowKey);
     } catch (error) {
       if (error.statusCode === 404) {
         throw new NotFoundError(`No suggested order ${index} for analysis ${date}`);
@@ -152,23 +156,31 @@ class AzureAnalysisRepository extends AzureTableRepository {
 
     // Merge: only the status columns change; immutable order fields untouched.
     // Empty-string clears the note (Merge leaves omitted properties unchanged).
-    await this._database.ordersClient.updateEntity(
-      {
-        partitionKey: id.partitionKey,
-        rowKey: id.rowKey,
-        executionStatus: status,
-        executionNote: note ? String(note) : '',
-        executionUpdatedAt: updatedAt,
-      },
-      'Merge'
-    );
+    const patch = {
+      partitionKey: id.partitionKey,
+      rowKey: id.rowKey,
+      executionStatus: status,
+      executionNote: note ? String(note) : '',
+      executionUpdatedAt: updatedAt,
+    };
+    if (executionPrice != null) {
+      patch.executionPrice = executionPrice;
+    }
+    await this._database.ordersClient.updateEntity(patch, 'Merge');
 
+    const previousPrice = typeof existing.executionPrice === 'number' ? existing.executionPrice : null;
     return {
       date,
       index,
       executionStatus: status,
       executionNote: note ? String(note) : null,
       executionUpdatedAt: updatedAt,
+      executionPrice: executionPrice != null ? executionPrice : previousPrice,
+      previous: {
+        executionStatus: existing.executionStatus || 'pending',
+        executionNote: existing.executionNote || null,
+        executionPrice: previousPrice,
+      },
     };
   }
 
@@ -400,6 +412,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
     }
     if (order.executionNote) entity.executionNote = order.executionNote;
     if (order.executionUpdatedAt) entity.executionUpdatedAt = order.executionUpdatedAt;
+    // Feature 018: optional execution price (only when set, same as above).
+    if (order.executionPrice != null) entity.executionPrice = order.executionPrice;
     return entity;
   }
 
@@ -417,6 +431,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
       executionStatus: entity.executionStatus || 'pending',
       executionNote: entity.executionNote || null,
       executionUpdatedAt: entity.executionUpdatedAt || null,
+      // Feature 018: absent on pre-feature rows → null.
+      executionPrice: typeof entity.executionPrice === 'number' ? entity.executionPrice : null,
     });
   }
 }

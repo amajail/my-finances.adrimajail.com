@@ -56,6 +56,11 @@ class SuggestedOrder {
       ? String(data.executionNote)
       : null;
     this._executionUpdatedAt = data.executionUpdatedAt || null;
+    // Feature 018: optional owner-reported execution price. Stored for future
+    // outcome-P&L scoring (roadmap P3-2); not consumed by the scorecard yet.
+    this._executionPrice = data.executionPrice !== undefined && data.executionPrice !== null
+      ? Number(data.executionPrice)
+      : null;
 
     this._validate();
     Object.freeze(this);
@@ -94,6 +99,9 @@ class SuggestedOrder {
     if (this._executionNote !== null && this._executionNote.length > NOTE_MAX) {
       errors.push(`executionNote must be at most ${NOTE_MAX} characters`);
     }
+    if (this._executionPrice !== null && (!Number.isFinite(this._executionPrice) || this._executionPrice <= 0)) {
+      errors.push('executionPrice must be a positive number when provided');
+    }
 
     if (errors.length > 0) {
       throw new ValidationError(
@@ -114,6 +122,7 @@ class SuggestedOrder {
   get executionStatus() { return this._executionStatus; }
   get executionNote() { return this._executionNote; }
   get executionUpdatedAt() { return this._executionUpdatedAt; }
+  get executionPrice() { return this._executionPrice; }
   isMarked() { return this._executionStatus !== 'pending'; }
 
   /**
@@ -139,6 +148,7 @@ class SuggestedOrder {
       executionStatus: this._executionStatus,
       executionNote: this._executionNote,
       executionUpdatedAt: this._executionUpdatedAt,
+      executionPrice: this._executionPrice,
     };
   }
 

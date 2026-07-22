@@ -27,6 +27,7 @@ class AzureTableDatabase {
     this.analysisClient = TableClient.fromConnectionString(connStr, 'portfolioAnalysis');
     this.ordersClient = TableClient.fromConnectionString(connStr, 'portfolioOrders');
     this.instructionsHistoryClient = TableClient.fromConnectionString(connStr, 'portfolioInstructionsHistory');
+    this.auditClient = TableClient.fromConnectionString(connStr, 'portfolioAudit');
   }
 
   /**
@@ -41,7 +42,8 @@ class AzureTableDatabase {
       this.pricesClient,
       this.analysisClient,
       this.ordersClient,
-      this.instructionsHistoryClient
+      this.instructionsHistoryClient,
+      this.auditClient
     ];
 
     for (const client of clients) {

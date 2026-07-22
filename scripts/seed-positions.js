@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Seed positions from a JSON file against the local API.
- * Idempotent: treats "already exists" (502 from createEntity 409) as success.
+ * Idempotent: treats "already exists" as success — 422 from the AddPosition
+ * duplicate pre-check (feature 018), or 502 from the createEntity 409 backstop.
  *
  * Reads scripts/positions.json by default; override with POSITIONS_FILE env var.
  *   node scripts/seed-positions.js
@@ -65,7 +66,7 @@ function tag(row) {
     if (res.status === 201) {
       console.log(`  ✓ created: ${tag(row)}`);
       created++;
-    } else if (res.status === 502 && isAlreadyExists(res)) {
+    } else if ((res.status === 422 || res.status === 502) && isAlreadyExists(res)) {
       console.log(`  · exists:  ${tag(row)}`);
       existed++;
     } else {

@@ -30,7 +30,7 @@ const SCHEDULE = '0 30 16 * * 1-5';
 app.timer('refreshPricesTimer', {
   schedule: SCHEDULE,
   handler: async (_myTimer, context) => {
-    await runTimer(context, 'Price refresh', () => container.getRefreshPrices().execute({}));
+    await runTimer(context, 'Price refresh', () => container.getRefreshPrices().execute({ _audit: { source: 'timer' } }));
   },
 });
 

@@ -9,16 +9,19 @@ const UseCase = require('../UseCase');
 const Position = require('../../../domain/entities/Position');
 const logger = require('../../../shared/logging');
 const { ValidationError, NotFoundError } = require('../../../shared/errors');
+const safeAppendAudit = require('../audit/safeAppendAudit');
 
 class UpdatePosition extends UseCase {
   /**
    * Create a new UpdatePosition use case
    * @param {Object} deps - Dependencies
    * @param {IPositionRepository} deps.positionRepository - Position repository
+   * @param {IAuditRepository} [deps.auditRepository] - Optional write-audit trail (feature 018)
    */
-  constructor({ positionRepository }) {
+  constructor({ positionRepository, auditRepository = null }) {
     super();
     this._positionRepository = positionRepository;
+    this._auditRepository = auditRepository;
   }
 
   /**
@@ -78,7 +81,23 @@ class UpdatePosition extends UseCase {
     // Persist
     await this._positionRepository.update(updated);
     logger.info('Position updated', { brokerId: input.brokerId, positionId: updated.id() });
-    return { ...updated.toJSON(), id: updated.id() };
+
+    // Feature 018: audit field-level old/new for the applied patch (both the
+    // dashboard/API path and the MCP path — every write is recorded).
+    const updatedData = updated.toJSON();
+    const changes = allowedFields
+      .filter((field) => field in input && existingData[field] !== updatedData[field])
+      .map((field) => ({ field, old: existingData[field], new: updatedData[field] }));
+    await safeAppendAudit(this._auditRepository, {
+      operation: 'update_position',
+      targetType: 'position',
+      targetId: `${input.brokerId}/${input.rowKey}`,
+      changes,
+      confirmationUsed: !!(input._audit && input._audit.confirmationUsed),
+      source: (input._audit && input._audit.source) || 'api',
+    });
+
+    return { ...updatedData, id: updated.id() };
   }
 }
 
