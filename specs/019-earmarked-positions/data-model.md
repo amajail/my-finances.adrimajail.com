@@ -8,7 +8,7 @@ reusing the per-position snapshot shape already in use by `administrativePositio
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `value` | string | Comma-separated broker ids, e.g. `"cash"` or `"cash,otherBroker"`. Whitespace around each id is trimmed. Empty string ⇒ no brokers earmarked (feature can be fully disabled without deleting the row). |
+| `value` | string | Comma-separated broker ids, e.g. `"cash"` or `"cash,otherBroker"`. Whitespace around each id is trimmed. A whitespace-only value (e.g. `" "`) ⇒ no brokers earmarked (feature can be fully disabled without deleting the row) — **not** a literal empty string, which the settings repository collapses to "unset" and treats as the default (discovered during implementation; see plan.md / tasks.md T001). |
 
 - **Default**: `'cash'` when the settings row is absent, matching today's single reserve broker
   (spec FR-001, User Story 4 Acceptance Scenario 3).

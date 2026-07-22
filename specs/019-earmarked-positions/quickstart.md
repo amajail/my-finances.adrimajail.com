@@ -23,9 +23,11 @@ npm test   # unit tests, incl. new partition / exclusion / prompt-block / persis
 curl -X PUT http://localhost:7071/api/settings/analysis.earmarkedBrokers \
   -H 'Content-Type: application/json' -d '{"value": "cash"}'
 
-# Clear the designation entirely (no positions earmarked)
+# Clear the designation entirely (no positions earmarked) — use a single space,
+# not an empty string: the settings repository collapses "" to "unset" and would
+# silently fall back to the default 'cash' instead of disabling earmarking.
 curl -X PUT http://localhost:7071/api/settings/analysis.earmarkedBrokers \
-  -H 'Content-Type: application/json' -d '{"value": ""}'
+  -H 'Content-Type: application/json' -d '{"value": " "}'
 ```
 
 ## Run an analysis and inspect

@@ -34,11 +34,15 @@ consume the existing `investableSnapshot` variable unchanged, redefining what th
 excludes here automatically satisfies most of User Story 1 for free — US1's own phase below is
 verification, not new call-site changes.
 
-- [ ] T001 In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, read setting
+- [x] T001 In `src/application/use-cases/analysis/GenerateWeeklyAnalysis.js`, read setting
   `analysis.earmarkedBrokers` via the existing `_getSetting` helper (default `'cash'`); parse the
-  comma-separated value into a trimmed, non-empty broker-id array (empty string ⇒ `[]`, no brokers
-  earmarked). (data-model.md Configuration; research.md Decision 2)
-- [ ] T002 In the same file, change the snapshot partition (currently: `investableSnapshot` =
+  comma-separated value into a trimmed, non-empty broker-id array. **Discovered during
+  implementation**: `_getSetting`/`AzureSettingsRepository.get()` collapse a stored literal empty
+  string to "unset" (falls back to the default) — a storage-layer quirk, not something this
+  feature can special-case. To fully disable earmarking, set the value to a single space (`" "`):
+  it survives storage as truthy, then trims/filters here to an empty broker list. (data-model.md
+  Configuration; research.md Decision 2)
+- [x] T002 In the same file, change the snapshot partition (currently: `investableSnapshot` =
   `valueUsd > 0`, `administrativePositions` = `valueUsd <= 0`) to a three-way split evaluated in
   this order: `earmarkedPositions` = `broker ∈ earmarkedBrokers AND valueUsd > 0` (checked FIRST,
   using T001's list) → `administrativePositions` = remaining positions with `valueUsd <= 0`
@@ -66,7 +70,7 @@ entirely.
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they fail before Phase 2 lands)
 
-- [ ] T003 [P] [US1] New test file
+- [x] T003 [P] [US1] New test file
   `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.earmarkedPositions.test.js`:
   assert that `AllocationDriftCalculator.computeDrift`, `.computeConcentrationCaps`, and
   `DuplicateHoldingsDetector.detect` are each invoked with a positions array that excludes a
@@ -75,7 +79,7 @@ entirely.
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] No additional call-site change required beyond T002 — `AllocationDriftCalculator`,
+- [x] T004 [US1] No additional call-site change required beyond T002 — `AllocationDriftCalculator`,
   `DuplicateHoldingsDetector`, and their inputs remain UNCHANGED (pure functions); the exclusion is
   entirely upstream. Run T003 against the Phase 2 implementation and fix T002 if it fails.
 
@@ -94,7 +98,7 @@ combined total — never folded into ordinary holdings, never silently dropped.
 
 ### Tests for User Story 2 ⚠️ (write first, ensure they fail)
 
-- [ ] T005 [P] [US2] Extend
+- [x] T005 [P] [US2] Extend
   `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.earmarkedPositions.test.js`:
   assert `earmarkedPositions` contains exactly the fixture's positive-value earmarked-broker
   position(s) and no others; assert it is excluded from the `## currentHoldings` prompt block;
@@ -105,12 +109,12 @@ combined total — never folded into ordinary holdings, never silently dropped.
   `administrativePositions`, not `earmarkedPositions` — the FR-006 edge case (a value-less
   position at an earmarked broker must NOT be misclassified as earmarked). (FR-003, FR-004,
   FR-006, FR-008, FR-009; SC-002)
-- [ ] T006 [P] [US2] New test file
+- [x] T006 [P] [US2] New test file
   `tests/unit/domain/entities/WeeklyAnalysis.earmarkedPositions.test.js`: `earmarkedPositions`
   defaults to `[]`; accepts an array of position-shaped objects; validation rejects a non-object
   entry; the field is frozen and appears in `toJSON()`. Mirror
   `WeeklyAnalysis.administrativePositions.test.js` structure.
-- [ ] T007 [P] [US2] New test file
+- [x] T007 [P] [US2] New test file
   `tests/unit/infrastructure/repositories/AzureAnalysisRepository.earmarkedPositions.test.js`:
   `earmarkedPositionsJson` is written only when the array is non-empty; reads back correctly;
   absent column on a pre-feature row reads back as `[]`. Include a case constructing a
@@ -121,19 +125,19 @@ combined total — never folded into ordinary holdings, never silently dropped.
 
 ### Implementation for User Story 2
 
-- [ ] T008 [P] [US2] In `src/domain/entities/WeeklyAnalysis.js`, add optional
+- [x] T008 [P] [US2] In `src/domain/entities/WeeklyAnalysis.js`, add optional
   `_earmarkedPositions` field: constructor default `[]`, validation (each entry a non-array
   object, same loop as `administrativePositions`), `Object.freeze`, getter, and inclusion in
   `toJSON()` — exact mirror of the existing `_administrativePositions` handling. (data-model.md
   Entity: WeeklyAnalysis)
-- [ ] T009 [P] [US2] In `src/infrastructure/repositories/AzureAnalysisRepository.js`, write
+- [x] T009 [P] [US2] In `src/infrastructure/repositories/AzureAnalysisRepository.js`, write
   `earmarkedPositionsJson` when the array is non-empty (mirroring the
   `administrativePositionsJson` write) and parse it back with the existing JSON-column parser,
   defaulting to `[]` when absent (mirroring the `administrativePositionsJson` read).
-- [ ] T010 [US2] In `GenerateWeeklyAnalysis.js`, pass `earmarkedPositions` through to the
+- [x] T010 [US2] In `GenerateWeeklyAnalysis.js`, pass `earmarkedPositions` through to the
   `WeeklyAnalysis` constructor call and to the `_persistFailed` capture object (depends on T002,
   T008). (FR-007)
-- [ ] T011 [US2] In `GenerateWeeklyAnalysis._buildUserMessage`, exclude earmarked positions from
+- [x] T011 [US2] In `GenerateWeeklyAnalysis._buildUserMessage`, exclude earmarked positions from
   the `## currentHoldings` block (mirroring the existing administrative-position exclusion there)
   and add a new `## earmarkedPositions` block — JSON array + combined `totalUsd`, fixed generic
   instruction text (exclude from invested-capital reasoning; report as a separate line; never
@@ -155,7 +159,7 @@ between them, the position-change comparison shows no entry for it in either run
 
 ### Tests for User Story 3 ⚠️ (write first, ensure they fail)
 
-- [ ] T012 [P] [US3] Extend
+- [x] T012 [P] [US3] Extend
   `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.earmarkedPositions.test.js`:
   given a prior snapshot and current snapshot that both include an earmarked-broker position with
   different values, `positionChanges` contains no entry for it; given a prior snapshot without an
@@ -164,7 +168,7 @@ between them, the position-change comparison shows no entry for it in either run
 
 ### Implementation for User Story 3
 
-- [ ] T013 [US3] Verify `PositionChangeCalculator.diff` receives both the current and prior
+- [x] T013 [US3] Verify `PositionChangeCalculator.diff` receives both the current and prior
   snapshots already filtered per T002's `priorSnapshot` exclusion; no changes to
   `PositionChangeCalculator` itself. Make T012 pass — if it fails, the fix belongs in T002's
   `priorSnapshot` filter, not here. (research.md Decision 3)
@@ -182,17 +186,19 @@ changes which positions are earmarked on the very next analysis run, with no cod
 
 ### Tests for User Story 4 ⚠️ (write first, ensure they fail)
 
-- [ ] T014 [P] [US4] Extend
+- [x] T014 [P] [US4] Extend
   `tests/unit/application/use-cases/analysis/GenerateWeeklyAnalysis.earmarkedPositions.test.js`:
   with `analysis.earmarkedBrokers` unset, only the default `'cash'` broker's positive-value
   positions are earmarked; with it set to a different broker (or a multi-broker list), exactly
   those broker(s)' positions are earmarked and `'cash'` positions become ordinary investable
-  holdings; with it set to `''`, no positions are earmarked and the `## earmarkedPositions` block
-  is entirely absent. (FR-001; SC-004)
+  holdings; with it set to a whitespace value (`" "` — see T001 note: the settings repository
+  collapses a literal empty string to "unset," so a space is the documented way to disable
+  earmarking entirely), no positions are earmarked and the `## earmarkedPositions` block is
+  entirely absent. (FR-001; SC-004)
 
 ### Implementation for User Story 4
 
-- [ ] T015 [US4] Verify T001's setting-read + parse logic satisfies all three T014 cases; no
+- [x] T015 [US4] Verify T001's setting-read + parse logic satisfies all three T014 cases; no
   further code change expected (this phase validates Foundational work under the story's
   acceptance lens).
 
@@ -205,9 +211,9 @@ changes which positions are earmarked on the very next analysis run, with no cod
 - [ ] T016 Run `specs/019-earmarked-positions/quickstart.md` acceptance checks end-to-end (set/clear
   `analysis.earmarkedBrokers` via the settings endpoint; generate an analysis; confirm drift/caps/
   duplications/position-changes/prompt-block behavior per the spec's Success Criteria).
-- [ ] T017 `npm test` green (full suite, incl. all `GenerateWeeklyAnalysis`,
+- [x] T017 `npm test` green (full suite, incl. all `GenerateWeeklyAnalysis`,
   `WeeklyAnalysis`, and `AzureAnalysisRepository` tests — new and pre-existing).
-- [ ] T018 Privacy self-review of the diff: tests/docs use placeholder brokers/symbols/values only
+- [x] T018 Privacy self-review of the diff: tests/docs use placeholder brokers/symbols/values only
   (no real broker names, quantities, or dollar amounts); the fixed prompt-block text names no
   real-world earmark purpose (FR-009).
 

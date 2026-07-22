@@ -13,11 +13,16 @@ No new HTTP endpoints and no dashboard changes (spec non-goals). Two additive co
 // PUT /api/settings/analysis.earmarkedBrokers
 // body: { "value": "cash" }               — single broker (today's default)
 // body: { "value": "cash,otherBroker" }   — multiple brokers
-// body: { "value": "" }                   — clears the designation entirely (no positions earmarked)
+// body: { "value": " " }                  — clears the designation entirely (no positions earmarked)
 ```
 
 - **Default when unset**: treated as `"cash"` by the use case (spec FR-001) — the settings row
   itself may simply not exist; no seed script writes it automatically.
+- **Clearing the designation**: use a single space (`" "`), not a literal empty string. The
+  underlying settings repository collapses a stored empty string to the same `null` as an absent
+  row, so `{ "value": "" }` would be silently treated as "unset" and fall back to the default
+  `"cash"` rather than disabling earmarking — a storage-layer quirk discovered during
+  implementation, not a feature of this use case.
 - **Parsing**: comma-separated, each id trimmed; empty/blank segments dropped.
 
 ## 2. LLM user-message payload — new `## earmarkedPositions` block

@@ -302,6 +302,14 @@ class AzureAnalysisRepository extends AzureTableRepository {
     if (Array.isArray(wa.duplications) && wa.duplications.length > 0) {
       entity.duplicationsJson = JSON.stringify(wa.duplications);
     }
+    // Feature 019: earmarked-broker positions. Only written when non-empty so
+    // pre-feature rows and runs with no earmarked positions stay clean; a
+    // re-run upserts with 'Replace', so a section present last week but empty
+    // this week (broker designation changed/cleared, or the position closed)
+    // is dropped (the column simply isn't written and reads back as []).
+    if (Array.isArray(wa.earmarkedPositions) && wa.earmarkedPositions.length > 0) {
+      entity.earmarkedPositionsJson = JSON.stringify(wa.earmarkedPositions);
+    }
     return entity;
   }
 
@@ -338,6 +346,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
     const administrativePositions = this._parseJsonColumn(entity.administrativePositionsJson, entity.rowKey, 'administrativePositionsJson', []);
     // Feature 014: duplicate-holdings groups (absent on pre-feature rows / none → null).
     const duplications = this._parseJsonColumn(entity.duplicationsJson, entity.rowKey, 'duplicationsJson', null);
+    // Feature 019: earmarked-broker positions (absent on pre-feature rows / none → []).
+    const earmarkedPositions = this._parseJsonColumn(entity.earmarkedPositionsJson, entity.rowKey, 'earmarkedPositionsJson', []);
     return new WeeklyAnalysis({
       date: entity.rowKey,
       status: entity.status,
@@ -375,6 +385,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
       administrativePositions,
       // Feature 014:
       duplications,
+      // Feature 019:
+      earmarkedPositions,
     });
   }
 

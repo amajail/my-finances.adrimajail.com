@@ -51,6 +51,9 @@ const DEFAULTS = {
   model: 'claude-opus-4-7',
   maxInputTokens: 80000,
   maxOutputTokens: 8000,
+  // Feature 019: comma-separated broker ids holding earmarked (non-investable)
+  // reserve capital. Today's single reserve broker.
+  earmarkedBrokers: 'cash',
 };
 
 class GenerateWeeklyAnalysis extends UseCase {
@@ -134,11 +137,23 @@ class GenerateWeeklyAnalysis extends UseCase {
 
     // 1. Load settings (with defaults if missing). promptVersion is retired
     //    (feature 005, FR-019) — the instructions document is the system prompt.
-    const [model, maxInputTokens, maxOutputTokens] = await Promise.all([
+    const [model, maxInputTokens, maxOutputTokens, earmarkedBrokersRaw] = await Promise.all([
       this._getSetting('analysis.model', DEFAULTS.model),
       this._getSettingNumber('analysis.maxInputTokens', DEFAULTS.maxInputTokens),
       this._getSettingNumber('analysis.maxOutputTokens', DEFAULTS.maxOutputTokens),
+      this._getSetting('analysis.earmarkedBrokers', DEFAULTS.earmarkedBrokers),
     ]);
+    // Feature 019: comma-separated broker ids. `_getSetting` treats a stored
+    // empty string the same as "unset" (falls back to the default) — a quirk of
+    // the underlying settings repository, which collapses both to null at the
+    // storage layer. To fully disable earmarking, set the value to a single
+    // space (`" "`): it survives storage as truthy, then trims/filters here to
+    // an empty broker list.
+    const earmarkedBrokers = earmarkedBrokersRaw
+      .split(',')
+      .map((b) => b.trim())
+      .filter(Boolean);
+    const earmarkedBrokerSet = new Set(earmarkedBrokers);
 
     // Buffers we may need to persist even on failure paths.
     let portfolioSnapshot = [];
@@ -146,6 +161,10 @@ class GenerateWeeklyAnalysis extends UseCase {
     // legacy/tokenized stubs with no recoverable price. Classified administrative
     // and excluded from drift/caps; surfaced as their own section. [] = none.
     let administrativePositions = [];
+    // Feature 019: positions held at an earmarked broker with positive value —
+    // reserve capital excluded from invested-capital reasoning, reported as its
+    // own separate section. [] = none.
+    let earmarkedPositions = [];
     let portfolioSummary = null;
     // Feature 006 capture buffers — preserved on failure paths too (FR-014).
     let macroContext = null;
@@ -173,16 +192,32 @@ class GenerateWeeklyAnalysis extends UseCase {
       portfolioSnapshot = this._snapshotFromSummary(portfolioSummary);
       portfolioTotals = this._totalsFromSummary(portfolioSummary);
 
-      // Feature 013: partition the snapshot once. A position is administrative
-      // (non-investable) when its computed USD value is <= 0 — zero OR negative.
-      // This is NOT keyed off a null price: cash/deposit can have a null price
-      // but a real positive value and MUST stay investable (FR-005). Only the
-      // investable set feeds the allocation-drift / concentration-cap / position-
-      // change computations; excluded positions contribute 0 USD, so no value-
-      // bearing percentage changes — only the spurious "unclassified" stub row
-      // disappears (FR-002..FR-004).
-      const investableSnapshot = portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) > 0);
-      administrativePositions = portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) <= 0);
+      // Feature 013/019: partition the snapshot once, three ways, evaluated in
+      // this order per position: (1) earmarked — held at an owner-designated
+      // earmarked broker AND computed value > 0 — checked FIRST so a price
+      // outage never misclassifies a real reserve as a worthless legacy stub
+      // (FR-006); (2) administrative (non-investable) — computed value <= 0,
+      // zero OR negative, for every remaining position (unchanged from feature
+      // 013; a zero/negative-value position at an earmarked broker still lands
+      // here, never in earmarked); (3) investable — everything else. This is
+      // NOT keyed off a null price: cash/deposit can have a null price but a
+      // real positive value and MUST stay investable (FR-005 of feature 013).
+      // Only the investable set feeds the allocation-drift / concentration-cap
+      // / duplicate-holdings / position-change computations; excluded positions
+      // contribute 0 USD, so no value-bearing percentage changes.
+      const investableSnapshot = [];
+      administrativePositions = [];
+      earmarkedPositions = [];
+      for (const p of portfolioSnapshot) {
+        const value = Number(p.valueUsd) || 0;
+        if (earmarkedBrokerSet.has(p.broker) && value > 0) {
+          earmarkedPositions.push(p);
+        } else if (value <= 0) {
+          administrativePositions.push(p);
+        } else {
+          investableSnapshot.push(p);
+        }
+      }
 
       // Feature 014: deterministic cross-broker duplicate-holdings detection over
       // the investable set (stateless — no prior needed; [] when none).
@@ -214,10 +249,13 @@ class GenerateWeeklyAnalysis extends UseCase {
       // 3b. Exact week-over-week position changes (Feature 006, FR-015..FR-017).
       //     null when there is no prior snapshot to diff (unknown / first run).
       //     Feature 013: diff investable-vs-investable so administrative stubs
-      //     (value <= 0) don't surface as spurious add/remove rows. The prior
-      //     snapshot is filtered the same way for a like-for-like comparison.
+      //     (value <= 0) don't surface as spurious add/remove rows. Feature 019:
+      //     also exclude earmarked-broker positions from the prior side, so the
+      //     reserve's presence, absence, or value change never surfaces as a
+      //     position-change entry (FR-005). The prior snapshot is filtered the
+      //     same way as the current one for a like-for-like comparison.
       const priorSnapshot = previousAnalysis && Array.isArray(previousAnalysis.portfolioSnapshot) && previousAnalysis.portfolioSnapshot.length > 0
-        ? previousAnalysis.portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) > 0)
+        ? previousAnalysis.portfolioSnapshot.filter((p) => (Number(p.valueUsd) || 0) > 0 && !earmarkedBrokerSet.has(p.broker))
         : null;
       positionChanges = PositionChangeCalculator.diff(priorSnapshot, investableSnapshot);
 
@@ -262,6 +300,7 @@ class GenerateWeeklyAnalysis extends UseCase {
           startedAt,
           model,
           portfolioSnapshot,
+          earmarkedPositions,
           macroContext,
           macroUsage,
           portfolioTotals,
@@ -308,6 +347,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         portfolioTotals,
         positionChanges,
         administrativePositions,
+        earmarkedPositions,
         duplications,
         concentrationCaps,
         upcomingEvents,
@@ -327,7 +367,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       } catch (err) {
         // Feature 006: all capture buffers ride onto the failed row (FR-014).
         const captured = {
-          targetDate, startedAt, model, portfolioSnapshot, administrativePositions, duplications,
+          targetDate, startedAt, model, portfolioSnapshot, administrativePositions, earmarkedPositions, duplications,
           macroContext, macroUsage, portfolioTotals, positionChanges, macroChanges,
           riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
         };
@@ -366,6 +406,8 @@ class GenerateWeeklyAnalysis extends UseCase {
         administrativePositions,
         // Feature 014: cross-broker duplicate-holdings groups ([] when none).
         duplications,
+        // Feature 019: earmarked-broker positions ([] when none).
+        earmarkedPositions,
         macroContext,
         portfolioTotals,
         positionChanges,
@@ -429,6 +471,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     targetDate, startedAt, model, portfolioSnapshot, errorMessage,
     instructionsHistoryRowKey = null,
     administrativePositions = [],
+    earmarkedPositions = [],
     duplications = null,
     macroContext = null, macroUsage = null, portfolioTotals = null,
     positionChanges = null, macroChanges = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
@@ -445,6 +488,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       promptVersion: INSTRUCTIONS_PROMPT_VERSION,
       portfolioSnapshot,
       administrativePositions,
+      earmarkedPositions,
       duplications,
       macroContext,
       portfolioTotals,
@@ -519,17 +563,25 @@ class GenerateWeeklyAnalysis extends UseCase {
       }));
   }
 
-  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], duplications = null, concentrationCaps = null, upcomingEvents = null }) {
+  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], earmarkedPositions = [], duplications = null, concentrationCaps = null, upcomingEvents = null }) {
+    const adminPositions = Array.isArray(administrativePositions) ? administrativePositions : [];
+    const earmarkedList = Array.isArray(earmarkedPositions) ? earmarkedPositions : [];
+    // Feature 019: identify raw summary positions already classified earmarked
+    // (by broker+assetType+symbol) so they can be excluded from `holdings` below,
+    // the same way administrative positions already are via the valueUsd filter.
+    const earmarkedKeys = new Set(earmarkedList.map((p) => `${p.broker}__${p.assetType}__${p.symbol}`));
     // The full per-position holdings list is delivered separately as an
     // authoritative `currentHoldings` block (below), so it is pulled out of the
     // portfolioSummary aggregates to avoid duplicating it in the prompt.
     // Feature 013: only the investable holdings (valueUsd > 0) go in
     // currentHoldings; the zero/negative-value stubs are delivered in a separate
     // `administrativePositions` block (below) so the model does not flag them.
+    // Feature 019: earmarked-broker positions are also excluded — they get their
+    // own `earmarkedPositions` block instead.
     const holdings = (portfolioSummary && Array.isArray(portfolioSummary.positions))
-      ? portfolioSummary.positions.filter((p) => (Number(p.valueUsd) || 0) > 0)
+      ? portfolioSummary.positions.filter((p) => (Number(p.valueUsd) || 0) > 0
+          && !earmarkedKeys.has(`${p.brokerId}__${p.assetType}__${p.symbol}`))
       : null;
-    const adminPositions = Array.isArray(administrativePositions) ? administrativePositions : [];
     const dupGroups = Array.isArray(duplications) ? duplications : [];
     // Feature 011 (FR-002): also strip topPerformers/bottomPerformers from the
     // prompt copy — they are derivable from currentHoldings and pure token
@@ -582,6 +634,22 @@ class GenerateWeeklyAnalysis extends UseCase {
         'These are excluded zero-value/legacy stubs (computed value <= 0, no recoverable price). They are deliberately excluded from allocation drift and concentration caps. Do NOT flag them for review or suggest orders for them; they are listed only for awareness.',
         '```json',
         JSON.stringify(adminPositions),
+        '```'
+      );
+    }
+    // Feature 019: earmarked reserve capital held at an owner-designated
+    // broker, excluded from invested-capital reasoning and reported as its own
+    // separate total (FR-003, FR-004, FR-008). Omitted when there are none.
+    if (earmarkedList.length > 0) {
+      const earmarkedTotalUsd = Number(
+        earmarkedList.reduce((sum, p) => sum + (Number(p.valueUsd) || 0), 0).toFixed(2)
+      );
+      parts.push(
+        '',
+        '## earmarkedPositions',
+        'These positions are earmarked reserve capital, set aside for a purpose outside ordinary portfolio management. Exclude them entirely from "invested capital" reasoning and every allocation/target percentage; report their combined total as its own separate line in your narrative; do NOT suggest deploying, trimming, or selling them.',
+        '```json',
+        JSON.stringify({ positions: earmarkedList, totalUsd: earmarkedTotalUsd }),
         '```'
       );
     }
