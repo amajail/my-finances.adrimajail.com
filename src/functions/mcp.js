@@ -81,7 +81,7 @@ app.mcpTool('mcpListPositions', {
     {
       propertyName: 'status',
       propertyType: 'string',
-      description: "Position status: open | closed. Defaults to open. Ignored when a broker is given (broker returns all statuses).",
+      description: "Position status: open | closed | all. Defaults to open.",
       isRequired: false,
     },
   ],
