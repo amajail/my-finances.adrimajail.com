@@ -71,6 +71,10 @@ app.http('getWeeklyAnalysis', {
         // Feature 014: cross-broker duplicate-holdings groups (null on pre-feature
         // rows and when there are no duplicates).
         duplications: analysis.duplications,
+        // Feature 019: earmarked-broker reserve positions, excluded from
+        // invested-capital reasoning (drift/caps/duplications/positionChanges).
+        // [] on pre-feature rows and when none.
+        earmarkedPositions: analysis.earmarkedPositions,
       };
 
       if (analysis.isCompleted()) {

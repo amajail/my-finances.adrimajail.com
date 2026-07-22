@@ -1,0 +1,32 @@
+{
+  "_comment": "PLACEHOLDER TEMPLATE — committable, holdings-free. Copy to scripts/plan-version.local.json (gitignored), replace with your real version/targets/rules, then run `node scripts/seed-plan-version.js`. Shape: PlanVersionDocument in src/domain/plan/plan-entities.d.ts. targetPct are decimal fractions (0.28 = 28%) and must sum to 1.00 ± 0.001.",
+  "version": "v0_0",
+  "name": "Example plan version",
+  "effectiveFrom": "2026-01-01",
+  "description": "Placeholder plan version. Replace every value.",
+  "targetAllocations": [
+    { "bucket": "US", "assetClass": "ETF_US", "targetPct": 0.4 },
+    { "bucket": "US", "assetClass": "T_BILL", "targetPct": 0.2, "notes": "opportunity fund" },
+    { "bucket": "ARG", "assetClass": "ARG_SOVEREIGN_BOND", "targetPct": 0.3 },
+    { "bucket": "ARG", "assetClass": "CASH_USD", "targetPct": 0.1 },
+    { "bucket": "OffSystem", "assetClass": "PHYSICAL_USD_CASH", "targetPct": 0, "notes": "earmarked — reported separately, no target" }
+  ],
+  "deployRules": [
+    {
+      "priority": 1,
+      "bucket": "US",
+      "symbol": "SYM_A",
+      "assetClass": "ETF_US",
+      "untilClassAtTarget": true,
+      "rationale": "Monthly wire → SYM_A until ETF_US reaches target"
+    },
+    {
+      "priority": 2,
+      "bucket": "US",
+      "symbol": "SYM_B",
+      "assetClass": "ETF_INTL",
+      "untilClassAtTarget": true,
+      "rationale": "After ETF_US at target: SYM_B until ETF_INTL reaches target"
+    }
+  ]
+}

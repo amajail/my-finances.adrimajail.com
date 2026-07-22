@@ -111,6 +111,12 @@ class WeeklyAnalysis {
     // and when the column is absent; [] when computed but no duplicates.
     this._duplications = Array.isArray(data.duplications) ? data.duplications : null;
 
+    // Feature 019: positions held at an owner-designated earmarked broker with
+    // positive computed value — reserve capital excluded from invested-capital
+    // reasoning. [] when none and on pre-feature rows (same convention as
+    // administrativePositions, not null).
+    this._earmarkedPositions = Array.isArray(data.earmarkedPositions) ? data.earmarkedPositions : [];
+
     this._validate();
     Object.freeze(this._portfolioSnapshot);
     if (this._macroContext) Object.freeze(this._macroContext);
@@ -125,6 +131,7 @@ class WeeklyAnalysis {
     if (this._macroChanges) Object.freeze(this._macroChanges);
     Object.freeze(this._administrativePositions);
     if (this._duplications) Object.freeze(this._duplications);
+    Object.freeze(this._earmarkedPositions);
     Object.freeze(this);
   }
 
@@ -205,6 +212,8 @@ class WeeklyAnalysis {
       administrativePositions: this._administrativePositions,
       // Feature 014: duplicate-holdings groups — same rule.
       duplications: this._duplications,
+      // Feature 019: earmarked positions — same rule ([] is fine).
+      earmarkedPositions: this._earmarkedPositions,
     })) {
       if (arr !== null) {
         for (const item of arr) {
@@ -253,6 +262,7 @@ class WeeklyAnalysis {
   get macroChanges() { return this._macroChanges; }
   get administrativePositions() { return this._administrativePositions; }
   get duplications() { return this._duplications; }
+  get earmarkedPositions() { return this._earmarkedPositions; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -295,6 +305,7 @@ class WeeklyAnalysis {
       macroChanges: this._macroChanges,
       administrativePositions: this._administrativePositions,
       duplications: this._duplications,
+      earmarkedPositions: this._earmarkedPositions,
     };
   }
 

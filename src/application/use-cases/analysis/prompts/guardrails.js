@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const GUARDRAIL_PREAMBLE = fs.readFileSync(path.join(__dirname, 'guardrail-preamble-v1.md'), 'utf8').trim();
+const GUARDRAIL_PREAMBLE = fs.readFileSync(path.join(__dirname, 'guardrail-preamble-v2.md'), 'utf8').trim();
 const EDITING_GUIDE = fs.readFileSync(path.join(__dirname, 'editing-guide-v1.md'), 'utf8').trim();
 
 /**

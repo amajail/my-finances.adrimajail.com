@@ -112,8 +112,9 @@ describe('GenerateWeeklyAnalysis — feature 015 token-diet v2', () => {
     expect(GUARDRAIL_PREAMBLE).toMatch(/macro week-over-week/i);
     expect(GUARDRAIL_PREAMBLE).toMatch(/duplicate holdings/i);
     expect(GUARDRAIL_PREAMBLE).toMatch(/administrative/i);
-    // ... and explicitly guards the required narrative sections.
-    expect(GUARDRAIL_PREAMBLE).toMatch(/executive summary/i);
-    expect(GUARDRAIL_PREAMBLE).toMatch(/watchlist/i);
+    // ... and still guards the required output sections — since guardrail-v2
+    // the section names come from the instructions document, not the preamble.
+    expect(GUARDRAIL_PREAMBLE).toMatch(/every output section the instructions below\s+define/i);
+    expect(GUARDRAIL_PREAMBLE).toMatch(/never means dropping a required\s+section/i);
   });
 });

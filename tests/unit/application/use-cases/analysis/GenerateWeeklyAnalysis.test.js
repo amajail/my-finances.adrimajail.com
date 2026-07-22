@@ -142,7 +142,7 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     expect(result.status).toBe('completed');
     expect(result.date).toBe('2026-05-15');
     expect(result.modelUsed).toBe('claude-opus-4-7');
-    expect(result.promptVersion).toBe('editable-instructions-v1+guardrail-v1');
+    expect(result.promptVersion).toBe('editable-instructions-v1+guardrail-v2');
     expect(result.instructionsHistoryRowKey).toBe('rk-active');
     expect(result.tokensIn).toBe(12000);
     expect(result.tokensOut).toBe(1500);

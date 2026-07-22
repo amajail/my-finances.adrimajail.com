@@ -22,6 +22,10 @@ Personal investments tracker. Azure Functions (Node) backend + Astro dashboard f
 
 Positions are keyed by `partitionKey = brokerId`, `rowKey = ${assetType}__${symbol}` (see `Position.id()` in `src/domain/entities/Position.js:240`).
 
+Strategic-plan tables (versioned per `docs/metaprompt-rebalance-plan.md` §2/§7; models in `src/domain/plan/plan-entities.d.ts`): `portfolioTargetAllocations`, `portfolioDeployRules`, `portfolioPlanVersions` (pk `versions`, exactly one row `isActive`). Written by `scripts/seed-plan-version.js` from gitignored `scripts/plan-version.local.json`; nothing in the app consumes them yet (future rebalance evaluator). The weekly analysis drift/caps read a separate document: `portfolioSettings` row `analysis.allocationTargetsV1` (feature 010 schema, seeded from `scripts/allocation-targets.local.json`).
+
+The weekly-analysis system prompt is the editable instructions document (`portfolioSettings` row `analysis.instructionsV1` + `portfolioInstructionsHistory`); since 2026-07-22 its content is the owner's portfolio framework v3.1 (kept locally at `docs/portfolio-framework-v3.md`, untracked — real strategy data, never commit).
+
 ## Position schema (key fields)
 `brokerId`, `assetType` (stock|etf|bond|cedear|cash|deposit|bopreal|lecap|on), `symbol`, `displayName`, `quantity`, `averageCost` (PPC), `currency`, `currentPrice`, `currentPriceUpdatedAt`, `exchange`, `maturityDate`, `status` (open|closed), `realizedPnl`, `notes`.
 
@@ -77,22 +81,24 @@ This repo is (or may become) public. Real portfolio data must stay local.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/018-mcp-write-tools/plan.md` (Phase 1 complete; tasks pending).
+`specs/019-earmarked-positions/plan.md` (Phase 1 complete; tasks pending).
 Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/mcp-tools.md`. Backend-only,
-no new npm deps, no new auth: extends `src/functions/mcp.js` with write tools
-(`update_position`, `create_position`, `set_order_execution_status` + optional
-`executionPrice`, `trigger_price_refresh`) plus read tool `list_audit_entries`.
-All writes delegate to container use cases (validation parity with dashboard).
-New pieces: `QuantityChangeGuard` pure domain service (>50% or to-zero quantity
-changes need `confirm: true`; threshold setting `mcpQuantityChangeThresholdPct`),
-`GuardedUpdatePosition` wrapper (guard + strips null/undefined patch keys so
-null averageCost preserves stored PPC — plain `UpdatePosition` would throw),
-`IAuditRepository`/`AzureAuditRepository` on new append-only `portfolioAudit`
-table (PK `'audit'`, RK inverted-timestamp → newest first), audit wired into
-UpdatePosition/AddPosition/SetOrderExecutionStatus/RefreshPrices as optional
-dep (dashboard writes audited too; append failure never fails the write).
-`AddPosition` gains duplicate pre-check (DomainError pointing at existing);
-`SuggestedOrder` gains optional `executionPrice` (stored, not scored).
-No delete tool anywhere. Prior plan: `specs/017-dividend-maturity-calendar/plan.md`.
+`data-model.md`, `quickstart.md`, `contracts/prompt-additions.md`.
+Backend-only, no new npm deps, no new endpoints, no dashboard changes: extends
+`GenerateWeeklyAnalysis.js` to read a new setting `analysis.earmarkedBrokers`
+(comma-separated broker ids, default `'cash'`) and partition the portfolio
+snapshot in order — earmarked (broker in list AND valueUsd > 0) computed
+BEFORE the existing feature-013 administrative check (valueUsd <= 0) — so an
+earmarked-broker position is never miscategorized as a legacy stub purely
+because its price feed is null. The investable remainder (unchanged shape)
+still feeds `AllocationDriftCalculator`, `DuplicateHoldingsDetector`, and
+`PositionChangeCalculator` (both current and prior snapshot sides) — none of
+those pure domain services change. New optional `earmarkedPositions` field on
+`WeeklyAnalysis` (same validate/freeze/getter/toJSON pattern as
+`administrativePositions`, incl. the `_persistFailed` path) persisted via a
+new `earmarkedPositionsJson` column on `AzureAnalysisRepository`, and a new
+`## earmarkedPositions` prompt block (generic wording only — no hardcoded
+real-world purpose; that framing lives in the owner's editable instructions
+document) omitted when empty. Prior plan: `specs/018-mcp-write-tools/plan.md`
+(shipped, PR #48).
 <!-- SPECKIT END -->
