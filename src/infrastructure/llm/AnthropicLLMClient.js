@@ -22,15 +22,26 @@ const logger = require('../../shared/logging');
 /**
  * Per-model USD prices (per 1M tokens). Update when Anthropic changes pricing.
  * Keys are the model id strings; values are { input, output } in USD per 1M tokens.
+ *
+ * Source: platform.claude.com pricing (2026-07). The whole Opus 4.6/4.7/4.8
+ * family is $5/$25 — the old $15/$75 here was Opus 4.0/4.1-era pricing and
+ * overstated every stored costUsd ~3x. Sonnet 5 has an intro price ($2/$10
+ * through 2026-08-31) not reflected here; we bill at the standard sticker so
+ * the table isn't time-dependent (slight overstatement during the intro window).
  */
 const MODEL_RATES = {
-  'claude-opus-4-7': { input: 15, output: 75 },
-  'claude-opus-4-6': { input: 15, output: 75 },
+  'claude-opus-4-8': { input: 5, output: 25 },
+  'claude-opus-4-7': { input: 5, output: 25 },
+  'claude-opus-4-6': { input: 5, output: 25 },
+  'claude-sonnet-5': { input: 3, output: 15 },
   'claude-sonnet-4-6': { input: 3, output: 15 },
+  'claude-haiku-4-5': { input: 1, output: 5 },
   'claude-haiku-4-5-20251001': { input: 1, output: 5 },
 };
 
-const DEFAULT_RATES = { input: 15, output: 75 };
+// Fallback for model ids not in the table: current Opus-tier pricing (the
+// likeliest unknown id is a newer Opus/default-tier model, not a legacy one).
+const DEFAULT_RATES = { input: 5, output: 25 };
 
 class CostCapExceededError extends Error {
   constructor(message) {
