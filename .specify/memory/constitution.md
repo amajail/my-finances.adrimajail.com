@@ -1,18 +1,23 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.1.1
+- Version change: 1.1.1 → 1.2.0
 - Ratification: 2026-05-16
-- Last Amended: 2026-06-13
+- Last Amended: 2026-07-23
 - Principles introduced (1.0.0): I. Privacy First (NON-NEGOTIABLE), II. Clean Architecture / DDD, III. Idempotent Data Operations, IV. Pragmatic Testing, V. Convention-Driven Workflow
 - 1.1.0 amendment: Principle I gains a "Runtime egress to authorized third-party AI services" sub-clause carving out Anthropic API calls for the weekly rebalance analysis (feature 002-weekly-rebalance-analysis). Source-control prohibition unchanged. Driven by spec FR-028.
 - 1.1.1 amendment (PATCH — clarification/wording): Principle V (Convention-Driven Workflow) branch-naming reconciled with actual practice and the owner's 2026-06-13 decision. The single `feature/{kebab-case}` rule is replaced by a documented split — speckit/SDD features (driven by /speckit-specify) use the bare `NNN-kebab` Spec Kit format matching their spec directory (no `feature/` prefix); ad-hoc work uses `feature/{kebab-case}` or `fix/{kebab-case}`. Development Workflow step 1 updated to match. No principle added/removed; all other guidance unchanged.
+- 1.2.0 amendment (MINOR — materially expanded guidance): Two changes, both reconciling principles with shipped reality.
+  (a) Principle III (Idempotent Data Operations) now names the `my-finances` MCP write tools (`update_position`, `create_position`, `set_order_execution_status`, shipped in feature 018-mcp-write-tools, PR #48) as the primary write path, with `PUT /api/positions/…` as the equivalent when MCP is unavailable. `scripts/positions.json` is restated as a recovery snapshot regenerated on demand, NOT a live mirror required to stay in sync after every change — the previous wording directly contradicted CLAUDE.md and was unkeepable once writes moved to MCP.
+  (b) Principle I (Privacy First) replaces the prose instruction "before any `git add`, scan the diff … if in doubt, ask" with the mechanical enforcement that now exists: `.gitignore` as the privacy boundary (including the default-deny `docs/private/`), plus `scripts/privacy-scan.js` as a PreToolUse hook and a fail-closed CI job. The prohibition itself is unchanged and remains NON-NEGOTIABLE; only its enforcement is now checkable. Driven by a live gap: `docs/portfolio-framework-v3.md` was documented as protected but was never actually gitignored.
+  No principle added or removed.
 - Added sections: Tech Stack & Constraints, Development Workflow, Governance
+- Enforcement: `scripts/privacy-scan.js` (Principle I), `.gitignore`, `.github/workflows/pr-checks.yml` job `privacy`, `.claude/settings.json` PreToolUse hook. A future amendment touching Principle I MUST update the scanner in the same change, or state why the rule is unenforceable.
 - Templates reviewed:
   - ✅ .specify/templates/plan-template.md — Constitution Check section is generic; no edit required (principles are surfaced by reference).
   - ✅ .specify/templates/spec-template.md — no constitution-specific slots; no edit required.
   - ✅ .specify/templates/tasks-template.md — no constitution-specific slots; no edit required.
 - Runtime guidance reviewed:
-  - ✅ CLAUDE.md — Privacy First section consistent; the `## Conventions` branch-naming block already documents the same split (updated 2026-06-13).
+  - ✅ CLAUDE.md — rewritten in the same change (107 → 80 lines). Its `## Privacy` and `## Changing portfolio data` sections now point here for rationale and carry only the operational instruction, per the division of labour: constitution = why + governing principle; CLAUDE.md = what to do now; `.gitignore` + `privacy-scan.js` = enforcement. The `positions.json` contradiction is resolved in favour of the recovery-snapshot reading.
 - Deferred TODOs: none.
 -->
 
@@ -23,7 +28,9 @@ Sync Impact Report
 ### I. Privacy First (NON-NEGOTIABLE)
 The repository is, or may become, public. Real personal-finance data MUST NEVER be staged, committed, or pushed. This covers: real quantities, PPC / `averageCost` values, prices, cost-basis figures, broker statements, account snapshots (`portfolio-report.html`, `plan-rebalanceo-brokers.html`, etc.), the full `scripts/positions.json`, credentials, connection strings, Azure resource names, account IDs, and real values embedded in commit messages, PR bodies, code comments, tests, or example snippets.
 
-Affirmatively OK to commit: `scripts/positions.template.json`, code that operates on positions without hard-coding real ones, and tests using clearly-fake data. Before any `git add`, scan the diff for real symbols + quantities + PPCs together; if in doubt, ask the user before staging.
+Affirmatively OK to commit: `scripts/positions.template.json`, code that operates on positions without hard-coding real ones, and tests using clearly-fake data.
+
+This prohibition is enforced mechanically, not by recollection. `.gitignore` is the privacy boundary — owner-private docs live under `docs/private/`, which is ignored wholesale so a new one is protected the moment it is created. `scripts/privacy-scan.js` runs as a Claude Code `PreToolUse` hook before agent-issued git commands and as a fail-closed job in `.github/workflows/pr-checks.yml` on every PR. Staging MUST name explicit paths; `git add -f` is denied outright, since its only purpose is crossing the boundary `.gitignore` draws. Any change to what counts as private MUST land in `.gitignore` or the scanner, not only in prose.
 
 **Runtime egress to authorized third-party AI services.** Real holdings data MAY flow to a named third-party AI service at runtime for analysis purposes, provided ALL of the following hold:
 
@@ -42,11 +49,13 @@ Positions are keyed by `partitionKey = brokerId`, `rowKey = ${assetType}__${symb
 *Rationale: Use-cases stay portable; swapping Azure Tables for another store, or adding a CLI/MCP surface, must not require rewriting business logic.*
 
 ### III. Idempotent Data Operations
-`scripts/seed-positions.js` is insert-only — existing rows MUST be skipped, never silently overwritten. Updates to existing positions go through `PUT /api/positions/{broker}/{rowKey}` with a JSON patch. Bulk updates are done by one-off scripts that issue PUTs, not by re-running seed scripts with mutated data.
+`scripts/seed-positions.js` is insert-only — existing rows MUST be skipped, never silently overwritten. Re-running a seed script with mutated data MUST NOT be used to update existing rows: it silently skips them, so the update appears to succeed while nothing changes.
 
-`scripts/positions.json` is the canonical local snapshot of holdings and MUST stay in sync with the database after any change.
+Updates to existing positions go through the `my-finances` MCP write tools (`update_position` for partial patches, `create_position` for new rows, `set_order_execution_status`), which are the primary write path and audit-log every mutation. `PUT /api/positions/{broker}/{rowKey}` with a JSON patch remains the equivalent path when MCP is unavailable. Bulk updates are done by one-off scripts that issue those writes.
 
-*Rationale: Idempotent seeders are safe to re-run after partial failures; surprise overwrites of real financial data are not.*
+`scripts/positions.json` is a **recovery snapshot and seed input**, not a live mirror of the database. It is regenerated from the live store on demand — before a disaster-recovery re-seed, or when the owner asks — and MUST NOT be hand-edited. The database is the single source of truth for holdings.
+
+*Rationale: Idempotent seeders are safe to re-run after partial failures; surprise overwrites of real financial data are not. Requiring `positions.json` to stay continuously in sync was a rule nobody could keep once writes moved to MCP, and a stale file that claims to be canonical is more dangerous than one that is honestly a snapshot.*
 
 ### IV. Pragmatic Testing
 Tests are required where they pay off: domain entities and value objects (validation rules), use-cases (orchestration logic), and HTTP route smoke tests (request → response shape). TDD is not mandated. Frontend visual UI and one-off scripts are exempt unless they encode business rules.
@@ -93,4 +102,4 @@ This constitution supersedes ad-hoc conventions in `CLAUDE.md` where they confli
 
 Compliance is verified at `/speckit-plan` time (Constitution Check section) and at PR review. Any deviation MUST be justified in the plan's Complexity Tracking section, not hidden in code.
 
-**Version**: 1.1.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-13
+**Version**: 1.2.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-23
