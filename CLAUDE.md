@@ -1,104 +1,80 @@
 # my-finances — Repo Guide
 
-Personal investments tracker. Azure Functions (Node) backend + Astro dashboard frontend, persisted to Azure Table Storage.
+Personal investments tracker. Azure Functions (Node) backend + Astro dashboard, persisted to
+Azure Table Storage. Ports: Functions on `http://localhost:7071/api`, Azurite for tables.
+Machine-specific facts (real resource names, local paths) are in @CLAUDE.local.md — gitignored.
 
-## Stack
-- **Backend:** Azure Functions v4 (Node.js) — `src/functions/`
-- **Frontend:** Astro app under `dashboard/`
-- **DB:** Azure Table Storage via `@azure/data-tables` (NOT SQLite/Postgres)
-- **Local dev:** Functions on `http://localhost:7071/api`; Azurite for tables
+## Read this first
+1. **Treat this repo as public. NEVER commit real quantities, `averageCost`/PPC, prices, account IDs, or credentials — use placeholders (`SYMBOL`, `123.45`, `BROKER`). Stage explicit paths; `git add -f`, `-A`, and `.` are gated by a hook. NEVER work around a block — fix the file or ask the owner.**
+2. **Fixed income (`bond|bopreal|on|lecap`) is stored per 100 nominales. NEVER write a fixed-income price without first deriving that row's scale factor from its own live `currentPrice` — it differs per instrument, and a wrong factor corrupts data by 100-1000×.**
+3. **`scripts/positions.json` is insert-only seed input, not a live mirror. NEVER hand-edit it, and NEVER re-run `seed-positions.js` to update an existing row — it silently skips. Use the MCP `update_position` tool.**
 
 ## Architecture (clean / DDD-style)
-- `src/domain/entities/` — `Position`, `Broker`, `Price`, etc. (immutable, validated)
-- `src/domain/value-objects/` — `BrokerId`, `Symbol`, `Quantity`, `AssetType`
-- `src/application/use-cases/` — orchestrators (CreatePosition, UpdatePosition, RefreshPrices, …)
-- `src/application/interfaces/` — repository interfaces (`IPositionRepository`, …)
-- `src/database/AzureTableDatabase.js` — concrete repo implementation
-- `src/functions/` — HTTP/timer entry points (thin: parse → use-case → respond)
-- `src/shared/` — errors, logger, response helpers
+- `src/domain/entities/` — `Position`, `Broker`, `Price` (immutable, validated); `src/domain/value-objects/` — `BrokerId`, `Symbol`, `Quantity`, `AssetType`
+- `src/application/use-cases/` — orchestrators (CreatePosition, RefreshPrices, …); `src/application/interfaces/` — repo interfaces
+- `src/database/AzureTableDatabase.js` — concrete repo impl; `src/shared/` — errors, logger, response helpers
+- `src/functions/` — HTTP/timer entry points, thin: parse → use-case → respond. Astro dashboard under `dashboard/`.
+- Storage is Azure Table via `@azure/data-tables` — not SQLite/Postgres (canonical: constitution Tech Stack).
 
 ## Tables
-`portfolioBrokers`, `portfolioPositions`, `portfolioSettings`, `portfolioPrices`.
-
-Positions are keyed by `partitionKey = brokerId`, `rowKey = ${assetType}__${symbol}` (see `Position.id()` in `src/domain/entities/Position.js:240`).
-
-Strategic-plan tables (versioned per `docs/metaprompt-rebalance-plan.md` §2/§7; models in `src/domain/plan/plan-entities.d.ts`): `portfolioTargetAllocations`, `portfolioDeployRules`, `portfolioPlanVersions` (pk `versions`, exactly one row `isActive`). Written by `scripts/seed-plan-version.js` from gitignored `scripts/plan-version.local.json`; nothing in the app consumes them yet (future rebalance evaluator). The weekly analysis drift/caps read a separate document: `portfolioSettings` row `analysis.allocationTargetsV1` (feature 010 schema, seeded from `scripts/allocation-targets.local.json`).
-
-The weekly-analysis system prompt is the editable instructions document (`portfolioSettings` row `analysis.instructionsV1` + `portfolioInstructionsHistory`); since 2026-07-22 its content is the owner's portfolio framework v3.1 (kept locally at `docs/portfolio-framework-v3.md`, untracked — real strategy data, never commit).
+`portfolioBrokers`, `portfolioPositions`, `portfolioSettings`, `portfolioPrices`. Positions are
+keyed by `partitionKey = brokerId`, `rowKey = ${assetType}__${symbol}` (`Position.id()` in
+`src/domain/entities/Position.js:240`). Strategic-plan tables and the weekly-analysis instructions
+document are seeded but not consumed by the app — if a task touches either, read
+`docs/architecture/plan-tables.md` first.
 
 ## Position schema (key fields)
-`brokerId`, `assetType` (stock|etf|bond|cedear|cash|deposit|bopreal|lecap|on), `symbol`, `displayName`, `quantity`, `averageCost` (PPC), `currency`, `currentPrice`, `currentPriceUpdatedAt`, `exchange`, `maturityDate`, `status` (open|closed), `realizedPnl`, `notes`.
+`brokerId`, `assetType` (stock|etf|bond|cedear|cash|deposit|bopreal|lecap|on), `symbol`,
+`displayName`, `quantity`, `averageCost` (PPC), `currency`, `currentPrice`,
+`currentPriceUpdatedAt`, `exchange`, `maturityDate`, `status` (open|closed), `realizedPnl`, `notes`.
+- `averageCost` = cost basis per unit (PPC in Spanish broker statements); `currentPrice` is
+  written only by the `RefreshPrices` use case — never seed it by hand.
+- Fixed-income scale: rule 2 above; procedure in `.claude/skills/sync-positions/SKILL.md` §3.
+- Broker slugs: `galicia`, `iol`, `ibkr`, `bullmarket`, `cash` (off-system USD reserve).
 
-- `averageCost` = user's cost basis per unit (a.k.a. **PPC** in Spanish broker statements).
-- `currentPrice` is auto-refreshed by `RefreshPrices` use case (timer + `POST /api/prices/refresh`). Not seeded manually.
-- For bonds/BOPREAL, prices are typically **per 100 nominales** (% of par convention); see existing `notes: "Quoted per 100 nominales — verify"` on IOL BPOC7.
-
-## Brokers
-Slugs: `galicia`, `iol`, `ibkr`, `bullmarket`, `cash` (off-system USD reserve).
-
-## API endpoints (for data updates)
-- `GET /api/positions?broker={id}&status={open|closed}` — list
-- `POST /api/positions` — create (used by `scripts/seed-positions.js`)
-- `GET|PUT|DELETE /api/positions/{broker}/{rowKey}` — fetch/update/delete one
-  - `rowKey` = `${assetType}__${symbol}` (e.g., `cedear__GOOGL`, `bond__GD35`)
-  - PUT accepts partial body (patch semantics) — preferred for "update PPC for one holding"
-- `POST /api/prices/refresh` — refresh all current prices. **Operator-only** since the dashboard's manual refresh button was removed; the production refresh path is the daily timer (`src/functions/refreshPricesTimer.js`, 16:30 ET weekdays). Endpoint requires the Function App key (`authLevel: 'function'`).
+## API endpoints
+- `GET /api/positions?broker={id}&status={open|closed}` — list; `POST /api/positions` — create
+- `GET|PUT|DELETE /api/positions/{broker}/{rowKey}` (e.g. `cedear__GOOGL`); PUT is a partial patch
+- `POST /api/prices/refresh` — needs the Function App key (`authLevel: 'function'`). Production
+  refresh is the 16:30-ET weekday timer in `refreshPricesTimer.js`. Don't add a UI trigger.
 - `GET /api/brokers`, `POST /api/brokers` — broker CRUD
 
-## Seeding scripts
-- `scripts/seed-positions.js` — POSTs `scripts/positions.json` rows. **Idempotent insert only**: existing rows are skipped, NOT updated. For updates use `PUT /api/positions/{broker}/{rowKey}` directly.
-- `scripts/seed-brokers.js` — broker records + settings.
-- `scripts/positions.json` is the canonical snapshot of holdings (last drafted from `portfolio-report.html`).
-
-## Working on data updates
-1. To update an existing position's `averageCost` (PPC) or `quantity`: send `PUT /api/positions/{broker}/{rowKey}` with a JSON patch — do NOT re-run `seed-positions.js` (it skips existing).
-2. To add new positions: append to `scripts/positions.json` and run `node scripts/seed-positions.js`.
-3. To bulk-update many positions: write a one-off `scripts/` script that issues PUTs (or extend `seed-positions.js` with an `--update` flag).
-4. Always keep `scripts/positions.json` in sync with the DB so it remains the canonical snapshot.
-5. To sync real IOL/IBKR broker holdings into the store, use the `sync-positions` skill (`.claude/skills/sync-positions/SKILL.md`) — it encodes the full pull → diff → dry-run → apply workflow.
+## Changing portfolio data
+Use the `my-finances` MCP tools for every portfolio read and write: `list_positions` /
+`portfolio_summary` to read, `update_position` (partial patch; large quantity changes need
+`confirm: "true"`) and `create_position` to write, `set_order_execution_status` and
+`trigger_price_refresh` for maintenance, `list_audit_entries` to review writes (all are
+audit-logged). Fall back to `PUT /api/positions/{broker}/{rowKey}` only if MCP isn't connected.
+- To sync real IOL/IBKR holdings, use the `sync-positions` skill: pull → diff against the live store → confirm → apply.
+- To bulk-update outside MCP, name the script `scripts/update-<YYYY-MM-DD>.local.js`. That exact
+  pattern is already gitignored; do not invent another name.
+- Regenerate `scripts/positions.json` from the live store only before a disaster-recovery re-seed,
+  or when the owner asks (rule 3).
 
 ## Conventions
-- Branch naming:
-  - **SDD / speckit features** (anything spec'd via `/speckit-specify`): use the Spec Kit format `NNN-kebab-description`, matching the `specs/NNN-…` directory the command creates (e.g., `009-performance-benchmarks`, `010-structured-analysis-tables`). The branch and its spec directory share the same name. Do **not** add a `feature/` prefix to these.
-  - **Ad-hoc work** (small fixes/chores not driven by a spec): `feature/{kebab-case}` or `fix/{kebab-case}` (e.g., `fix/register-007-functions`).
-- Commit style: short imperative (`fix:`, `feat:`, `ci:` prefixes used recently).
+- Branches: speckit features use bare `NNN-kebab` matching their `specs/` dir (no `feature/`
+  prefix); ad-hoc work uses `feature/…` or `fix/…`. Canonical: constitution §V.
+- Commit subject: `<type>: <imperative>`, ≤72 chars, type ∈ `feat|fix|refactor|docs|test|ci|chore|perf`.
+- Ask before committing ad-hoc work; speckit/SDD work may be committed as it goes.
 
-## Privacy: never commit personal or holdings data
-This repo is (or may become) public. Real portfolio data must stay local.
+## Privacy
+Enforced, not remembered: `.gitignore` is the privacy boundary, and `scripts/privacy-scan.js`
+runs before your git commands (hook) and on every PR (CI). Rule 1 says what must never ship.
+Canonical rationale: constitution §I.
+- Private docs with real figures go in `docs/private/` — ignored wholesale, so a new one is safe
+  the moment it's created. Never put them elsewhere under `docs/`.
+- A file that must hold credential-shaped test data can carry a `privacy-scan: allow-secrets` comment.
 
-**Never stage, commit, or push anything containing:**
-- Real quantities, PPC / `averageCost` values, prices, or cost-basis figures for actual holdings.
-- Broker statements, account snapshots, or portfolio reports (`portfolio-report.html`, `plan-rebalanceo-brokers.html`, etc.).
-- The full `scripts/positions.json` (the canonical real-holdings snapshot — already gitignored; keep it that way).
-- One-off seed/update scripts that hard-code real values (e.g. `scripts/update-bullmarket-YYYY-MM-DD.js`). Either gitignore them, keep them outside the repo, or replace literals with env vars / external JSON before committing.
-- Credentials, connection strings, Azure resource names, account IDs — anything that ties this code to the user's actual accounts. `.env*` and `local.settings.json` are gitignored; don't bypass that.
-- Real values embedded in commit messages, PR descriptions, code comments, test fixtures, or example snippets in committed files. Use obvious placeholders (`SYMBOL`, `123.45`, `BROKER`) in anything that will be committed.
-
-**Affirmatively OK to commit:** `scripts/positions.template.json` (placeholder schema), code that operates on positions without hard-coding real ones, and tests that use clearly-fake data.
-
-**Before any `git add` / commit:** if the change touches `scripts/`, fixtures, docs, or comments, scan the diff for real symbols + quantities + PPCs together. If in doubt, ask the user before staging.
+## When I get something wrong
+If the owner corrects you on a repo convention, offer to run `/claude-md-fix`: it finds the
+sentence that permitted the error and fixes it in the right place (hook, `.gitignore`,
+constitution, or here), logging to `docs/claude-md-log.md`. If the same rule appears 3 times in
+that log it must become a hook check or a `.gitignore` entry — or be deleted as unenforceable:
+prose that has failed three times won't work the fourth. Soft cap: 80 lines, and 3 bold spans —
+if a fourth thing needs bold, one of the three isn't earning it. Adding more than 4 lines means
+deleting something else in the same edit.
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan at
-`specs/019-earmarked-positions/plan.md` (Phase 1 complete; tasks pending).
-Companion artifacts in the same folder: `spec.md`, `research.md`,
-`data-model.md`, `quickstart.md`, `contracts/prompt-additions.md`.
-Backend-only, no new npm deps, no new endpoints, no dashboard changes: extends
-`GenerateWeeklyAnalysis.js` to read a new setting `analysis.earmarkedBrokers`
-(comma-separated broker ids, default `'cash'`) and partition the portfolio
-snapshot in order — earmarked (broker in list AND valueUsd > 0) computed
-BEFORE the existing feature-013 administrative check (valueUsd <= 0) — so an
-earmarked-broker position is never miscategorized as a legacy stub purely
-because its price feed is null. The investable remainder (unchanged shape)
-still feeds `AllocationDriftCalculator`, `DuplicateHoldingsDetector`, and
-`PositionChangeCalculator` (both current and prior snapshot sides) — none of
-those pure domain services change. New optional `earmarkedPositions` field on
-`WeeklyAnalysis` (same validate/freeze/getter/toJSON pattern as
-`administrativePositions`, incl. the `_persistFailed` path) persisted via a
-new `earmarkedPositionsJson` column on `AzureAnalysisRepository`, and a new
-`## earmarkedPositions` prompt block (generic wording only — no hardcoded
-real-world purpose; that framing lives in the owner's editable instructions
-document) omitted when empty. Prior plan: `specs/018-mcp-write-tools/plan.md`
-(shipped, PR #48).
+Current plan: none active. Most recent: `specs/019-earmarked-positions/plan.md` (shipped, PR #50).
+Companion artifacts (`spec.md`, `research.md`, `data-model.md`, `quickstart.md`, `contracts/`) sit alongside each plan.
 <!-- SPECKIT END -->
