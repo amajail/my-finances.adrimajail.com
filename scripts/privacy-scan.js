@@ -213,12 +213,41 @@ const GIT_FLAGS_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '-
  * @returns {Array<{verb: string, args: string[], force: boolean, broad: boolean,
  *                  pathspecs: string[], messages: string[], deferMessage: boolean}>}
  */
+/**
+ * Remove heredoc bodies before looking for git invocations. Text written into
+ * a file is data, not a command — `cat > notes.md <<'EOF'` containing the words
+ * `git add -f` must not read as a force-add. Without this, documenting the
+ * guard trips the guard.
+ *
+ * Known limit: `bash <<'EOF'` genuinely executes its body, and that body is
+ * dropped here too. Rare enough to accept, and CI still scans the result.
+ */
+function stripHeredocs(command) {
+  if (!command.includes('<<')) return command;
+
+  const START = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/g;
+  const kept = [];
+  let delimiter = null;
+
+  for (const line of command.split('\n')) {
+    if (delimiter !== null) {
+      if (line.trim() === delimiter) delimiter = null;
+      continue; // drop the body and its terminator
+    }
+    kept.push(line);
+    const starts = [...line.matchAll(START)];
+    if (starts.length) delimiter = starts[0][2];
+  }
+
+  return kept.join('\n');
+}
+
 function classifyCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return [];
 
   const invocations = [];
 
-  for (const segment of splitSegments(command)) {
+  for (const segment of splitSegments(stripHeredocs(command))) {
     const tokens = tokenize(segment);
 
     let i = 0;

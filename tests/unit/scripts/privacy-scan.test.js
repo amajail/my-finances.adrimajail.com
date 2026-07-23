@@ -241,3 +241,28 @@ describe('privacy-scan / shell-shape bypasses', () => {
     expect(inv.pathspecs).toEqual(['-f']);
   });
 });
+
+describe('privacy-scan / heredoc bodies are data, not commands', () => {
+  it('does not read a documented git command as a real one', () => {
+    const cmd = [
+      "cat > pr-body.md <<'EOF'",
+      'Adversarial testing found `(git add -f x)` slipping through in a subshell.',
+      'Any `git add -A` would have published it.',
+      'EOF',
+      'gh pr create --body-file pr-body.md',
+    ].join('\n');
+    expect(classifyCommand(cmd)).toEqual([]);
+  });
+
+  it('still sees a real git command outside the heredoc', () => {
+    const cmd = ["cat > x.md <<'EOF'", 'git add -f nothing', 'EOF', 'git add -f real.json'].join('\n');
+    const invs = classifyCommand(cmd);
+    expect(invs).toHaveLength(1);
+    expect(invs[0].pathspecs).toEqual(['real.json']);
+  });
+
+  it('handles unquoted and dash-suppressed delimiters', () => {
+    expect(classifyCommand(['cat <<EOF', 'git add -f x', 'EOF'].join('\n'))).toEqual([]);
+    expect(classifyCommand(['cat <<-END', '\tgit add -f x', '\tEND'].join('\n'))).toEqual([]);
+  });
+});
