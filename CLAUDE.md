@@ -19,7 +19,7 @@ Machine-specific facts (real resource names, local paths) are in @CLAUDE.local.m
 ## Tables
 `portfolioBrokers`, `portfolioPositions`, `portfolioSettings`, `portfolioPrices`. Positions are
 keyed by `partitionKey = brokerId`, `rowKey = ${assetType}__${symbol}` (`Position.id()` in
-`src/domain/entities/Position.js:240`). Strategic-plan tables and the weekly-analysis instructions
+`src/domain/entities/Position.js:239`). Strategic-plan tables and the weekly-analysis instructions
 document are seeded but not consumed by the app — if a task touches either, read
 `docs/architecture/plan-tables.md` first.
 
@@ -32,7 +32,7 @@ document are seeded but not consumed by the app — if a task touches either, re
 - Fixed-income scale: rule 2 above; procedure in `.claude/skills/sync-positions/SKILL.md` §3.
 - Broker slugs: `galicia`, `iol`, `ibkr`, `bullmarket`, `cash` (off-system USD reserve).
 
-## API endpoints
+## API endpoints (portfolio data; analysis/instructions/calendar routes not listed)
 - `GET /api/positions?broker={id}&status={open|closed}` — list; `POST /api/positions` — create
 - `GET|PUT|DELETE /api/positions/{broker}/{rowKey}` (e.g. `cedear__GOOGL`); PUT is a partial patch
 - `POST /api/prices/refresh` — needs the Function App key (`authLevel: 'function'`). Production

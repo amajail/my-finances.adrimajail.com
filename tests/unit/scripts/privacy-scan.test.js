@@ -220,3 +220,24 @@ describe('privacy-scan / commit -a', () => {
     expect(classifyCommand('git commit -m "x"')[0].stagesTracked).toBe(false);
   });
 });
+
+describe('privacy-scan / shell-shape bypasses', () => {
+  it.each([
+    ['subshell', '(git add -f x)'],
+    ['grouped', '{ git add -f x; }'],
+    ['command substitution', 'echo $(git add -f x)'],
+    ['chained subshell', 'cd /tmp && (git add -f x)'],
+    ['env prefix', 'FOO=1 git add -f x'],
+    ['absolute path', '/usr/bin/git add -f x'],
+    ['backgrounded', 'git add -f x &'],
+  ])('still finds the invocation: %s', (_label, cmd) => {
+    const invs = classifyCommand(cmd);
+    expect(invs.some((i) => i.verb === 'add' && i.force)).toBe(true);
+  });
+
+  it('treats -f after -- as a pathspec, not a flag', () => {
+    const [inv] = classifyCommand('git add -- -f');
+    expect(inv.force).toBe(false);
+    expect(inv.pathspecs).toEqual(['-f']);
+  });
+});

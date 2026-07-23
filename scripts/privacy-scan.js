@@ -146,7 +146,9 @@ function splitSegments(command) {
       i++;
       continue;
     }
-    if (ch === ';' || ch === '|' || ch === '\n') {
+    // `(`/`)`/`{`/`}` are separators too, so a subshell like `(git add -f x)`
+    // does not hide the invocation behind a `(git` token.
+    if (ch === ';' || ch === '|' || ch === '\n' || ch === '(' || ch === ')' || ch === '{' || ch === '}') {
       segments.push(current);
       current = '';
       continue;
