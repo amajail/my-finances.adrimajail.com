@@ -11,6 +11,7 @@
     "test:unit": "jest tests/unit --passWithNoTests",
     "test:integration": "jest tests/integration --passWithNoTests",
     "lint": "eslint .",
+    "privacy:scan": "node scripts/privacy-scan.js",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

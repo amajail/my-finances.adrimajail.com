@@ -7,6 +7,32 @@ on:
     branches: [main]
 
 jobs:
+  privacy:
+    name: Privacy scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      # No `npm ci` — privacy-scan.js is dependency-free so this job stays fast.
+      # This is the fail-closed half of the guard: the Claude Code PreToolUse
+      # hook only sees Claude's git commands, CI sees everything reaching a PR.
+      - name: Scan changed lines for holdings data and credentials
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="origin/${{ github.base_ref }}...HEAD"
+          else
+            RANGE="HEAD~1...HEAD"
+          fi
+          echo "Scanning $RANGE"
+          npm run privacy:scan -- --range "$RANGE"
+
   test-backend:
     name: Backend tests
     runs-on: ubuntu-latest
