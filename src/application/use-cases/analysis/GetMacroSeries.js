@@ -11,6 +11,7 @@
  */
 
 const UseCase = require('../UseCase');
+const EarmarkedTotals = require('../../../domain/services/EarmarkedTotals');
 
 const DEFAULT_WEEKS = 60;
 const MAX_WEEKS = 200;
@@ -39,7 +40,10 @@ class GetMacroSeries extends UseCase {
       .map((a) => ({
         date: a.date,
         macroContext: a.macroContext || null,
-        portfolioTotals: a.portfolioTotals || null,
+        // Feature 019 follow-up: augment (never replace) the persisted totals
+        // with the investable ex-earmarked split, so the charted portfolio line
+        // stays continuous across the run where the reserve was first priced.
+        portfolioTotals: EarmarkedTotals.split(a.portfolioTotals || null, a.earmarkedPositions),
       }))
       .sort((x, y) => x.date.localeCompare(y.date)); // ascending for charts
 

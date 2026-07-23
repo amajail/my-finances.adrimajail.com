@@ -13,6 +13,7 @@
 
 const UseCase = require('../UseCase');
 const BenchmarkAligner = require('../../../domain/services/BenchmarkAligner');
+const EarmarkedTotals = require('../../../domain/services/EarmarkedTotals');
 const ArCpiIndex = require('../../../domain/services/ArCpiIndex');
 const logger = require('../../../shared/logging');
 
@@ -47,11 +48,17 @@ class GetPerformanceSeries extends UseCase {
     const analyses = await this._analysisRepository.getLatest(limit); // newest-first
     const base = (analyses || [])
       .map((a) => {
-        const t = a.portfolioTotals || null;
+        // The portfolio line is investable capital, EXCLUDING the earmarked
+        // reserve (feature 019 follow-up): a static reserve both dilutes the
+        // benchmark comparison and — because it only started carrying a market
+        // value once it was priced — would inject a one-off step that is not a
+        // real gain. Rows written before that carry no earmarked positions, so
+        // investableTotalUsd === grandTotalUsd and history is unaffected.
+        const t = EarmarkedTotals.split(a.portfolioTotals || null, a.earmarkedPositions);
         const mepVal = t && Number.isFinite(Number(t.mepRate)) ? Number(t.mepRate) : null;
         return {
           date: a.date,
-          portfolioValueUsd: t && Number.isFinite(Number(t.grandTotalUsd)) ? Number(t.grandTotalUsd) : null,
+          portfolioValueUsd: t && Number.isFinite(Number(t.investableTotalUsd)) ? Number(t.investableTotalUsd) : null,
           mep: { value: mepVal, asOf: t ? t.mepRateAsOf || a.date : null, available: mepVal !== null },
         };
       })
