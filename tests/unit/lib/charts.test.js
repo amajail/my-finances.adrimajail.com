@@ -54,12 +54,16 @@ const macroPoint = (date, over = {}) => ({
     imfReviewStatus: { value: 'approved', asOf: date, available: true },
     ...over,
   },
-  portfolioTotals: { totalUsd: 100000, totalArs: 5000000, unrealizedPnlUsd: 1200, grandTotalUsd: 101000, mepRateAsOf: date },
+  portfolioTotals: {
+    totalUsd: 100000, totalArs: 5000000, unrealizedPnlUsd: 1200, grandTotalUsd: 101000, mepRateAsOf: date,
+    // Derived server-side by EarmarkedTotals; the charted keys are the ex-reserve ones.
+    investableUsd: 100000, investableArs: 5000000, investableTotalUsd: 101000, earmarkedTotalUsd: 0,
+  },
 });
 
 describe('buildSeries', () => {
   const macro = METRIC_CATALOGUE.find((m) => m.key === 'riesgoPais');
-  const total = METRIC_CATALOGUE.find((m) => m.key === 'totalUsd');
+  const total = METRIC_CATALOGUE.find((m) => m.key === 'investableUsd');
 
   it('maps a macro reading to a numeric value with as-of', () => {
     const s = buildSeries([macroPoint('2026-06-05')], macro);
@@ -140,7 +144,7 @@ describe('imfChangePoints', () => {
 
 describe('SVG renderers (smoke)', () => {
   const macro = METRIC_CATALOGUE.find((m) => m.key === 'riesgoPais');
-  const total = METRIC_CATALOGUE.find((m) => m.key === 'totalUsd');
+  const total = METRIC_CATALOGUE.find((m) => m.key === 'investableUsd');
   const pts = [macroPoint('2026-06-05'), macroPoint('2026-06-12')];
 
   it('lineChartSvg returns an svg with points and first/last date labels', () => {

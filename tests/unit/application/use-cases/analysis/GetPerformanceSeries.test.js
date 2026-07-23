@@ -31,6 +31,21 @@ describe('GetPerformanceSeries', () => {
     expect(r).toEqual({ points: [], count: 0, benchmarksAvailable: { mep: false, sp500: false, usCpi: false, arCpi: false } });
   });
 
+  // Feature 019 follow-up: the portfolio line is invested capital, so an
+  // earmarked reserve is netted out of every point that carries one. Rows from
+  // before the reserve was priced carry none, so their value is unchanged —
+  // which is what keeps the benchmark comparison free of a phantom step.
+  it('nets the earmarked reserve out of the portfolio line', async () => {
+    const { useCase } = build({
+      analyses: [
+        { ...wa('2026-05-15', totals(220000, 1460, '2026-05-15')), earmarkedPositions: [{ currency: 'USD', quantity: 100000, currentPrice: 1, valueUsd: 100000 }] },
+        wa('2026-05-08', totals(110000, 1450, '2026-05-08')), // pre-earmark row, untouched
+      ],
+    });
+    const r = await useCase.execute({});
+    expect(r.points.map((p) => p.portfolioValueUsd)).toEqual([110000, 120000]);
+  });
+
   it('maps portfolio value + MEP ascending and populates benchmarks aligned on/before', async () => {
     const { useCase } = build({
       analyses: [

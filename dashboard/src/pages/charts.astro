@@ -144,8 +144,13 @@ import Layout from '../layouts/Layout.astro';
       () => api('/analysis/macro-series?weeks=60'),
       (data) => {
         allPoints = data.points || [];
+        // Portfolio cards chart invested capital only; say so (with the current
+        // amount) whenever an earmarked reserve is actually being held out.
+        const latestTotals = allPoints.length ? allPoints[allPoints.length - 1].portfolioTotals : null;
+        const earmarked = latestTotals && Number(latestTotals.earmarkedTotalUsd) > 0 ? Number(latestTotals.earmarkedTotalUsd) : 0;
         document.getElementById('hdr-meta').textContent =
-          `${allPoints.length} weekly ${allPoints.length === 1 ? 'analysis' : 'analyses'}`;
+          `${allPoints.length} weekly ${allPoints.length === 1 ? 'analysis' : 'analyses'}`
+          + (earmarked ? ` · portfolio cards exclude the earmarked reserve (USD ${Math.round(earmarked).toLocaleString('en-US')})` : '');
         fillOverlaySelects();
         render();
 

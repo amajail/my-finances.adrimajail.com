@@ -20,11 +20,15 @@ const METRIC_CATALOGUE = [
   { key: 'usaInterestRate', label: 'US Fed funds', unit: '%', group: 'United States', source: 'macro' },
   // Global
   { key: 'sp500Drawdown', label: 'S&P 500 drawdown', unit: '%', group: 'Global', source: 'macro' },
-  // Portfolio totals
-  { key: 'totalUsd', label: 'Total USD', unit: 'USD', group: 'Portfolio', source: 'totals' },
-  { key: 'totalArs', label: 'Total ARS', unit: 'ARS', group: 'Portfolio', source: 'totals' },
+  // Portfolio totals — invested capital only. The raw totalUsd/grandTotalUsd
+  // keys are still delivered by the API but are deliberately NOT charted: the
+  // earmarked reserve entered them the week it was first priced, which reads as
+  // a spike that never happened. The API derives the investable* keys for every
+  // row, including pre-earmark ones (see EarmarkedTotals).
+  { key: 'investableUsd', label: 'USD sleeve (ex-reserve)', unit: 'USD', group: 'Portfolio', source: 'totals' },
+  { key: 'investableArs', label: 'ARS sleeve (ex-reserve)', unit: 'ARS', group: 'Portfolio', source: 'totals' },
   { key: 'unrealizedPnlUsd', label: 'Unrealized P&L', unit: 'USD', group: 'Portfolio', source: 'totals' },
-  { key: 'grandTotalUsd', label: 'Grand total', unit: 'USD', group: 'Portfolio', source: 'totals' },
+  { key: 'investableTotalUsd', label: 'Invested total (ex-reserve)', unit: 'USD', group: 'Portfolio', source: 'totals' },
 ];
 
 const PORTFOLIO_KEYS = METRIC_CATALOGUE.filter((m) => m.source === 'totals').map((m) => m.key);
