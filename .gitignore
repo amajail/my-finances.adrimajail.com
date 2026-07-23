@@ -1,11 +1,19 @@
-# Claude Code local session files
-.claude/
+# Claude Code local session files. Note `.claude/*` not `.claude/` — git never
+# descends into an excluded directory, so the negations below would not work.
+# Shared project config (hooks, settings, skills) IS tracked; anything personal
+# or machine-specific (settings.local.json, worktrees/, private-symbols.txt) is not.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/skills/
 
-# Playwright MCP audit artifacts (screenshots/snapshots may capture real holdings)
+# Playwright MCP artifacts — screenshots/snapshots of the running dashboard
+# capture REAL holdings figures (Total USD/ARS, P&L). Never commit.
 .playwright-mcp/
 **/.playwright-mcp/
 audit-*.png
 verify-*.png
+*-mcp-*.png
 
 # Environment variables (contains sensitive data)
 .env
@@ -131,12 +139,16 @@ plan-rebalanceo-brokers.html
 # (P&L percentages on real positions). Never commit.
 metaprompt-rebalance-plan.md
 
+# Machine-specific agent context, @import-ed by CLAUDE.md. Holds real Azure
+# resource names and local paths — never commit.
+CLAUDE.local.md
+
+# Owner-private docs: real figures, strategy, personal plans. DEFAULT-DENY —
+# everything under docs/private/ is ignored, so a new private doc is safe the
+# moment it is created. Put private docs HERE, never elsewhere under docs/.
+docs/private/
+
 # Owner-private strategic framework, seeded into portfolioSettings at run time
 # via `node scripts/seed-analysis-framework.js`. The example template at
 # scripts/seed-analysis-framework.example.md IS committed (placeholders).
 scripts/analysis-framework.local.md
-
-# Playwright MCP browser artifacts — snapshots/screenshots of the running
-# dashboard capture REAL holdings figures (Total USD/ARS, P&L). Never commit.
-.playwright-mcp/
-*-mcp-*.png
