@@ -89,6 +89,20 @@ function attachSortHandlers(brokerId) {
   });
 }
 
+// Unrealized P&L as a % of cost basis for one broker sleeve, in its own
+// currency (never blended across currencies — an ARS return is not comparable
+// to a USD one). Null when nothing priced backs the sleeve.
+function unrealizedPct(acc) {
+  if (!acc || !(acc.cb > 0)) return null;
+  return ((acc.mv - acc.cb) / acc.cb) * 100;
+}
+
+function renderPnlPct(pct) {
+  if (pct == null) return '';
+  return `<div class="text-xs num-mono mt-0.5 ${pnlClass(pct)}">${fmtPct(pct)}
+    <span class="text-[var(--color-muted)]">unrealized</span></div>`;
+}
+
 function renderStatCell(label, value, sub = '') {
   return `
     <div class="stat-cell">
@@ -115,11 +129,21 @@ async function load() {
     const totalByCurrency = {};
     const totalByBroker = {};
     for (const p of positions) {
-      const mv = marketValue(p) || 0;
+      const priced = marketValue(p);
+      const mv = priced || 0;
       totalByCurrency[p.currency] = (totalByCurrency[p.currency] || 0) + mv;
 
-      const t = totalByBroker[p.brokerId] ||= { native: {} };
+      const t = totalByBroker[p.brokerId] ||= { native: {}, pnl: {} };
       t.native[p.currency] = (t.native[p.currency] || 0) + mv;
+
+      // Unrealized P&L % accumulates over PRICED positions only: an unpriced
+      // holding contributes no market value, so counting its cost basis would
+      // read as a total loss on that sleeve.
+      if (priced != null) {
+        const acc = t.pnl[p.currency] ||= { mv: 0, cb: 0 };
+        acc.mv += priced;
+        acc.cb += costBasis(p);
+      }
     }
 
     // Grand total: keep the backend's USD figure (uses MEP rate); refresh
@@ -157,6 +181,8 @@ async function load() {
       const accent = broker.accentColor || 'var(--color-accent)';
       const usdNative = totals.native.USD;
       const arsNative = totals.native.ARS;
+      const usdPct = unrealizedPct(totals.pnl.USD);
+      const arsPct = unrealizedPct(totals.pnl.ARS);
       const showUsd = usdNative != null && usdNative !== 0;
       const showArs = arsNative != null && arsNative !== 0;
       const empty = !showUsd && !showArs;
@@ -171,12 +197,14 @@ async function load() {
                   <div>
                     <div class="text-xs text-[var(--color-muted)] uppercase tracking-wider">USD</div>
                     <div class="text-2xl font-bold num-mono">${fmtUsd(usdNative)}</div>
+                    ${renderPnlPct(usdPct)}
                   </div>
                 ` : ''}
                 ${showArs ? `
                   <div>
                     <div class="text-xs text-[var(--color-muted)] uppercase tracking-wider">ARS</div>
                     <div class="text-2xl font-bold num-mono">${fmtArs(arsNative)}</div>
+                    ${renderPnlPct(arsPct)}
                   </div>
                 ` : ''}
               </div>
