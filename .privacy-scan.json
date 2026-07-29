@@ -1,0 +1,90 @@
+{
+  "$schema": "https://raw.githubusercontent.com/amajail/dev-kit/main/schema/privacy-scan.schema.json",
+
+  "_comment": [
+    "Rules for the shared privacy scanner (amajail/dev-kit). The engine is shared;",
+    "these rules are not, because what counts as private differs per repo.",
+    "This repo tracks a real investment portfolio and must be treated as public.",
+    "Deliberately no real symbol, quantity or PPC appears below — the patterns",
+    "describe the SHAPE and the LOCATION of private data, never an instance of it.",
+    "Canonical rationale: .specify/memory/constitution.md Principle I."
+  ],
+
+  "privatePaths": [
+    ["(^|/)positions\\.json$", "the positions seed file, which carries real quantities and PPC"],
+    ["(^|/)scripts/[^/]*\\.local\\.[A-Za-z0-9]+$", "a local-only script or config, written against the live portfolio"],
+    ["(^|/)scripts/update-[^/]*$", "an ad-hoc bulk-update script, which names real positions"],
+    ["(^|/)docs/private/", "an owner-private document — ignored wholesale, so a new one is safe the moment it exists"],
+    ["(^|/)portfolio-report\\.html$", "a rendered portfolio report, with real totals and P&L"],
+    ["(^|/)plan-rebalanceo-brokers\\.html$", "a rendered rebalance plan naming the real brokers and amounts"],
+    ["(^|/)metaprompt-rebalance-plan\\.md$", "the rebalance metaprompt, which embeds the real portfolio"],
+    ["(^|/)analysis-framework\\.local\\.md$", "the owner's private analysis framework"],
+    ["(^|/)\\.playwright-mcp/", "a screenshot or snapshot of the running dashboard, which captures real totals"],
+    ["(^|/)\\.claude/private-symbols\\.txt$", "the owner's real ticker list, which is itself a holdings disclosure"],
+    ["(^|/)CLAUDE\\.local\\.md$", "machine-specific notes — real resource names and local paths"]
+  ],
+
+  "_privatePathExceptionsWhy": [
+    "Both are denied by the BUILT-IN `.env` rule, and a rule's own `unless` cannot",
+    "reach a default — hence this list rather than an `unless`. `.env.test` holds",
+    "Azurite placeholders that the CI test run needs; dashboard/.env.production is",
+    "the public dashboard URL. Both are un-ignored in .gitignore for the same reason."
+  ],
+  "privatePathExceptions": ["(^|/)\\.env\\.test$", "(^|/)dashboard/\\.env\\.production$"],
+
+  "_secretPatternsWhy": [
+    "Almost everything this repo needs is already a dev-kit default. Only the two",
+    "shapes whose local versions were case-insensitive are restated here. The old",
+    "local `AZURE_STORAGE_CONNECTION_STRING\\s*=\\s*\\S+` is deliberately NOT restated:",
+    "dev-kit narrowed it to a quoted literal containing `;` because the broad form",
+    "flagged ordinary save/restore code — and it would flag .env.test's",
+    "`UseDevelopmentStorage=true` too."
+  ],
+  "secretPatterns": [
+    ["(?i)SharedAccessSignature\\s*=", "an Azure SAS token"],
+    ["(?i)x-functions-key\\s*[:=]\\s*['\"]?[A-Za-z0-9+/=_-]{20,}", "an Azure Function App key"]
+  ],
+
+  "safePrefixes": [
+    "src/",
+    "tests/",
+    "dashboard/",
+    "specs/",
+    ".github/",
+    ".specify/",
+    "docs/",
+    ".claude/hooks/",
+    ".claude/skills/",
+    "scripts/"
+  ],
+
+  "safeRootFiles": [
+    "package.json",
+    "package-lock.json",
+    ".gitignore",
+    ".prettierignore",
+    ".prettierrc",
+    ".funcignore",
+    "eslint.config.js",
+    "jest.config.js",
+    "host.json",
+    "README.md",
+    "CLAUDE.md",
+    ".env.test",
+    ".claude/settings.json",
+    ".privacy-scan.json"
+  ],
+
+  "_privateTermsFileWhy": "Gitignored on purpose: a committed list of the owner's real tickers is itself a holdings disclosure. Consequence — CI can never run this check, only the local hook can.",
+  "privateTermsFile": ".claude/private-symbols.txt",
+
+  "_selfExemptWhy": "This file necessarily contains the credential shapes it looks for. Exempt from CONTENT rules only — never from path rules.",
+  "selfExempt": ["(^|/)\\.privacy-scan\\.json$"],
+
+  "wording": {
+    "boundary": "real holdings, credentials and owner-private docs",
+    "placeholders": "placeholder values (SYMBOL, 123.45, BROKER)",
+    "confirm": "real quantities, PPC/averageCost, prices, or account identifiers",
+    "fixHint": "Docs with real figures belong in docs/private/ (gitignored), never elsewhere.\n  If this block is wrong, run /claude-md-fix so the rule gets fixed, not worked around."
+  }
+}
