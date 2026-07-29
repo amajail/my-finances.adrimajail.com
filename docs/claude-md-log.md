@@ -6,8 +6,13 @@ Deliberately kept out of `CLAUDE.md` and never `@import`ed: it grows without bou
 and history is only needed when deciding whether a rule has earned graduation.
 
 **Graduation rule:** if the same rule appears here 3 times, prose has failed. It must
-become a check in `scripts/privacy-scan.js` or an entry in `.gitignore` — or be deleted
-as unenforceable. Grep this file before filing a fourth prose tweak.
+become an entry in `.gitignore`, a rule in `.privacy-scan.json`, or — if the shared engine
+itself must change — a check in `amajail/dev-kit` with a test in the same PR; otherwise it
+is deleted as unenforceable. Grep this file before filing a fourth prose tweak.
+
+Rows below name the enforcement that existed when they were written. `scripts/privacy-scan.js`
+and `scripts/hooks/git-guard.sh` lived in this repo until PR #53 moved them to `amajail/dev-kit`;
+the rows are history and are deliberately left as written.
 
 Classes: **A** hard + machine-checkable (→ hook/gitignore, prose deleted) · **B** hard,
 not checkable (→ rewritten to name the replacement) · **C** preference (→ plain or
