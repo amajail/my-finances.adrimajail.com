@@ -1,23 +1,25 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.1 → 1.2.0
+- Version change: 1.2.0 → 1.2.1
 - Ratification: 2026-05-16
-- Last Amended: 2026-07-23
+- Last Amended: 2026-07-29
 - Principles introduced (1.0.0): I. Privacy First (NON-NEGOTIABLE), II. Clean Architecture / DDD, III. Idempotent Data Operations, IV. Pragmatic Testing, V. Convention-Driven Workflow
 - 1.1.0 amendment: Principle I gains a "Runtime egress to authorized third-party AI services" sub-clause carving out Anthropic API calls for the weekly rebalance analysis (feature 002-weekly-rebalance-analysis). Source-control prohibition unchanged. Driven by spec FR-028.
 - 1.1.1 amendment (PATCH — clarification/wording): Principle V (Convention-Driven Workflow) branch-naming reconciled with actual practice and the owner's 2026-06-13 decision. The single `feature/{kebab-case}` rule is replaced by a documented split — speckit/SDD features (driven by /speckit-specify) use the bare `NNN-kebab` Spec Kit format matching their spec directory (no `feature/` prefix); ad-hoc work uses `feature/{kebab-case}` or `fix/{kebab-case}`. Development Workflow step 1 updated to match. No principle added/removed; all other guidance unchanged.
 - 1.2.0 amendment (MINOR — materially expanded guidance): Two changes, both reconciling principles with shipped reality.
   (a) Principle III (Idempotent Data Operations) now names the `my-finances` MCP write tools (`update_position`, `create_position`, `set_order_execution_status`, shipped in feature 018-mcp-write-tools, PR #48) as the primary write path, with `PUT /api/positions/…` as the equivalent when MCP is unavailable. `scripts/positions.json` is restated as a recovery snapshot regenerated on demand, NOT a live mirror required to stay in sync after every change — the previous wording directly contradicted CLAUDE.md and was unkeepable once writes moved to MCP.
-  (b) Principle I (Privacy First) replaces the prose instruction "before any `git add`, scan the diff … if in doubt, ask" with the mechanical enforcement that now exists: `.gitignore` as the privacy boundary (including the default-deny `docs/private/`), plus `scripts/privacy-scan.js` as a PreToolUse hook and a fail-closed CI job. The prohibition itself is unchanged and remains NON-NEGOTIABLE; only its enforcement is now checkable. Driven by a live gap: `docs/portfolio-framework-v3.md` was documented as protected but was never actually gitignored.
+  (b) Principle I (Privacy First) replaces the prose instruction "before any `git add`, scan the diff … if in doubt, ask" with the mechanical enforcement that now exists: `.gitignore` as the privacy boundary (including the default-deny `docs/private/`), plus `scripts/privacy-scan.js` as a PreToolUse hook and a fail-closed CI job. The prohibition itself is unchanged and remains NON-NEGOTIABLE; only its enforcement is now checkable. Driven by a live gap: `docs/portfolio-framework-v3.md` was documented as protected but was never actually gitignored. *(Mechanism superseded by 1.2.1: the scanner engine and the hook left this repo. The substance of (b) — enforcement is mechanical, not remembered — is unchanged.)*
   No principle added or removed.
+- 1.2.1 amendment (PATCH — clarification/wording): Principle I's description of *how* it is enforced is corrected to match what shipped in PR #53. The scanner engine and the git guard were deleted from this repo and now come from the shared `amajail/dev-kit@v1`; the PreToolUse hook is registered once at user level in `~/.claude/settings.json`, and only the rules stay here in `.privacy-scan.json`. The old text named `scripts/privacy-scan.js` and a repo-local `.claude/settings.json` hook — both gone, so the document was asserting an enforcement mechanism that no longer existed. The prohibition itself is untouched and remains NON-NEGOTIABLE; no principle added, removed or redefined.
 - Added sections: Tech Stack & Constraints, Development Workflow, Governance
-- Enforcement: `scripts/privacy-scan.js` (Principle I), `.gitignore`, `.github/workflows/pr-checks.yml` job `privacy`, `.claude/settings.json` PreToolUse hook. A future amendment touching Principle I MUST update the scanner in the same change, or state why the rule is unenforceable.
-- Templates reviewed:
+- Enforcement of Principle I (current): `.gitignore` is the boundary; `.privacy-scan.json` holds this repo's rules; the scan engine is shared at `amajail/dev-kit@v1`; it runs as a user-level PreToolUse hook (fail-open, and it only ever sees Claude's own git commands) and as the fail-closed `privacy` job in `.github/workflows/pr-checks.yml`, which is the actual guarantee. A future amendment touching Principle I MUST land in `.gitignore` or `.privacy-scan.json` here, or in an `amajail/dev-kit` PR when the engine itself must change — or state why the rule is unenforceable.
+- Templates reviewed (1.2.0 pass):
   - ✅ .specify/templates/plan-template.md — Constitution Check section is generic; no edit required (principles are surfaced by reference).
   - ✅ .specify/templates/spec-template.md — no constitution-specific slots; no edit required.
   - ✅ .specify/templates/tasks-template.md — no constitution-specific slots; no edit required.
+- Templates reviewed (1.2.1 pass): all five of `.specify/templates/*.md` grepped for the deleted paths and for enforcement wording — plan, spec, tasks, checklist and constitution templates. No hit; no edit required.
 - Runtime guidance reviewed:
-  - ✅ CLAUDE.md — rewritten in the same change (107 → 80 lines). Its `## Privacy` and `## Changing portfolio data` sections now point here for rationale and carry only the operational instruction, per the division of labour: constitution = why + governing principle; CLAUDE.md = what to do now; `.gitignore` + `privacy-scan.js` = enforcement. The `positions.json` contradiction is resolved in favour of the recovery-snapshot reading.
+  - ✅ CLAUDE.md — rewritten during 1.2.0 (107 → 80 lines). Its `## Privacy` and `## Changing portfolio data` sections point here for rationale and carry only the operational instruction, per the division of labour: constitution = why + governing principle; CLAUDE.md = what to do now; `.gitignore` + `.privacy-scan.json` + the shared engine = enforcement. Re-checked at 1.2.1: `## Privacy` was already updated by PR #53 and needs no edit.
 - Deferred TODOs: none.
 -->
 
@@ -30,7 +32,7 @@ The repository is, or may become, public. Real personal-finance data MUST NEVER 
 
 Affirmatively OK to commit: `scripts/positions.template.json`, code that operates on positions without hard-coding real ones, and tests using clearly-fake data.
 
-This prohibition is enforced mechanically, not by recollection. `.gitignore` is the privacy boundary — owner-private docs live under `docs/private/`, which is ignored wholesale so a new one is protected the moment it is created. `scripts/privacy-scan.js` runs as a Claude Code `PreToolUse` hook before agent-issued git commands and as a fail-closed job in `.github/workflows/pr-checks.yml` on every PR. Staging MUST name explicit paths; `git add -f` is denied outright, since its only purpose is crossing the boundary `.gitignore` draws. Any change to what counts as private MUST land in `.gitignore` or the scanner, not only in prose.
+This prohibition is enforced mechanically, not by recollection. `.gitignore` is the privacy boundary — owner-private docs live under `docs/private/`, which is ignored wholesale so a new one is protected the moment it is created. What counts as private in *this* repo is declared in `.privacy-scan.json`; the engine that reads it is shared, at `amajail/dev-kit@v1`. It runs in two layers with deliberately opposite failure modes: a `PreToolUse` hook registered once at user level in `~/.claude/settings.json`, which is **fail-open** and only ever sees git commands Claude itself issues on this machine; and the **fail-closed** `privacy` job in `.github/workflows/pr-checks.yml`, which sees everything that reaches a PR and is therefore the actual guarantee. Staging MUST name explicit paths; `git add -f` is denied outright, since its only purpose is crossing the boundary `.gitignore` draws. Any change to what counts as private MUST land in `.gitignore` or `.privacy-scan.json`, not only in prose.
 
 **Runtime egress to authorized third-party AI services.** Real holdings data MAY flow to a named third-party AI service at runtime for analysis purposes, provided ALL of the following hold:
 
@@ -102,4 +104,4 @@ This constitution supersedes ad-hoc conventions in `CLAUDE.md` where they confli
 
 Compliance is verified at `/speckit-plan` time (Constitution Check section) and at PR review. Any deviation MUST be justified in the plan's Complexity Tracking section, not hidden in code.
 
-**Version**: 1.2.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-23
+**Version**: 1.2.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-29

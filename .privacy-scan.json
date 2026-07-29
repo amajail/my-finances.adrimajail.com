@@ -25,12 +25,21 @@
   ],
 
   "_privatePathExceptionsWhy": [
-    "Both are denied by the BUILT-IN `.env` rule, and a rule's own `unless` cannot",
-    "reach a default — hence this list rather than an `unless`. `.env.test` holds",
-    "Azurite placeholders that the CI test run needs; dashboard/.env.production is",
-    "the public dashboard URL. Both are un-ignored in .gitignore for the same reason."
+    "The BUILT-IN rule is `(^|/)\\.env(\\.|$)`, so it denies EVERY `.env.*` — including",
+    "the files below, which are committed on purpose. A rule's own `unless` cannot reach",
+    "a default, hence this list. `.env.test` holds Azurite placeholders the CI test run",
+    "needs and dashboard/.env.production is the public dashboard URL; both are un-ignored",
+    "in .gitignore. The `.env.example` templates only name which variables exist, with",
+    "placeholder values — .gitignore never matched them (it lists `.env`, `.env.local`,",
+    "`.env.production`), so they need no negation there.",
+    "Every entry names an exact filename: this list is checked BEFORE every rule, defaults",
+    "included, so a loose pattern here is the one way to re-allow a real `.env`."
   ],
-  "privatePathExceptions": ["(^|/)\\.env\\.test$", "(^|/)dashboard/\\.env\\.production$"],
+  "privatePathExceptions": [
+    "(^|/)\\.env\\.test$",
+    "(^|/)dashboard/\\.env\\.production$",
+    "(^|/)\\.env\\.example$"
+  ],
 
   "_secretPatternsWhy": [
     "Almost everything this repo needs is already a dev-kit default. Only the two",
@@ -53,7 +62,6 @@
     ".github/",
     ".specify/",
     "docs/",
-    ".claude/hooks/",
     ".claude/skills/",
     "scripts/"
   ],
@@ -71,7 +79,6 @@
     "README.md",
     "CLAUDE.md",
     ".env.test",
-    ".claude/settings.json",
     ".privacy-scan.json"
   ],
 

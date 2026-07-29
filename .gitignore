@@ -1,10 +1,9 @@
 # Claude Code local session files. Note `.claude/*` not `.claude/` — git never
-# descends into an excluded directory, so the negations below would not work.
-# Shared project config (hooks, settings, skills) IS tracked; anything personal
-# or machine-specific (settings.local.json, worktrees/, private-symbols.txt) is not.
+# descends into an excluded directory, so the negation below would not work.
+# Project skills are the only shared config left here: settings.json and the git
+# guard moved up to ~/.claude (shared via amajail/dev-kit). Anything personal or
+# machine-specific (settings.local.json, worktrees/, private-symbols.txt) stays out.
 .claude/*
-!.claude/settings.json
-!.claude/hooks/
 !.claude/skills/
 
 # Playwright MCP artifacts — screenshots/snapshots of the running dashboard
