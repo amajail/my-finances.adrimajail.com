@@ -58,18 +58,18 @@ audit-logged). Fall back to `PUT /api/positions/{broker}/{rowKey}` only if MCP i
 - Ask before committing ad-hoc work; speckit/SDD work may be committed as it goes.
 
 ## Privacy
-Enforced, not remembered: `.gitignore` is the privacy boundary, and `scripts/privacy-scan.js`
-runs before your git commands (hook) and on every PR (CI). Rule 1 says what must never ship.
-Canonical rationale: constitution §I.
-- Private docs with real figures go in `docs/private/` — ignored wholesale, so a new one is safe
-  the moment it's created. Never put them elsewhere under `docs/`.
+Enforced, not remembered: `.gitignore` is the privacy boundary; the shared scanner (`amajail/dev-kit`)
+runs on every PR (CI) and before your git commands (hook, registered once in `~/.claude`, not here).
+This repo owns only the rules — change what counts as private in `.privacy-scan.json`, never in
+prose. Rule 1 says what must never ship. Canonical rationale: constitution §I.
+- Private docs with real figures go in `docs/private/` (ignored wholesale) — never elsewhere under `docs/`.
 - A file that must hold credential-shaped test data can carry a `privacy-scan: allow-secrets` comment.
 
 ## When I get something wrong
 If the owner corrects you on a repo convention, offer to run `/claude-md-fix`: it finds the
-sentence that permitted the error and fixes it in the right place (hook, `.gitignore`,
+sentence that permitted the error and fixes it in the right place (`.privacy-scan.json`, `.gitignore`,
 constitution, or here), logging to `docs/claude-md-log.md`. If the same rule appears 3 times in
-that log it must become a hook check or a `.gitignore` entry — or be deleted as unenforceable:
+that log it must become a scanner rule or a `.gitignore` entry — or be deleted as unenforceable:
 prose that has failed three times won't work the fourth. Soft cap: 80 lines, and 3 bold spans —
 if a fourth thing needs bold, one of the three isn't earning it. Adding more than 4 lines means
 deleting something else in the same edit.

@@ -8,7 +8,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@amajail/ui": "github:amajail/amajail-ui#f83141b1c17d93392af66ca16cda85243860f74a",
+    "@amajail/ui": "github:amajail/amajail-ui#v0.1.0",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.1.4",
     "astro": "^6.3.1",

@@ -13,25 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # required: the scan needs the merge base
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-
-      # No `npm ci` — privacy-scan.js is dependency-free so this job stays fast.
-      # This is the fail-closed half of the guard: the Claude Code PreToolUse
-      # hook only sees Claude's git commands, CI sees everything reaching a PR.
-      - name: Scan changed lines for holdings data and credentials
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            RANGE="origin/${{ github.base_ref }}...HEAD"
-          else
-            RANGE="HEAD~1...HEAD"
-          fi
-          echo "Scanning $RANGE"
-          npm run privacy:scan -- --range "$RANGE"
+      # Shared engine, local rules (.privacy-scan.json). This is the fail-closed
+      # half of the guard: the Claude Code PreToolUse hook only sees Claude's git
+      # commands, CI sees everything that reaches a PR. No Node setup and no
+      # `npm ci` — the action uses the runner's Node and the scanner has no deps.
+      - uses: amajail/dev-kit/actions/privacy-scan@v1
 
   test-backend:
     name: Backend tests
