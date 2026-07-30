@@ -192,6 +192,25 @@ class GenerateWeeklyAnalysis extends UseCase {
       portfolioSnapshot = this._snapshotFromSummary(portfolioSummary);
       portfolioTotals = this._totalsFromSummary(portfolioSummary);
 
+      // 2b. Degraded-FX refusal (Slice D). When the MEP provider is down the
+      //     summary carries fxDegraded: ARS valueUsd is null, so every
+      //     USD-derived deterministic input to the analysis (investable /
+      //     administrative / earmarked partitioning, drift, caps, position
+      //     changes) would silently misclassify ARS holdings as worthless.
+      //     No caveat can rescue an analysis built on those inputs, so the
+      //     run refuses before spending macro or LLM tokens and persists a
+      //     failed row that names the outage.
+      if (portfolioSummary && portfolioSummary.fxDegraded) {
+        return await this._persistFailed({
+          targetDate,
+          startedAt,
+          model,
+          portfolioSnapshot,
+          portfolioTotals,
+          errorMessage: `FX degraded: MEP rate unavailable (${portfolioSummary.fxError || 'unknown provider error'}) — refusing to analyze with unreliable ARS→USD figures`,
+        });
+      }
+
       // Feature 013/019: partition the snapshot once, three ways, evaluated in
       // this order per position: (1) earmarked — held at an owner-designated
       // earmarked broker AND computed value > 0 — checked FIRST so a price
@@ -765,7 +784,9 @@ class GenerateWeeklyAnalysis extends UseCase {
       unrealizedPnlArs: num(pnl.ARS),
       costBasisUsd: num(cost.USD),
       costBasisArs: num(cost.ARS),
-      mepRate: num(summary.mepRate),
+      // Slice D: on a degraded-FX summary mepRate is null and MUST stay null
+      // (num() would coerce it to a plausible-looking 0).
+      mepRate: Number.isFinite(Number(summary.mepRate)) && summary.mepRate !== null ? Number(summary.mepRate) : null,
       mepRateAsOf: summary.mepRateAsOf || null,
     };
   }

@@ -39,29 +39,48 @@ describe('GetPortfolioSummary Use Case', () => {
     expect(result).toHaveProperty('mepRate');
     expect(result.mepRate).toBe(1000);
     expect(result.mepRateAsOf).toBe('2026-05-14');
+    expect(result.fxDegraded).toBe(false);
+    expect(result.fxError).toBeNull();
   });
 
-  it('should fall back to mepRate=1 when the MEP provider fails', async () => {
+  it('should report an explicit degraded state when the MEP provider fails', async () => {
     const broker = new Broker({ id: 'broker2', displayName: 'IOL', type: 'broker' });
-    const position = new Position({
+    const usdPosition = new Position({
       brokerId: 'broker2', assetType: 'stock', symbol: 'MSFT',
       quantity: 5, averageCost: 300, currency: 'USD', currentPrice: 320,
+    });
+    const arsPosition = new Position({
+      brokerId: 'broker2', assetType: 'stock', symbol: 'GGAL',
+      quantity: 10, averageCost: 4000, currency: 'ARS', currentPrice: 5000,
     });
 
     const useCase = new GetPortfolioSummary({
       brokerRepository: { findAll: jest.fn().mockResolvedValue([broker]) },
-      positionRepository: { findAll: jest.fn().mockResolvedValue([position]) },
+      positionRepository: { findAll: jest.fn().mockResolvedValue([usdPosition, arsPosition]) },
       priceRepository: { getRecent: jest.fn().mockResolvedValue([]) },
       mepProvider: failingMepProvider(),
     });
 
     const result = await useCase.execute({});
 
-    expect(result.mepRate).toBe(1);
+    expect(result.fxDegraded).toBe(true);
+    expect(result.fxError).toMatch(/upstream timeout/);
+    // No 1:1 pretending: the rate and every USD-derived figure are null.
+    expect(result.mepRate).toBeNull();
     expect(result.mepRateAsOf).toBeNull();
+    expect(result.grandTotalUsd).toBeNull();
+    expect(result.totalByBroker.broker2.usdEquivalent).toBeNull();
+    // Native-currency figures survive intact.
+    expect(result.totalByCurrency.ARS).toBe(50000);
+    expect(result.totalByCurrency.USD).toBe(1600);
+    expect(result.totalByBroker.broker2.native).toEqual({ USD: 1600, ARS: 50000 });
+    // Snapshot: ARS valueUsd unknowable → null; USD untouched.
+    const bySymbol = Object.fromEntries(result.positions.map((p) => [p.symbol, p]));
+    expect(bySymbol.GGAL.valueUsd).toBeNull();
+    expect(bySymbol.MSFT.valueUsd).toBe(1600);
   });
 
-  it('should fall back to mepRate=1 when no MEP provider is injected at all', async () => {
+  it('should report the degraded state when no MEP provider is injected at all', async () => {
     const broker = new Broker({ id: 'broker1', displayName: 'Galicia', type: 'broker' });
 
     const useCase = new GetPortfolioSummary({
@@ -73,8 +92,25 @@ describe('GetPortfolioSummary Use Case', () => {
 
     const result = await useCase.execute({});
 
-    expect(result.mepRate).toBe(1);
+    expect(result.fxDegraded).toBe(true);
+    expect(result.fxError).toMatch(/no MEP provider configured/);
+    expect(result.mepRate).toBeNull();
     expect(result.mepRateAsOf).toBeNull();
+  });
+
+  it('should report the degraded state when the provider returns an unusable rate', async () => {
+    const useCase = new GetPortfolioSummary({
+      brokerRepository: { findAll: jest.fn().mockResolvedValue([]) },
+      positionRepository: { findAll: jest.fn().mockResolvedValue([]) },
+      priceRepository: { getRecent: jest.fn().mockResolvedValue([]) },
+      mepProvider: mockMepProvider({ rate: 0, asOf: '2026-05-14' }),
+    });
+
+    const result = await useCase.execute({});
+
+    expect(result.fxDegraded).toBe(true);
+    expect(result.fxError).toMatch(/no usable rate/);
+    expect(result.mepRate).toBeNull();
   });
 
   it('should include lastPriceRefreshAt when a successful quote exists', async () => {

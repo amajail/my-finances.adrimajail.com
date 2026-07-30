@@ -42,24 +42,38 @@ class GetPortfolioSummary extends UseCase {
     // Fetch the MEP rate from the configured provider (dólar bolsa via
     // api.argentinadatos.com). The legacy `mep_rate` portfolioSettings row
     // is no longer consulted; if a stale row still exists in the table it is
-    // simply ignored. On provider failure we fall back to mepRate=1 (which
-    // makes ARS positions value 1:1 to USD — obviously wrong, but matches
-    // the historical behavior of "no usable MEP available, surface mepRate=1
-    // in the output so the caller can see the degradation").
-    let mepRate = 1;
+    // simply ignored.
+    //
+    // Degraded-FX contract (Slice D): on provider failure (or no provider)
+    // the summary NEVER pretends ARS:USD is 1:1. Instead it carries
+    // `fxDegraded: true` + `fxError`, reports `mepRate: null`, and every
+    // USD-derived figure that would need the missing rate (`grandTotalUsd`,
+    // per-broker `usdEquivalent`, ARS positions' `valueUsd`) is null — a
+    // null total cannot be mistaken for healthy data, while a plausible 1:1
+    // number can. Native-currency figures stay intact. No last-known-good
+    // rate is stored anywhere, so none is invented here.
+    let mepRate = null;
     let mepRateAsOf = null;
+    let fxDegraded = true;
+    let fxError = null;
     if (this._mepProvider) {
       try {
         const reading = await this._mepProvider.getLatest();
         if (reading && Number.isFinite(reading.rate) && reading.rate > 0) {
           mepRate = reading.rate;
           mepRateAsOf = reading.asOf || null;
+          fxDegraded = false;
+        } else {
+          fxError = 'MEP provider returned no usable rate';
+          logger.warn('MEP provider returned no usable rate; summary is FX-degraded');
         }
       } catch (err) {
-        logger.warn('MEP provider failed, falling back to mepRate=1', { errorType: err && err.name });
+        fxError = `MEP provider failed: ${(err && err.message) || String(err)}`;
+        logger.warn('MEP provider failed; summary is FX-degraded', { errorType: err && err.name });
       }
     } else {
-      logger.warn('No MEP provider configured, using default mepRate=1');
+      fxError = 'no MEP provider configured';
+      logger.warn('No MEP provider configured; summary is FX-degraded');
     }
 
     // Get last price refresh timestamp
@@ -79,20 +93,34 @@ class GetPortfolioSummary extends UseCase {
     // Build portfolio
     const portfolio = new Portfolio(positions, brokers);
 
-    // Calculate summary
-    const calculator = new PortfolioCalculator(portfolio, mepRate);
+    // Calculate summary. PortfolioCalculator requires a positive rate, so on
+    // the degraded path a placeholder of 1 keeps the native-currency math
+    // running — every figure that placeholder touches is nulled out below,
+    // so the 1:1 value never leaves this method.
+    const calculator = new PortfolioCalculator(portfolio, fxDegraded ? 1 : mepRate);
     const summary = calculator.summary();
+    if (fxDegraded) {
+      summary.grandTotalUsd = null;
+      summary.totalByBroker = Object.fromEntries(
+        Object.entries(summary.totalByBroker).map(([brokerId, t]) => [
+          brokerId,
+          { ...t, usdEquivalent: null },
+        ])
+      );
+    }
 
     // Per-position snapshot (feature 006). GenerateWeeklyAnalysis consumes this
     // via _snapshotFromSummary to capture the week's holdings and compute exact
     // week-over-week position changes. Shape must match the fields that
     // _snapshotFromSummary reads. valueUsd converts the native market value to
     // USD using the MEP rate (ARS only; other currencies are treated as USD).
+    // When FX is degraded an ARS position's valueUsd is null (unknowable), not
+    // a 1:1 guess.
     const positionSnapshot = positions.map((p) => {
       const mv = p.marketValue();
       const valueUsd = (mv === null || mv === undefined)
         ? 0
-        : (p.currency === 'ARS' ? mv / mepRate : mv);
+        : (p.currency === 'ARS' ? (fxDegraded ? null : mv / mepRate) : mv);
       return {
         brokerId: p.brokerId.value,
         assetType: p.assetType,
@@ -111,14 +139,18 @@ class GetPortfolioSummary extends UseCase {
       };
     });
 
-    logger.info('Portfolio summary generated', { mepRate, mepRateAsOf, positionCount: positions.length });
+    logger.info('Portfolio summary generated', { mepRate, mepRateAsOf, fxDegraded, positionCount: positions.length });
 
     return {
       ...summary,
       positions: positionSnapshot,
       lastPriceRefreshAt,
       mepRate,
-      mepRateAsOf
+      mepRateAsOf,
+      // Degraded-FX signal, consumed by GenerateWeeklyAnalysis (refuses) and
+      // by the monthly-close routine (M1) per dev-kit docs/mcp-contracts.md.
+      fxDegraded,
+      fxError
     };
   }
 }
