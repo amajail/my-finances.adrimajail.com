@@ -17,11 +17,12 @@ Machine-specific facts (real resource names, local paths) are in @CLAUDE.local.m
 - Storage is Azure Table via `@azure/data-tables` — not SQLite/Postgres (canonical: constitution Tech Stack).
 
 ## Tables
-`portfolioBrokers`, `portfolioPositions`, `portfolioSettings`, `portfolioPrices`. Positions are
-keyed by `partitionKey = brokerId`, `rowKey = ${assetType}__${symbol}` (`Position.id()` in
-`src/domain/entities/Position.js:239`). Strategic-plan tables and the weekly-analysis instructions
-document are seeded but not consumed by the app — if a task touches either, read
-`docs/architecture/plan-tables.md` first.
+All 8 created in `src/database/AzureTableDatabase.js`: `portfolioBrokers`, `portfolioPositions`,
+`portfolioSettings`, `portfolioPrices`, `portfolioAnalysis`, `portfolioOrders`,
+`portfolioInstructionsHistory`, `portfolioAudit`. Positions are keyed by `partitionKey = brokerId`,
+`rowKey = ${assetType}__${symbol}` (`Position.id()` in `src/domain/entities/Position.js:239`).
+Strategic-plan tables and the weekly-analysis instructions document are seeded but not consumed by
+the app — if a task touches either, read `docs/architecture/plan-tables.md` first.
 
 ## Position schema (key fields)
 `brokerId`, `assetType` (stock|etf|bond|cedear|cash|deposit|bopreal|lecap|on), `symbol`,

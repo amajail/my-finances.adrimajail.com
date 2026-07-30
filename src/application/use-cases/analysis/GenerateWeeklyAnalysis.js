@@ -34,7 +34,11 @@ const {
   LLMRequestError,
 } = require('../../../infrastructure/llm/AnthropicLLMClient');
 
-const TOOL_SCHEMA = require('../../../../specs/002-weekly-rebalance-analysis/contracts/submit-analysis-tool.json');
+// The runtime copy of the submit_analysis tool schema lives here in src/ so
+// production never depends on the specs/ tree being deployed. The original at
+// specs/002-weekly-rebalance-analysis/contracts/submit-analysis-tool.json
+// stays as documentation; schema changes must land in BOTH copies.
+const TOOL_SCHEMA = require('./submit-analysis-tool.json');
 
 // Feature 005 retired the `analysis.promptVersion` template-file selector
 // (FR-019). The instructions document is now the single source of the system
@@ -191,6 +195,25 @@ class GenerateWeeklyAnalysis extends UseCase {
       portfolioSummary = await this._getPortfolioSummary.execute({});
       portfolioSnapshot = this._snapshotFromSummary(portfolioSummary);
       portfolioTotals = this._totalsFromSummary(portfolioSummary);
+
+      // 2b. Degraded-FX refusal (Slice D). When the MEP provider is down the
+      //     summary carries fxDegraded: ARS valueUsd is null, so every
+      //     USD-derived deterministic input to the analysis (investable /
+      //     administrative / earmarked partitioning, drift, caps, position
+      //     changes) would silently misclassify ARS holdings as worthless.
+      //     No caveat can rescue an analysis built on those inputs, so the
+      //     run refuses before spending macro or LLM tokens and persists a
+      //     failed row that names the outage.
+      if (portfolioSummary && portfolioSummary.fxDegraded) {
+        return await this._persistFailed({
+          targetDate,
+          startedAt,
+          model,
+          portfolioSnapshot,
+          portfolioTotals,
+          errorMessage: `FX degraded: MEP rate unavailable (${portfolioSummary.fxError || 'unknown provider error'}) — refusing to analyze with unreliable ARS→USD figures`,
+        });
+      }
 
       // Feature 013/019: partition the snapshot once, three ways, evaluated in
       // this order per position: (1) earmarked — held at an owner-designated
@@ -765,7 +788,9 @@ class GenerateWeeklyAnalysis extends UseCase {
       unrealizedPnlArs: num(pnl.ARS),
       costBasisUsd: num(cost.USD),
       costBasisArs: num(cost.ARS),
-      mepRate: num(summary.mepRate),
+      // Slice D: on a degraded-FX summary mepRate is null and MUST stay null
+      // (num() would coerce it to a plausible-looking 0).
+      mepRate: Number.isFinite(Number(summary.mepRate)) && summary.mepRate !== null ? Number(summary.mepRate) : null,
       mepRateAsOf: summary.mepRateAsOf || null,
     };
   }
