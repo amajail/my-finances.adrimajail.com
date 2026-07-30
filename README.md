@@ -17,25 +17,26 @@ multiple brokers.
   `GenerateWeeklyAnalysis`, which asks Claude (Anthropic SDK, default
   `claude-opus-4-7`, configurable via `portfolioSettings`) for a written
   strategic analysis + structured buy/sell orders. Inputs: current portfolio,
-  prior week's analysis (narrative + portfolio snapshot), Argentina riesgo
-  país (via `api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo`),
-  and the owner's strategic framework (stored as `analysis.strategicFrameworkV1`
-  in `portfolioSettings` — NOT in the repo). Output persists to two new
-  tables (`portfolioAnalysis`, `portfolioOrders`) and renders on the dashboard
-  at `/analysis` (list) + `/analysis-detail?date=YYYY-MM-DD` (detail).
-  Requires `ANTHROPIC_API_KEY` in Function App settings. Full design lives
-  under `specs/002-weekly-rebalance-analysis/`; local-dev recipe in that
-  feature's `quickstart.md`. The prompt template at
-  `src/application/use-cases/analysis/prompts/weekly-rebalance-v1.md` is
-  generic; the owner's framework content (bucket→symbol mappings, target
-  allocations, deploy priorities, standing directives) is injected at
-  runtime from settings to keep personal data out of git.
-- **Editable strategic framework**: the framework prompt is editable from
-  the dashboard at `/framework` with append-only version history (every save
-  becomes an immutable row in `portfolioFrameworkHistory`; restore creates
-  a new entry, never mutates). Each weekly analysis is linked to the exact
-  framework version that produced it. Full design in
-  `specs/004-editable-strategic-framework/`.
+  prior week's analysis, a macro context panel (riesgo país among nine
+  indicators, via `api.argentinadatos.com` and friends), and the owner's
+  instructions document (stored in `portfolioSettings` — NOT in the repo),
+  used verbatim as the system prompt. Output persists to `portfolioAnalysis`
+  + `portfolioOrders` and renders on the dashboard at `/analysis` (list) +
+  `/analysis-detail?date=YYYY-MM-DD` (detail). If the MEP (dólar bolsa) rate
+  provider is down, the portfolio summary reports `fxDegraded` with USD
+  aggregates nulled — never a silent 1:1 — and the weekly run refuses with a
+  failed row instead of analyzing unreliable figures. Requires
+  `ANTHROPIC_API_KEY` in Function App settings. Full design lives under
+  `specs/002-weekly-rebalance-analysis/`; local-dev recipe in that feature's
+  `quickstart.md`.
+- **Editable analysis instructions**: the complete system prompt is one
+  owner-edited instructions document, editable from the dashboard at
+  `/instructions` with append-only version history (every save becomes an
+  immutable row in `portfolioInstructionsHistory`; restore creates a new
+  entry, never mutates). Each weekly analysis is linked to the exact
+  instructions version that produced it. Full design in
+  `specs/005-editable-metaprompt/` (which retired the `/framework` page and
+  prompt-template file of `specs/004-editable-strategic-framework/`).
 
 ## Develop
 
