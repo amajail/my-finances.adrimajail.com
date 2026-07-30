@@ -33,6 +33,21 @@ jobs:
           PUBLIC_FUNCTION_KEY: ${{ secrets.PUBLIC_FUNCTION_KEY }}
         run: npm run build
 
+      # The route rule is the ONLY thing keeping this site private, and the
+      # function key is compiled into the bundle — so a missing config file does
+      # not degrade gracefully, it publishes the app and the key with it. Astro
+      # only copies public/ into dist/, so this is one `git mv` away from
+      # silently breaking. Fail loudly instead. (Ported from my-expenses, where
+      # exactly this failure already happened once.)
+      - name: Verify the auth config shipped
+        working-directory: dashboard
+        run: |
+          test -f dist/staticwebapp.config.json \
+            || { echo "::error::dist/staticwebapp.config.json missing — the site would deploy PUBLIC"; exit 1; }
+          grep -q '"allowedRoles"' dist/staticwebapp.config.json \
+            || { echo "::error::config has no allowedRoles — the site would deploy PUBLIC"; exit 1; }
+          echo "auth config present:"; cat dist/staticwebapp.config.json
+
       - name: Deploy
         uses: Azure/static-web-apps-deploy@v1
         with:
