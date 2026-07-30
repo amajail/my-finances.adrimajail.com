@@ -1,6 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "Documentation copy. The runtime copy production requires lives at src/application/use-cases/analysis/submit-analysis-tool.json — change both together (kept in sync by tests/unit/application/use-cases/analysis/toolSchemaSync.test.js).",
   "name": "submit_analysis",
   "description": "Submit the structured result of the weekly portfolio rebalance analysis. The summary and markdownBody are the human-readable narrative; orders is the machine-actionable list of buy/sell suggestions. All fields are required.",
   "input_schema": {

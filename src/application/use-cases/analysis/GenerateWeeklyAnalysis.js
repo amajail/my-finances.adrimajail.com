@@ -34,7 +34,11 @@ const {
   LLMRequestError,
 } = require('../../../infrastructure/llm/AnthropicLLMClient');
 
-const TOOL_SCHEMA = require('../../../../specs/002-weekly-rebalance-analysis/contracts/submit-analysis-tool.json');
+// The runtime copy of the submit_analysis tool schema lives here in src/ so
+// production never depends on the specs/ tree being deployed. The original at
+// specs/002-weekly-rebalance-analysis/contracts/submit-analysis-tool.json
+// stays as documentation; schema changes must land in BOTH copies.
+const TOOL_SCHEMA = require('./submit-analysis-tool.json');
 
 // Feature 005 retired the `analysis.promptVersion` template-file selector
 // (FR-019). The instructions document is now the single source of the system
