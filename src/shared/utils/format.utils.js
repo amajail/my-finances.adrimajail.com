@@ -2,53 +2,19 @@
  * Formatting Utility Functions
  *
  * Provides formatting utilities for display, logging, and output.
+ *
+ * Money-related formatting (currency, numbers, percentages, symbols) comes
+ * from @amajail/money — the family's single es-AR implementation (dev-kit
+ * packages/money, family roadmap Slice E). Only the non-money helpers are
+ * implemented here.
  */
 
-/**
- * Format number as currency
- * @param {number} amount - Amount to format
- * @param {Object} options - Format options
- * @returns {string} Formatted currency string
- */
-function formatCurrency(amount, options = {}) {
-  const {
-    currency = 'ARS',
-    showSymbol = true,
-    decimals = 2
-  } = options;
-
-  const formatted = new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-  }).format(amount);
-
-  return showSymbol ? formatted : formatted.replace(/[^\d.,]/g, '').trim();
-}
-
-/**
- * Format number with thousands separator
- * @param {number} num - Number to format
- * @param {number} decimals - Number of decimal places (default: 0)
- * @returns {string} Formatted number string
- */
-function formatNumber(num, decimals = 0) {
-  return new Intl.NumberFormat('es-AR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-  }).format(num);
-}
-
-/**
- * Format percentage with symbol
- * @param {number} value - Value to format as percentage
- * @param {number} decimals - Number of decimal places (default: 2)
- * @returns {string} Formatted percentage
- */
-function formatPercentage(value, decimals = 2) {
-  return `${value.toFixed(decimals)}%`;
-}
+const {
+  formatCurrency,
+  formatNumber,
+  formatPercentage,
+  getCurrencySymbol,
+} = require('@amajail/money');
 
 /**
  * Format file size in human-readable format
@@ -91,23 +57,6 @@ function padString(str, length, padChar = ' ', padLeft = false) {
 
   const padding = padChar.repeat(length - strLen);
   return padLeft ? padding + str : str + padding;
-}
-
-/**
- * Format currency code to symbol
- * @param {string} currencyCode - Currency code
- * @returns {string} Currency symbol
- */
-function getCurrencySymbol(currencyCode) {
-  const symbols = {
-    'ARS': '$',
-    'PES': '$',
-    'USD': 'US$',
-    'DOL': 'US$',
-    'EUR': '€',
-    'BRL': 'R$'
-  };
-  return symbols[currencyCode] || currencyCode;
 }
 
 /**
