@@ -19,6 +19,7 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
+    "@amajail/money": "https://github.com/amajail/dev-kit/releases/download/money-v0.1.0/amajail-money-0.1.0.tgz",
     "@anthropic-ai/sdk": "^0.96.0",
     "@azure/data-tables": "^13.3.2",
     "@azure/functions": "^4.16.2",
