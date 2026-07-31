@@ -1,5 +1,13 @@
-export const fmtUsd = n => n == null ? '—' : `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-export const fmtArs = n => n == null ? '—' : `$${Math.round(Number(n)).toLocaleString('es-AR')}`;
+import { amountsHidden } from '@amajail/ui/privacy';
+
+// Privacy mode (the header eye, Layout.astro): while amounts are hidden the
+// two money formatters return a fixed-width mask — same length for every
+// value, so digit count leaks nothing. Percentages deliberately stay real.
+// Sites that print money without these formatters mask through maskable().
+export const maskable = text => amountsHidden() ? '••••••' : text;
+
+export const fmtUsd = n => n == null ? '—' : amountsHidden() ? '$••••••' : `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+export const fmtArs = n => n == null ? '—' : amountsHidden() ? '$••••••' : `$${Math.round(Number(n)).toLocaleString('es-AR')}`;
 export const fmtPct = n => n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 export const pnlClass = n => n == null ? 'pos-neutral' : n >= 0 ? 'pos-positive' : 'pos-negative';
 

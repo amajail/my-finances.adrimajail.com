@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { fmtUsd, fmtArs, fmtPct, pnlClass, brokerTypeLabel } from './format.js';
+import { fmtUsd, fmtArs, fmtPct, pnlClass, brokerTypeLabel, maskable } from './format.js';
 import { marketValue, costBasis } from './pricing.js';
 
 // Per-broker positions table state: rows + active sort + active asset filter.
@@ -44,8 +44,8 @@ function brokerRowHtml({ p, mv, pnl, pct }) {
   return `
     <tr class="border-t border-[var(--color-border)]" data-asset-type="${p.assetType}">
       <td class="px-4 py-2"><span class="font-semibold">${p.symbol}</span> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
-      <td class="px-4 py-2 text-right num-mono">${mv != null ? mv.toFixed(0) + ' ' + p.currency : '—'}</td>
-      <td class="px-4 py-2 text-right num-mono ${pnlClass(pnl)}">${pnl != null ? pnl.toFixed(0) : '—'}</td>
+      <td class="px-4 py-2 text-right num-mono">${mv != null ? maskable(mv.toFixed(0) + ' ' + p.currency) : '—'}</td>
+      <td class="px-4 py-2 text-right num-mono ${pnlClass(pnl)}">${pnl != null ? maskable(pnl.toFixed(0)) : '—'}</td>
       <td class="px-4 py-2 text-right num-mono ${pnlClass(pct)}">${fmtPct(pct)}</td>
     </tr>
   `;

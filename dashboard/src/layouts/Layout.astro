@@ -55,21 +55,31 @@ const navItems = [
           ))}
         </ul>
 
-        <!-- Mobile nav toggle: below lg. ≥44px touch target. -->
-        <button
-          id="nav-toggle"
+        <div class="flex items-center gap-1">
+          <!-- Privacy eye: amounts start masked on every visit; this reveals them. -->
+          <button
+            id="privacy-toggle"
+            type="button"
+            class="inline-flex h-11 w-11 lg:h-9 lg:w-9 items-center justify-center rounded-md border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)]"
+            aria-label="Show amounts"
+          ></button>
+
+          <!-- Mobile nav toggle: below lg. ≥44px touch target. -->
+          <button
+            id="nav-toggle"
           type="button"
-          class="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)]"
-          aria-label="Toggle navigation menu"
-          aria-controls="mobile-nav"
-          aria-expanded="false"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
+            class="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)]"
+            aria-label="Toggle navigation menu"
+            aria-controls="mobile-nav"
+            aria-expanded="false"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+        </div>
       </nav>
 
       <!-- Mobile menu panel: hidden by default and always hidden at lg+. -->
@@ -96,6 +106,11 @@ const navItems = [
     </main>
 
     <script>
+      import { bindPrivacyToggle } from '@amajail/ui/privacy';
+      // Pages render once after fetch, so a toggle just reloads: the reveal
+      // carries across that one programmatic reload, manual reloads re-mask.
+      bindPrivacyToggle(document.getElementById('privacy-toggle'), { reloadOnToggle: true });
+
       const btn = document.getElementById('nav-toggle');
       const panel = document.getElementById('mobile-nav');
       if (btn && panel) {

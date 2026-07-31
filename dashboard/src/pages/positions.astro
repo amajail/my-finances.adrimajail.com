@@ -90,6 +90,7 @@ import Layout from '../layouts/Layout.astro';
 
 <script>
   import { api } from '../lib/api.js';
+  import { maskable } from '../lib/format.js';
   import { attempt, loadInto } from '../lib/load.js';
 
   let allPositions = [];
@@ -158,7 +159,7 @@ import Layout from '../layouts/Layout.astro';
           return `
             <tr class="border-t border-[var(--color-border)]">
               <td class="px-4 py-2"><strong>${p.symbol}</strong> <span class="text-xs text-[var(--color-muted)]">${p.assetType}</span></td>
-              <td class="px-4 py-2 text-right num-mono">${p.quantity}</td>
+              <td class="px-4 py-2 text-right num-mono">${maskable(String(p.quantity))}</td>
               <td class="px-4 py-2 text-right num-mono">${p.averageCost.toFixed(2)}</td>
               <td class="px-4 py-2 text-right num-mono price-cell" data-broker="${p.brokerId}" data-rowkey="${p.id}">${p.currentPrice != null ? p.currentPrice.toFixed(2) : '—'}</td>
               <td class="px-4 py-2 text-right">${p.currency}</td>
