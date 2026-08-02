@@ -5,7 +5,7 @@
 
 import { api } from '../api.js';
 import { attempt } from '../load.js';
-import { escapeHtml } from '../format.js';
+import { escapeHtml, maskable } from '../format.js';
 
 function show(el) { el.classList.remove('hidden'); }
 
@@ -28,7 +28,7 @@ export function renderOrders(detail, date, reload) {
         <td class="px-4 py-2">${escapeHtml(o.broker)}</td>
         <td class="px-4 py-2 num-mono">${escapeHtml(o.symbol)}</td>
         <td class="px-4 py-2"><span class="badge ${o.side === 'buy' ? 'badge-success' : 'badge-pending'}">${escapeHtml(o.side)}</span></td>
-        <td class="px-4 py-2 text-right num-mono">${escapeHtml(String(o.quantity))}</td>
+        <td class="px-4 py-2 text-right num-mono">${maskable(escapeHtml(String(o.quantity)))}</td>
         <td class="px-4 py-2">${escapeHtml(o.conviction)}</td>
         <td class="px-4 py-2">
           <select class="exec-status text-sm bg-[var(--color-surface-2)] rounded px-1 py-0.5" data-index="${o.index}">${sel}</select>

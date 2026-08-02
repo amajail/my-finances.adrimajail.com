@@ -3,7 +3,7 @@
 // detail page. Extracted from analysis-detail.astro (was one big inline
 // <script>) with no behavior change.
 
-import { escapeHtml, fmtNumber } from '../format.js';
+import { escapeHtml, fmtNumber, maskable } from '../format.js';
 
 function show(el) { el.classList.remove('hidden'); }
 
@@ -57,12 +57,13 @@ export function renderMacro(macro) {
 
 export function renderTotals(t) {
   if (!t) return;
+  // Portfolio totals mask under privacy mode; the MEP rate is public data.
   const rows = [
-    { label: 'Total USD', val: `USD ${fmtNumber(t.totalUsd)}` },
-    { label: 'Total ARS', val: `ARS ${fmtNumber(t.totalArs)}` },
-    { label: 'Grand total (USD)', val: `USD ${fmtNumber(t.grandTotalUsd)}` },
-    { label: 'Unrealized P&L USD', val: `USD ${fmtNumber(t.unrealizedPnlUsd)}` },
-    { label: 'Unrealized P&L ARS', val: `ARS ${fmtNumber(t.unrealizedPnlArs)}` },
+    { label: 'Total USD', val: `USD ${maskable(fmtNumber(t.totalUsd))}` },
+    { label: 'Total ARS', val: `ARS ${maskable(fmtNumber(t.totalArs))}` },
+    { label: 'Grand total (USD)', val: `USD ${maskable(fmtNumber(t.grandTotalUsd))}` },
+    { label: 'Unrealized P&L USD', val: `USD ${maskable(fmtNumber(t.unrealizedPnlUsd))}` },
+    { label: 'Unrealized P&L ARS', val: `ARS ${maskable(fmtNumber(t.unrealizedPnlArs))}` },
     { label: 'MEP rate', val: `${fmtNumber(t.mepRate)}${t.mepRateAsOf ? ' · ' + escapeHtml(t.mepRateAsOf) : ''}` },
   ];
   document.getElementById('totals-grid').innerHTML = rows.map((r) => `

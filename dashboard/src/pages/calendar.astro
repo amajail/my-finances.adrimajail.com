@@ -43,7 +43,7 @@ import Layout from '../layouts/Layout.astro';
 <script>
   import { api } from '../lib/api.js';
   import { loadInto } from '../lib/load.js';
-  import { escapeHtml, fmtUsd } from '../lib/format.js';
+  import { escapeHtml, fmtUsd, maskable } from '../lib/format.js';
 
   function show(el) { el.classList.remove('hidden'); }
 
@@ -61,7 +61,7 @@ import Layout from '../layouts/Layout.astro';
   function amountLabel(e) {
     if (typeof e.amountUsd === 'number') return fmtUsd(e.amountUsd);
     if (typeof e.amountNative === 'number' && e.currency) {
-      return `${e.amountNative.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${escapeHtml(e.currency)}`;
+      return `${maskable(e.amountNative.toLocaleString('en-US', { maximumFractionDigits: 2 }))} ${escapeHtml(e.currency)}`;
     }
     return '—';
   }

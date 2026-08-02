@@ -163,6 +163,9 @@ function plotGeometry(series, w, h, pad = {}) {
  */
 function lineChartSvg(series, opts = {}) {
   const w = opts.w || 230, h = opts.h || 112;
+  // opts.fmtValue overrides how values print (privacy mode passes a mask for
+  // money charts); the line shape itself always stays real.
+  const fv = opts.fmtValue || fmt;
   if (!series.length || series.every((d) => d.value == null)) {
     return `<svg viewBox="0 0 ${w} ${h}" class="w-full"><text x="${w / 2}" y="${h / 2}" text-anchor="middle" font-size="10" fill="${C.muted}">no data</text></svg>`;
   }
@@ -186,7 +189,7 @@ function lineChartSvg(series, opts = {}) {
     const x = g.xs(i), y = g.ys(pt.value);
     d += `${started ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
     started = true;
-    circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${C.accent}"><title>${fmt(pt.value)}${opts.unit ? ' ' + opts.unit : ''}${pt.asOf ? ' · as of ' + esc(pt.asOf) : ''} (${esc(pt.date)})</title></circle>`;
+    circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${C.accent}"><title>${fv(pt.value)}${opts.unit ? ' ' + opts.unit : ''}${pt.asOf ? ' · as of ' + esc(pt.asOf) : ''} (${esc(pt.date)})</title></circle>`;
   });
 
   const grid = `<line x1="${g.padL}" y1="${top.toFixed(1)}" x2="${w - g.padR}" y2="${top.toFixed(1)}" stroke="${C.grid}" stroke-width="1" />`
@@ -195,8 +198,8 @@ function lineChartSvg(series, opts = {}) {
   return `<svg viewBox="0 0 ${w} ${h}" class="w-full">`
     + bands
     + grid
-    + `<text x="${g.padL}" y="${(top - 3).toFixed(1)}" font-size="8" fill="${C.muted}">${fmt(g.sc.max)}</text>`
-    + `<text x="${g.padL}" y="${(bot + 9).toFixed(1)}" font-size="8" fill="${C.muted}">${fmt(g.sc.min)}</text>`
+    + `<text x="${g.padL}" y="${(top - 3).toFixed(1)}" font-size="8" fill="${C.muted}">${fv(g.sc.max)}</text>`
+    + `<text x="${g.padL}" y="${(bot + 9).toFixed(1)}" font-size="8" fill="${C.muted}">${fv(g.sc.min)}</text>`
     + `<path d="${d}" fill="none" stroke="${C.accent}" stroke-width="1.5" />`
     + circles
     + `<text x="${g.padL}" y="${h - 3}" font-size="8" fill="${C.muted}">${esc(first)}</text>`
@@ -216,22 +219,25 @@ function dualAxisSvg(left, right, opts = {}) {
   const has = (s) => s && s.some((d) => d && d.value != null);
   const gL = has(left) ? plotGeometry(left, w, h, pad) : null;
   const gR = has(right) ? plotGeometry(right, w, h, pad) : null;
+  // Per-side value formatters (privacy mode masks the money side(s) only).
+  const fvL = opts.fmtValueLeft || fmt;
+  const fvR = opts.fmtValueRight || fmt;
 
-  const draw = (series, g, color) => {
+  const draw = (series, g, color, fv) => {
     if (!g) return '';
     let d = '', started = false, circles = '';
     series.forEach((pt, i) => {
       if (pt.value == null) { started = false; return; }
       const x = g.xs(i), y = g.ys(pt.value);
       d += `${started ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; started = true;
-      circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${color}"><title>${fmt(pt.value)}${pt.asOf ? ' · as of ' + esc(pt.asOf) : ''} (${esc(pt.date)})</title></circle>`;
+      circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${color}"><title>${fv(pt.value)}${pt.asOf ? ' · as of ' + esc(pt.asOf) : ''} (${esc(pt.date)})</title></circle>`;
     });
     return `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.5" />${circles}`;
   };
   const tickVals = (g) => [g.sc.max, (g.sc.max + g.sc.min) / 2, g.sc.min];
-  const ticks = (g, color, side) => (g ? tickVals(g).map((v) => {
+  const ticks = (g, color, side, fv) => (g ? tickVals(g).map((v) => {
     const x = side === 'left' ? pad.l - 4 : w - pad.r + 4;
-    return `<text x="${x}" y="${(g.ys(v) + 3).toFixed(1)}" text-anchor="${side === 'left' ? 'end' : 'start'}" font-size="9" fill="${color}">${fmt(v)}</text>`;
+    return `<text x="${x}" y="${(g.ys(v) + 3).toFixed(1)}" text-anchor="${side === 'left' ? 'end' : 'start'}" font-size="9" fill="${color}">${fv(v)}</text>`;
   }).join('') : '');
 
   const gGrid = gL || gR;
@@ -246,8 +252,8 @@ function dualAxisSvg(left, right, opts = {}) {
     + grid
     + `<text x="${pad.l}" y="14" font-size="10" fill="${C.accent}">${esc(opts.leftLabel || 'left')}</text>`
     + `<text x="${w - pad.r}" y="14" text-anchor="end" font-size="10" fill="${C.accent2}">${esc(opts.rightLabel || 'right')}</text>`
-    + draw(left, gL, C.accent) + draw(right, gR, C.accent2)
-    + ticks(gL, C.accent, 'left') + ticks(gR, C.accent2, 'right')
+    + draw(left, gL, C.accent, fvL) + draw(right, gR, C.accent2, fvR)
+    + ticks(gL, C.accent, 'left', fvL) + ticks(gR, C.accent2, 'right', fvR)
     + xdates
     + `</svg>`;
 }
