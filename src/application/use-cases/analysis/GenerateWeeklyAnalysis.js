@@ -31,6 +31,7 @@ const logger = require('../../../shared/logging');
 const {
   CostCapExceededError,
   LLMSchemaValidationError,
+  LLMTruncationError,
   LLMRequestError,
 } = require('../../../infrastructure/llm/AnthropicLLMClient');
 
@@ -389,16 +390,26 @@ class GenerateWeeklyAnalysis extends UseCase {
         });
       } catch (err) {
         // Feature 006: all capture buffers ride onto the failed row (FR-014).
+        // The failed submit call's own usage (attached by the client, summed
+        // across retries) rides along too, so the row can answer "did we hit
+        // the output cap?" — the 2026-08-14 failure was undiagnosable without it.
+        const llmUsage = err && err.usage ? err.usage : null;
+        const llmDetail = llmUsage
+          ? ` [attempts=${err.attempts || 1}, stop_reason=${err.stopReason || 'n/a'}, tokensOut=${llmUsage.outputTokens}]`
+          : '';
         const captured = {
           targetDate, startedAt, model, portfolioSnapshot, administrativePositions, earmarkedPositions, duplications,
-          macroContext, macroUsage, portfolioTotals, positionChanges, macroChanges,
+          macroContext, macroUsage, llmUsage, portfolioTotals, positionChanges, macroChanges,
           riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
         };
         if (err instanceof CostCapExceededError) {
           return await this._persistFailed({ ...captured, errorMessage: `cost cap exceeded: ${err.message}` });
         }
+        if (err instanceof LLMTruncationError) {
+          return await this._persistFailed({ ...captured, errorMessage: `LLM output truncated: ${err.message}${llmDetail}` });
+        }
         if (err instanceof LLMSchemaValidationError) {
-          return await this._persistFailed({ ...captured, errorMessage: `tool_use schema validation failed: ${err.message}` });
+          return await this._persistFailed({ ...captured, errorMessage: `tool_use schema validation failed: ${err.message}${llmDetail}` });
         }
         if (err instanceof LLMRequestError) {
           const sanitized = err.sanitized || { message: err.message };
@@ -496,13 +507,21 @@ class GenerateWeeklyAnalysis extends UseCase {
     administrativePositions = [],
     earmarkedPositions = [],
     duplications = null,
-    macroContext = null, macroUsage = null, portfolioTotals = null,
+    macroContext = null, macroUsage = null, llmUsage = null, portfolioTotals = null,
     positionChanges = null, macroChanges = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
   }) {
     // Feature 006: whatever context was gathered before the failure is
     // preserved on the failed row (macro, totals, position changes) and the
-    // IMF classify cost — if any — is still recorded (FR-014).
-    const usage = macroUsage || { inputTokens: 0, outputTokens: 0, costUsd: 0 };
+    // IMF classify cost — if any — is still recorded (FR-014). The failed
+    // submit call's own usage (llmUsage) is folded in so tokensOut/costUsd
+    // reflect what the run actually spent.
+    const macro = macroUsage || { inputTokens: 0, outputTokens: 0, costUsd: 0 };
+    const llm = llmUsage || { inputTokens: 0, outputTokens: 0, costUsd: 0 };
+    const usage = {
+      inputTokens: (macro.inputTokens || 0) + (llm.inputTokens || 0),
+      outputTokens: (macro.outputTokens || 0) + (llm.outputTokens || 0),
+      costUsd: Number(((macro.costUsd || 0) + (llm.costUsd || 0)).toFixed(4)),
+    };
     const failed = new WeeklyAnalysis({
       date: targetDate,
       status: 'failed',

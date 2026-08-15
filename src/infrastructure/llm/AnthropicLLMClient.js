@@ -57,6 +57,15 @@ class LLMSchemaValidationError extends Error {
   }
 }
 
+// Output hit max_tokens before the tool call finished — the tool input JSON is
+// (at best) partial, so it must never reach schema validation as if complete.
+class LLMTruncationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'LLMTruncationError';
+  }
+}
+
 class LLMRequestError extends Error {
   constructor(sanitized) {
     super(sanitized.message);
@@ -106,6 +115,54 @@ class AnthropicLLMClient extends ILLMClient {
       );
     }
 
+    // One retry for a bad-but-recoverable response: a truncated output retries
+    // with a doubled cap (max_tokens is a ceiling, not a spend — the retry only
+    // costs what it generates); an invalid tool payload retries once with the
+    // validation error fed back. The 5-min cached system prefix keeps the
+    // retry's input cost low. Two attempts max — beyond that the failure is
+    // persisted for the owner, not papered over.
+    try {
+      return await this._submitOnce({ systemPrompt, userMessage, toolSchema, model, maxOutputTokens });
+    } catch (err) {
+      const firstUsage = err.usage || { inputTokens: 0, outputTokens: 0, costUsd: 0 };
+      let retryInput = null;
+      if (err instanceof LLMTruncationError) {
+        retryInput = { systemPrompt, userMessage, toolSchema, model, maxOutputTokens: maxOutputTokens * 2 };
+      } else if (err instanceof LLMSchemaValidationError) {
+        retryInput = {
+          systemPrompt,
+          userMessage:
+            `${userMessage}\n\n[RETRY] Your previous submission was rejected: ${err.message}. ` +
+            'Call the tool again with every required field present and schema-valid.',
+          toolSchema, model, maxOutputTokens,
+        };
+      }
+      if (!retryInput) throw err;
+
+      logger.warn('AnthropicLLMClient: submitAnalysis retrying once', {
+        errorType: err.name,
+        stopReason: err.stopReason || null,
+        firstAttemptOutputTokens: firstUsage.outputTokens,
+      });
+      try {
+        const result = await this._submitOnce(retryInput);
+        return { ...result, usage: this._sumUsage(firstUsage, result.usage) };
+      } catch (retryErr) {
+        if (retryErr.usage) retryErr.usage = this._sumUsage(firstUsage, retryErr.usage);
+        retryErr.attempts = 2;
+        throw retryErr;
+      }
+    }
+  }
+
+  /**
+   * Single submit attempt. Throws LLMRequestError (SDK), LLMTruncationError
+   * (stop_reason=max_tokens), or LLMSchemaValidationError (bad payload) — the
+   * latter two carry `.usage` and `.stopReason` so failures are diagnosable
+   * from the persisted row.
+   * @private
+   */
+  async _submitOnce({ systemPrompt, userMessage, toolSchema, model, maxOutputTokens }) {
     const client = this._client();
     const toolName = toolSchema.name || 'submit_analysis';
 
@@ -141,25 +198,45 @@ class AnthropicLLMClient extends ILLMClient {
       throw new LLMRequestError(sanitized);
     }
 
+    const rawUsage = response.usage || { input_tokens: 0, output_tokens: 0 };
+    const rates = MODEL_RATES[model] || DEFAULT_RATES;
+    const usage = {
+      inputTokens: rawUsage.input_tokens,
+      outputTokens: rawUsage.output_tokens,
+      costUsd: Number(
+        ((rawUsage.input_tokens / 1_000_000) * rates.input +
+          (rawUsage.output_tokens / 1_000_000) * rates.output).toFixed(4)
+      ),
+    };
+    const stopReason = response.stop_reason || null;
+    const failWith = (ErrClass, msg) => {
+      const e = new ErrClass(msg);
+      e.usage = usage;
+      e.stopReason = stopReason;
+      throw e;
+    };
+
+    // A max_tokens stop means the tool input JSON was cut mid-emission — treat
+    // it as truncation, never as a schema problem.
+    if (stopReason === 'max_tokens') {
+      failWith(LLMTruncationError, `output truncated at max_tokens=${maxOutputTokens}`);
+    }
+
     // Extract the tool_use block.
     const toolBlock = Array.isArray(response.content)
       ? response.content.find((b) => b.type === 'tool_use' && b.name === toolName)
       : null;
     if (!toolBlock || !toolBlock.input || typeof toolBlock.input !== 'object') {
-      throw new LLMSchemaValidationError(
-        `model did not return a "${toolName}" tool_use block`
-      );
+      failWith(LLMSchemaValidationError, `model did not return a "${toolName}" tool_use block`);
     }
 
     // Defense-in-depth: validate against the schema before persisting.
-    this._validateAgainstSchema(toolBlock.input, toolSchema.input_schema);
-
-    const usage = response.usage || { input_tokens: 0, output_tokens: 0 };
-    const rates = MODEL_RATES[model] || DEFAULT_RATES;
-    const costUsd = Number(
-      ((usage.input_tokens / 1_000_000) * rates.input +
-        (usage.output_tokens / 1_000_000) * rates.output).toFixed(4)
-    );
+    try {
+      this._validateAgainstSchema(toolBlock.input, toolSchema.input_schema);
+    } catch (err) {
+      if (err instanceof LLMSchemaValidationError) failWith(LLMSchemaValidationError, err.message);
+      throw err;
+    }
 
     return {
       summary: toolBlock.input.summary,
@@ -170,11 +247,15 @@ class AnthropicLLMClient extends ILLMClient {
       watchlist: Array.isArray(toolBlock.input.watchlist) ? toolBlock.input.watchlist : null,
       weekOverWeek: Array.isArray(toolBlock.input.weekOverWeek) ? toolBlock.input.weekOverWeek : null,
       frameworkAmendments: Array.isArray(toolBlock.input.frameworkAmendments) ? toolBlock.input.frameworkAmendments : null,
-      usage: {
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
-        costUsd,
-      },
+      usage,
+    };
+  }
+
+  _sumUsage(a, b) {
+    return {
+      inputTokens: (a.inputTokens || 0) + (b.inputTokens || 0),
+      outputTokens: (a.outputTokens || 0) + (b.outputTokens || 0),
+      costUsd: Number(((a.costUsd || 0) + (b.costUsd || 0)).toFixed(4)),
     };
   }
 
@@ -378,4 +459,5 @@ class AnthropicLLMClient extends ILLMClient {
 module.exports = AnthropicLLMClient;
 module.exports.CostCapExceededError = CostCapExceededError;
 module.exports.LLMSchemaValidationError = LLMSchemaValidationError;
+module.exports.LLMTruncationError = LLMTruncationError;
 module.exports.LLMRequestError = LLMRequestError;

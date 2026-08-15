@@ -443,6 +443,7 @@ describe('GenerateWeeklyAnalysis (US4 trend context)', () => {
 const {
   CostCapExceededError,
   LLMSchemaValidationError,
+  LLMTruncationError,
   LLMRequestError,
 } = require('../../../../../src/infrastructure/llm/AnthropicLLMClient');
 
@@ -539,6 +540,39 @@ describe('GenerateWeeklyAnalysis (failure branches)', () => {
     expect(result.status).toBe('failed');
     expect(result.errorMessage).toMatch(/tool_use schema validation failed: .*orders\[0\]\.side/);
     expect(repo.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('LLMTruncationError: persists a failed row with truncation reason and the LLM usage folded in', async () => {
+    const repo = mockRepositoryEmpty();
+    const err = new LLMTruncationError('output truncated at max_tokens=16000');
+    err.usage = { inputTokens: 2000, outputTokens: 16600, costUsd: 0.425 };
+    err.stopReason = 'max_tokens';
+    err.attempts = 2;
+    const llmClient = { submitAnalysis: jest.fn().mockRejectedValue(err) };
+    const { useCase } = buildUseCase({ repository: repo, llmClient });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+    expect(result.status).toBe('failed');
+    expect(result.errorMessage).toMatch(/LLM output truncated: output truncated at max_tokens=16000/);
+    expect(result.errorMessage).toContain('[attempts=2, stop_reason=max_tokens, tokensOut=16600]');
+    expect(result.tokensIn).toBe(2000);
+    expect(result.tokensOut).toBe(16600);
+    expect(result.costUsd).toBeCloseTo(0.425, 4);
+    expect(repo.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('LLMSchemaValidationError with attached usage: telemetry lands on the failed row', async () => {
+    const repo = mockRepositoryEmpty();
+    const err = new LLMSchemaValidationError('$.markdownBody: required');
+    err.usage = { inputTokens: 1000, outputTokens: 450, costUsd: 0.0163 };
+    err.stopReason = 'tool_use';
+    const llmClient = { submitAnalysis: jest.fn().mockRejectedValue(err) };
+    const { useCase } = buildUseCase({ repository: repo, llmClient });
+
+    const result = await useCase.execute({ targetDate: '2026-05-15' });
+    expect(result.status).toBe('failed');
+    expect(result.errorMessage).toContain('[attempts=1, stop_reason=tool_use, tokensOut=450]');
+    expect(result.tokensOut).toBe(450);
   });
 
   it('LLMRequestError: persists a failed row using the sanitized message (no payload echoed)', async () => {
