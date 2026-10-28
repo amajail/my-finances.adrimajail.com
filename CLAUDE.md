@@ -76,6 +76,6 @@ if a fourth thing needs bold, one of the three isn't earning it. Adding more tha
 deleting something else in the same edit.
 
 <!-- SPECKIT START -->
-Current plan: `specs/020-stale-order-handling/plan.md` (in progress, branch 020-stale-order-handling).
+Current plan: none active. Most recent: `specs/020-stale-order-handling/plan.md` (shipped, PR #72).
 Companion artifacts (`spec.md`, `research.md`, `data-model.md`, `quickstart.md`, `contracts/`) sit alongside.
 <!-- SPECKIT END -->
