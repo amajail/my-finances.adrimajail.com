@@ -10,6 +10,8 @@ Contents:
   real API costs, evals design, tracing/observability, multi-model testing (2026-07).
 - `llm-provider-abstraction.md` — model-agnostic LLM layer: current Anthropic client
   contract + agreed router/adapter design (researched 2026-07, not implemented).
+- `system-assessment-2026-10-28.md` — LLM-surface assessment: model version vs lineup,
+  API compatibility, logs/CI, code review, prompt, token observability, backlog.
 
 Conventions: no real holdings data (quantities, PPCs, account identifiers) — aggregate
 API costs and architecture detail only. Speckit features live in `specs/`, not here.
