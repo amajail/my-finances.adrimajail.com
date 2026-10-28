@@ -27,11 +27,22 @@ const { runTimer } = require('./_shared');
  */
 const SCHEDULE = '0 30 16 * * 1-5';
 
-app.timer('refreshPricesTimer', {
-  schedule: SCHEDULE,
-  handler: async (_myTimer, context) => {
-    await runTimer(context, 'Price refresh', () => container.getRefreshPrices().execute({ _audit: { source: 'timer' } }));
-  },
-});
+/**
+ * Timer body. runTimer swallows task errors and logs successes at info, so a
+ * run that "completes" with failed instruments would be invisible at alertable
+ * severity; surface those at warning level (counts only, no symbols).
+ */
+async function handler(_myTimer, context) {
+  const result = await runTimer(context, 'Price refresh', () => container.getRefreshPrices().execute({ _audit: { source: 'timer' } }));
+  if (result && result.failed > 0) {
+    context.warn(`Price refresh finished with ${result.failed} failed of ${result.totalSymbols} instruments`, {
+      failed: result.failed,
+      succeeded: result.succeeded,
+      totalSymbols: result.totalSymbols,
+    });
+  }
+}
 
-module.exports = { SCHEDULE };
+app.timer('refreshPricesTimer', { schedule: SCHEDULE, handler });
+
+module.exports = { SCHEDULE, handler };
