@@ -173,3 +173,25 @@ describe('AddPosition — duplicate rejection + audit (feature 018)', () => {
     await expect(withoutAudit.execute(validInput)).resolves.toMatchObject({ symbol: 'AAPL' });
   });
 });
+
+describe('AddPosition — cash default price', () => {
+  const run = (assetType, extra = {}) => {
+    const positionRepository = mockPositionRepo();
+    const useCase = new AddPosition({ brokerRepository: mockBrokerRepo(), positionRepository });
+    return useCase.execute({
+      brokerId: 'broker1', assetType, symbol: 'SYMBOL', quantity: 10, averageCost: 1, currency: 'USD', ...extra,
+    });
+  };
+
+  it('prices a cash row at 1 when no price is given, so it is not valued at 0', async () => {
+    expect((await run('cash')).currentPrice).toBe(1);
+  });
+
+  it('leaves quotable asset types unpriced until RefreshPrices runs', async () => {
+    expect((await run('stock')).currentPrice).toBeNull();
+  });
+
+  it('keeps an explicit price on a cash row', async () => {
+    expect((await run('cash', { currentPrice: 2 })).currentPrice).toBe(2);
+  });
+});

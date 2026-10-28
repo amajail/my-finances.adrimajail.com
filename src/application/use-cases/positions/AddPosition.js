@@ -87,7 +87,9 @@ class AddPosition extends UseCase {
       quantity: input.quantity,
       averageCost: input.averageCost,
       currency: input.currency,
-      currentPrice: input.currentPrice || null,
+      // Cash is always worth 1 per unit and RefreshPrices never quotes it; without
+      // this default a cash row created without a price is valued at 0.
+      currentPrice: input.currentPrice || (input.assetType === 'cash' ? 1 : null),
       currentPriceUpdatedAt: input.currentPriceUpdatedAt || null,
       exchange: input.exchange || null,
       maturityDate: input.maturityDate || null,
