@@ -78,13 +78,16 @@ src/
 │   ├── GenerateWeeklyAnalysis.js                        # load history, evaluate, prompt block, persist
 │   └── prompts/guardrail-preamble-v2.md                 # + rule 5
 ├── infrastructure/repositories/AzureAnalysisRepository.js  # sustainedTriggersJson read/write
-└── functions/getWeeklyAnalysis.js                       # + sustainedTriggers in body
+└── functions/
+    ├── getWeeklyAnalysis.js                             # + sustainedTriggers in body
+    └── mcp.js                                           # + sustainedTriggers in get_weekly_analysis body
 
 tests/unit/
 ├── domain/services/SustainedTriggerEvaluator.test.js                                   # NEW
 ├── application/use-cases/analysis/GenerateWeeklyAnalysis.sustainedTriggers.test.js     # NEW
 ├── infrastructure/repositories/AzureAnalysisRepository.sustainedTriggers.test.js       # NEW
-└── functions/getWeeklyAnalysis.test.js                                                 # extended
+├── functions/mcp.test.js                                                               # extended
+└── (integration) tests/integration/functions/getWeeklyAnalysis.test.js                 # extended
 ```
 
 **Structure Decision**: Single backend project, following the layout feature 020 used. The dashboard is out of scope per the spec, so `dashboard/` is untouched.

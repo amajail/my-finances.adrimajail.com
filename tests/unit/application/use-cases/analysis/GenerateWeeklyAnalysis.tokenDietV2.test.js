@@ -92,7 +92,8 @@ describe('GenerateWeeklyAnalysis — feature 015 token-diet v2', () => {
     await useCase.execute({ targetDate: '2026-06-20' });
 
     const userMessage = llm.submitAnalysis.mock.calls[0][0].userMessage;
-    const macroBlock = userMessage.split('## macroContext')[1];
+    // Only the macroContext section: the feature-021 sustainedTriggers block follows it.
+    const macroBlock = userMessage.split('## macroContext')[1].split('\n## ')[0];
     expect(macroBlock).not.toContain('"fxGap"');     // unavailable → omitted
     expect(macroBlock).toContain('"riesgoPais"');     // available → kept
   });

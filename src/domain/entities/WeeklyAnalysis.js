@@ -121,6 +121,10 @@ class WeeklyAnalysis {
     // [] when none and on pre-feature rows.
     this._confirmationItems = Array.isArray(data.confirmationItems) ? data.confirmationItems : [];
 
+    // Feature 021: code-computed durations of the framework's "sustained Nd"
+    // macro triggers. OPTIONAL — null on pre-feature rows and when not computed.
+    this._sustainedTriggers = Array.isArray(data.sustainedTriggers) ? data.sustainedTriggers : null;
+
     this._validate();
     Object.freeze(this._portfolioSnapshot);
     if (this._macroContext) Object.freeze(this._macroContext);
@@ -137,6 +141,7 @@ class WeeklyAnalysis {
     if (this._duplications) Object.freeze(this._duplications);
     Object.freeze(this._earmarkedPositions);
     Object.freeze(this._confirmationItems);
+    if (this._sustainedTriggers) Object.freeze(this._sustainedTriggers);
     Object.freeze(this);
   }
 
@@ -231,6 +236,8 @@ class WeeklyAnalysis {
       earmarkedPositions: this._earmarkedPositions,
       // Feature 020: confirmation items — same rule ([] is fine).
       confirmationItems: this._confirmationItems,
+      // Feature 021: sustained-trigger rows — same rule (null is fine).
+      sustainedTriggers: this._sustainedTriggers,
     })) {
       if (arr !== null) {
         for (const item of arr) {
@@ -238,6 +245,19 @@ class WeeklyAnalysis {
             errors.push(`each ${name} entry must be an object`);
             break;
           }
+        }
+      }
+    }
+    // Feature 021: each sustained-trigger row needs a known status, a whole-day
+    // count and a boolean FIRED gate.
+    if (this._sustainedTriggers !== null) {
+      for (const row of this._sustainedTriggers) {
+        if (!row || typeof row !== 'object'
+          || !['met', 'building', 'not-satisfied', 'unknown', 'insufficient-history', 'not-evaluable'].includes(row.status)
+          || !Number.isInteger(row.heldDays) || row.heldDays < 0
+          || typeof row.durationMet !== 'boolean') {
+          errors.push('each sustainedTrigger must have a known status, a non-negative integer heldDays and a boolean durationMet');
+          break;
         }
       }
     }
@@ -281,6 +301,7 @@ class WeeklyAnalysis {
   get duplications() { return this._duplications; }
   get earmarkedPositions() { return this._earmarkedPositions; }
   get confirmationItems() { return this._confirmationItems; }
+  get sustainedTriggers() { return this._sustainedTriggers; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -325,6 +346,7 @@ class WeeklyAnalysis {
       duplications: this._duplications,
       earmarkedPositions: this._earmarkedPositions,
       confirmationItems: this._confirmationItems,
+      sustainedTriggers: this._sustainedTriggers,
     };
   }
 

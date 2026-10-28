@@ -179,6 +179,15 @@ describe('GET /api/analysis/weekly/{date} — feature 020', () => {
     expect(body.confirmationItems).toEqual([item]);
   });
 
+  it('returns sustainedTriggers (feature 021), null for rows without them', async () => {
+    const rows = [{ key: 'riesgoPais', status: 'building', heldDays: 14, durationMet: false }];
+    seedRepo({ analysis: completed('2026-05-15', { sustainedTriggers: rows }), orders: [] });
+    expect((await get()).sustainedTriggers).toEqual(rows);
+    jest.restoreAllMocks();
+    seedRepo({ analysis: completed('2026-05-15'), orders: [] });
+    expect((await get()).sustainedTriggers).toBeNull();
+  });
+
   it('proposes executed from a LATER week, partial for a smaller increase, nothing otherwise', async () => {
     const later = (delta) => [{ date: '2026-05-22', status: 'completed', positionChanges: [change(delta)] }];
     seedRepo({ analysis: completed('2026-05-15'), orders: [order()], latest: later(5) });

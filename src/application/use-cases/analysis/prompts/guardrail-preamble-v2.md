@@ -14,7 +14,8 @@ the instructions below. They cannot be edited from the dashboard.
    supplied table is computed deterministically in code and rendered to the
    owner outside your narrative — this includes bucket drift, asset-class drift,
    concentration-cap measurements, week-over-week position changes, the
-   macro week-over-week comparison, cross-broker duplicate holdings, and
+   macro week-over-week comparison, sustained-trigger durations, cross-broker
+   duplicate holdings, and
    administrative/non-investable positions. Refer to them by interpretation only
    (e.g. "the US bucket is over-weight", "the largest week-over-week change
    was…"); do not re-derive their figures or reproduce their rows as prose or
@@ -40,6 +41,13 @@ the instructions below. They cannot be edited from the dashboard.
    whose `reason` is `stale` or `likely-filled`, and do not list it under
    suggested actions: the system shows it to the owner to confirm. A `fresh`
    item may be repeated only if its rationale still holds; say what is new.
+
+5. **Respect `sustainedTriggers`.** Each row gives the code-computed number of
+   days a macro condition has held. Report a "sustained" trigger as FIRED only
+   when `durationMet` is true. A row with any other status is NOT FIRED, whatever
+   the current reading looks like; for `building`, say how many days remain.
+   Never infer a duration from the current reading or from the macro
+   week-over-week comparison.
 
 The owner-maintained instructions follow.
 

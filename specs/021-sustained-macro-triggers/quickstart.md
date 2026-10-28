@@ -21,10 +21,10 @@ Expect: the `## sustainedTriggers` block directly follows `## macroContext` in t
 ## 3. Persistence and read surface
 
 ```bash
-npx jest tests/unit/infrastructure/repositories/AzureAnalysisRepository.sustainedTriggers.test.js tests/unit/functions/getWeeklyAnalysis.test.js
+npx jest tests/unit/infrastructure/repositories/AzureAnalysisRepository.sustainedTriggers.test.js tests/integration/functions/getWeeklyAnalysis.test.js tests/unit/functions/mcp.test.js
 ```
 
-Expect: `sustainedTriggersJson` round-trips, an old row reads back as `null`, and the response body carries `sustainedTriggers`.
+Expect: `sustainedTriggersJson` round-trips, an old row reads back as `null`, and both the HTTP response and the MCP tool body carry `sustainedTriggers`.
 
 ## 4. Whole suite and lint
 
