@@ -42,6 +42,50 @@ class OrderExecutionMatcher {
     const qty = Number(order.quantity) || 0;
     return magnitude + EPSILON >= qty ? 'executed' : 'partial';
   }
+
+  /**
+   * Feature 020: propose statuses for several pending orders against position
+   * changes from multiple weeks (every week strictly after the orders were
+   * issued). One position change is consumed by at most one order (greedy, in
+   * the order given), so two orders never share the same fill. Never returns
+   * 'skipped': no matching change means the order simply stays pending (null).
+   * Weeks whose positionChanges are null/unknown are ignored.
+   *
+   * @param {Array<{broker:string,symbol:string,side:string,quantity:number}>} orders
+   * @param {Array<{positionChanges: Array|null}>} weeks
+   * @returns {Array<'executed'|'partial'|null>} aligned with `orders`
+   */
+  static proposeAcrossWeeks(orders, weeks) {
+    const ledger = new Map();
+    const remaining = (broker, symbol, side) => {
+      const key = `${broker}|${symbol}|${side}`;
+      if (!ledger.has(key)) {
+        let total = 0;
+        for (const w of Array.isArray(weeks) ? weeks : []) {
+          if (!w || !Array.isArray(w.positionChanges)) continue;
+          for (const c of w.positionChanges) {
+            if (c.broker !== broker || c.symbol !== symbol) continue;
+            const delta = Number(c.deltaQuantity) || 0;
+            if (side === 'buy' && delta > EPSILON) total += delta;
+            if (side === 'sell' && delta < -EPSILON) total += -delta;
+          }
+        }
+        ledger.set(key, total);
+      }
+      return key;
+    };
+
+    return (Array.isArray(orders) ? orders : []).map((order) => {
+      if (!order) return null;
+      const key = remaining(order.broker, order.symbol, order.side);
+      const available = ledger.get(key);
+      const qty = Number(order.quantity) || 0;
+      if (available <= EPSILON || qty <= 0) return null;
+      const taken = Math.min(available, qty);
+      ledger.set(key, available - taken);
+      return taken + EPSILON >= qty ? 'executed' : 'partial';
+    });
+  }
 }
 
 module.exports = OrderExecutionMatcher;

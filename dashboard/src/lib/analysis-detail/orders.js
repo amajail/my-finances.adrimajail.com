@@ -26,7 +26,7 @@ export function renderOrders(detail, date, reload) {
     return `
       <tr class="border-t border-[var(--color-border)]">
         <td class="px-4 py-2">${escapeHtml(o.broker)}</td>
-        <td class="px-4 py-2 num-mono">${escapeHtml(o.symbol)}</td>
+        <td class="px-4 py-2 num-mono">${escapeHtml(o.symbol)}${o.ageWeeks > 0 ? ` <span class="badge badge-pending" title="Already pending ${o.ageWeeks} week(s) when issued">week ${o.ageWeeks + 1}</span>` : ''}</td>
         <td class="px-4 py-2"><span class="badge ${o.side === 'buy' ? 'badge-success' : 'badge-pending'}">${escapeHtml(o.side)}</span></td>
         <td class="px-4 py-2 text-right num-mono">${maskable(escapeHtml(String(o.quantity)))}</td>
         <td class="px-4 py-2">${escapeHtml(o.conviction)}</td>
@@ -70,4 +70,34 @@ export function renderOrders(detail, date, reload) {
       saveFor(i, btn.getAttribute('data-proposed'), note);
     });
   });
+}
+
+// Feature 020: orders that were not repeated because they stayed pending too
+// long (stale) or the position changes show they were done (likely-filled).
+// Resolution uses the existing per-order status control on the linked week.
+const CONFIRMATION_WHY = {
+  stale: 'pending too long',
+  'likely-filled': 'looks filled',
+};
+
+export function renderConfirmationItems(detail) {
+  const items = Array.isArray(detail.confirmationItems) ? detail.confirmationItems : [];
+  if (items.length === 0) return;
+  show(document.getElementById('confirmation-section'));
+  document.getElementById('confirmation-count').textContent = `${items.length} to confirm`;
+  document.getElementById('confirmation-tbody').innerHTML = items.map((it) => {
+    const why = CONFIRMATION_WHY[it.reason] || escapeHtml(it.reason);
+    const proposed = it.proposedStatus ? ` (proposed: ${escapeHtml(it.proposedStatus)})` : '';
+    const link = `/analysis-detail?date=${encodeURIComponent(it.lastDate)}`;
+    return `
+      <tr class="border-t border-[var(--color-border)]">
+        <td class="px-4 py-2">${escapeHtml(it.broker)}</td>
+        <td class="px-4 py-2 num-mono">${escapeHtml(it.symbol)}</td>
+        <td class="px-4 py-2"><span class="badge ${it.side === 'buy' ? 'badge-success' : 'badge-pending'}">${escapeHtml(it.side)}</span></td>
+        <td class="px-4 py-2 text-right num-mono">${maskable(escapeHtml(String(it.quantity)))}</td>
+        <td class="px-4 py-2">${escapeHtml(String(it.ageWeeks))} weeks since ${escapeHtml(it.originDate)}</td>
+        <td class="px-4 py-2">${why}${proposed}</td>
+        <td class="px-4 py-2"><a href="${link}" class="text-[var(--color-accent)] underline-offset-2 hover:underline">${escapeHtml(it.lastDate)} #${escapeHtml(String(it.lastIndex))}</a></td>
+      </tr>`;
+  }).join('');
 }

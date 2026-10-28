@@ -8,6 +8,29 @@ const { app } = require('@azure/functions');
 const container = require('../application/di/container');
 const { ok, fail, mapError } = require('./_shared');
 const OrderExecutionMatcher = require('../domain/services/OrderExecutionMatcher');
+const { MAX_LOOKBACK_WEEKS } = require('../domain/services/PendingOrderTracker');
+
+/**
+ * Feature 020: Map<orderIndex, 'executed'|'partial'> for the pending orders of
+ * `date`, using position changes from completed analyses dated after it.
+ * Display-only; any storage problem just means no proposals.
+ */
+async function proposeFromLaterWeeks(repo, date, orders) {
+  const pending = orders.filter((o) => (o.executionStatus || 'pending') === 'pending');
+  const out = new Map();
+  if (pending.length === 0 || typeof repo.getLatest !== 'function') return out;
+  try {
+    const recent = await repo.getLatest(MAX_LOOKBACK_WEEKS + 2);
+    const later = (recent || [])
+      .filter((a) => a.date > date && a.status === 'completed')
+      .map((a) => ({ positionChanges: a.positionChanges }));
+    const results = OrderExecutionMatcher.proposeAcrossWeeks(pending, later);
+    pending.forEach((o, i) => { if (results[i]) out.set(o.index, results[i]); });
+  } catch (_err) {
+    // propose-only: failing to compute a proposal must never fail the read
+  }
+  return out;
+}
 
 app.http('getWeeklyAnalysis', {
   methods: ['GET'],
@@ -82,9 +105,11 @@ app.http('getWeeklyAnalysis', {
         body.markdownBody = analysis.markdownBody;
         body.riesgoPaisBp = analysis.riesgoPaisBp;
         body.riesgoPaisAsOf = analysis.riesgoPaisAsOf;
-        // Feature 007: each order carries its execution status; pending orders
-        // get a read-time proposal from the week's position changes (FR-006/8).
-        const changes = analysis.positionChanges; // null|[]|[...] (feature 006)
+        // Feature 007: each order carries its execution status. Feature 020: pending
+        // orders get a display-only proposal from the position changes of every
+        // completed week AFTER this analysis (a fill can only show up later;
+        // changes in the order's own week predate it), never 'skipped'.
+        const proposals = await proposeFromLaterWeeks(repo, analysis.date, orders);
         body.orders = orders.map((o) => {
           const out = {
             index: o.index,
@@ -97,18 +122,21 @@ app.http('getWeeklyAnalysis', {
             executionStatus: o.executionStatus || 'pending',
             executionNote: o.executionNote || null,
             executionUpdatedAt: o.executionUpdatedAt || null,
+            // Feature 020: prior consecutive weeks pending when issued (0 = new).
+            ageWeeks: o.ageWeeks || 0,
           };
-          if (out.executionStatus === 'pending') {
-            const proposed = OrderExecutionMatcher.propose(o, changes);
-            if (proposed) out.proposedStatus = proposed;
-          }
+          const proposed = proposals.get(o.index);
+          if (out.executionStatus === 'pending' && proposed) out.proposedStatus = proposed;
           return out;
         });
+        // Feature 020: orders awaiting owner confirmation ([] on pre-feature rows).
+        body.confirmationItems = analysis.confirmationItems || [];
         // Feature 007: any non-pending order freezes the week (FR-004).
         body.frozen = body.orders.some((o) => o.executionStatus !== 'pending');
       } else {
         body.errorMessage = analysis.errorMessage;
         body.orders = [];
+        body.confirmationItems = analysis.confirmationItems || [];
         body.frozen = false;
       }
 

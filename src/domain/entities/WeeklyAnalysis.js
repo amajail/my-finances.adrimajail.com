@@ -117,6 +117,10 @@ class WeeklyAnalysis {
     // administrativePositions, not null).
     this._earmarkedPositions = Array.isArray(data.earmarkedPositions) ? data.earmarkedPositions : [];
 
+    // Feature 020: orders needing owner confirmation (stale or likely-filled).
+    // [] when none and on pre-feature rows.
+    this._confirmationItems = Array.isArray(data.confirmationItems) ? data.confirmationItems : [];
+
     this._validate();
     Object.freeze(this._portfolioSnapshot);
     if (this._macroContext) Object.freeze(this._macroContext);
@@ -132,6 +136,7 @@ class WeeklyAnalysis {
     Object.freeze(this._administrativePositions);
     if (this._duplications) Object.freeze(this._duplications);
     Object.freeze(this._earmarkedPositions);
+    Object.freeze(this._confirmationItems);
     Object.freeze(this);
   }
 
@@ -188,6 +193,16 @@ class WeeklyAnalysis {
         }
       }
     }
+    // Feature 020: each confirmation item needs an identity, a reason and a row pointer.
+    for (const item of this._confirmationItems) {
+      if (!item || typeof item !== 'object' || !item.symbol || !item.broker
+        || !['stale', 'likely-filled'].includes(item.reason)
+        || !/^\d{4}-\d{2}-\d{2}$/.test(String(item.lastDate || ''))
+        || !Number.isInteger(item.lastIndex) || item.lastIndex < 0) {
+        errors.push('each confirmationItem must have broker, symbol, reason in stale|likely-filled, lastDate (ISO) and lastIndex');
+        break;
+      }
+    }
     if (this._positionChanges !== null) {
       for (const c of this._positionChanges) {
         if (!c || typeof c !== 'object' || !c.symbol || !['added', 'removed', 'increased', 'reduced'].includes(c.change)) {
@@ -214,6 +229,8 @@ class WeeklyAnalysis {
       duplications: this._duplications,
       // Feature 019: earmarked positions — same rule ([] is fine).
       earmarkedPositions: this._earmarkedPositions,
+      // Feature 020: confirmation items — same rule ([] is fine).
+      confirmationItems: this._confirmationItems,
     })) {
       if (arr !== null) {
         for (const item of arr) {
@@ -263,6 +280,7 @@ class WeeklyAnalysis {
   get administrativePositions() { return this._administrativePositions; }
   get duplications() { return this._duplications; }
   get earmarkedPositions() { return this._earmarkedPositions; }
+  get confirmationItems() { return this._confirmationItems; }
 
   isCompleted() { return this._status === 'completed'; }
   isFailed() { return this._status === 'failed'; }
@@ -306,6 +324,7 @@ class WeeklyAnalysis {
       administrativePositions: this._administrativePositions,
       duplications: this._duplications,
       earmarkedPositions: this._earmarkedPositions,
+      confirmationItems: this._confirmationItems,
     };
   }
 
