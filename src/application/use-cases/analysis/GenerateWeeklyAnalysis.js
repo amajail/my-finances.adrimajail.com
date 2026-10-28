@@ -53,7 +53,7 @@ const TOOL_SCHEMA = require('./submit-analysis-tool.json');
 const INSTRUCTIONS_PROMPT_VERSION = 'editable-instructions-v1+guardrail-v2';
 
 const DEFAULTS = {
-  model: 'claude-opus-4-7',
+  model: 'claude-opus-5',
   maxInputTokens: 80000,
   maxOutputTokens: 8000,
   // Feature 019: comma-separated broker ids holding earmarked (non-investable)
@@ -134,10 +134,13 @@ class GenerateWeeklyAnalysis extends UseCase {
         }
       }
     } catch (err) {
-      // A guard failure must not block the run; fall through and proceed.
-      logger.warn('GenerateWeeklyAnalysis: freeze-guard check failed; proceeding', {
+      // Fail closed: proceeding on a transient storage error would re-run the
+      // analysis and overwrite the recorded execution statuses (destructive).
+      // Nothing has been spent or written yet, so abort and let the caller retry.
+      logger.error('GenerateWeeklyAnalysis: freeze-guard check failed; aborting run', {
         date: targetDate, errorType: err && err.name,
       });
+      throw new Error(`freeze-guard check failed for ${targetDate}: ${err && err.message ? err.message : String(err)}`);
     }
 
     // 1. Load settings (with defaults if missing). promptVersion is retired
@@ -206,11 +209,19 @@ class GenerateWeeklyAnalysis extends UseCase {
       //     run refuses before spending macro or LLM tokens and persists a
       //     failed row that names the outage.
       if (portfolioSummary && portfolioSummary.fxDegraded) {
+        // Earmarked is checked first and needs value > 0, so a positive USD
+        // reserve is classified correctly even with ARS values unavailable;
+        // keeping it on the failed row avoids a spurious reserve step in the
+        // dashboard chart. Administrative is left empty (null ARS values would
+        // misclassify as worthless).
         return await this._persistFailed({
           targetDate,
           startedAt,
           model,
           portfolioSnapshot,
+          earmarkedPositions: portfolioSnapshot.filter(
+            (p) => earmarkedBrokerSet.has(p.broker) && (Number(p.valueUsd) || 0) > 0
+          ),
           portfolioTotals,
           errorMessage: `FX degraded: MEP rate unavailable (${portfolioSummary.fxError || 'unknown provider error'}) — refusing to analyze with unreliable ARS→USD figures`,
         });
@@ -324,11 +335,14 @@ class GenerateWeeklyAnalysis extends UseCase {
           startedAt,
           model,
           portfolioSnapshot,
+          administrativePositions,
           earmarkedPositions,
+          duplications,
           macroContext,
           macroUsage,
           portfolioTotals,
           positionChanges,
+          macroChanges,
           riesgoPaisBp,
           riesgoPaisAsOf,
           instructionsHistoryRowKey,
@@ -377,6 +391,12 @@ class GenerateWeeklyAnalysis extends UseCase {
         upcomingEvents,
       });
 
+      const capturedBase = {
+        targetDate, startedAt, model, portfolioSnapshot, administrativePositions, earmarkedPositions, duplications,
+        macroContext, macroUsage, portfolioTotals, positionChanges, macroChanges,
+        riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
+      };
+
       // 6. Call the LLM. The privacy boundary lives inside this method.
       let llmResult;
       try {
@@ -397,11 +417,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         const llmDetail = llmUsage
           ? ` [attempts=${err.attempts || 1}, stop_reason=${err.stopReason || 'n/a'}, tokensOut=${llmUsage.outputTokens}]`
           : '';
-        const captured = {
-          targetDate, startedAt, model, portfolioSnapshot, administrativePositions, earmarkedPositions, duplications,
-          macroContext, macroUsage, llmUsage, portfolioTotals, positionChanges, macroChanges,
-          riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
-        };
+        const captured = { ...capturedBase, llmUsage };
         if (err instanceof CostCapExceededError) {
           return await this._persistFailed({ ...captured, errorMessage: `cost cap exceeded: ${err.message}` });
         }
@@ -424,54 +440,66 @@ class GenerateWeeklyAnalysis extends UseCase {
 
       // 7. Build domain entities from the structured result. Telemetry folds in
       //    the IMF classify call's usage (Feature 006, FR-022).
-      const analysis = new WeeklyAnalysis({
-        date: targetDate,
-        status: 'completed',
-        generatedAt: startedAt,
-        modelUsed: model,
-        promptVersion: INSTRUCTIONS_PROMPT_VERSION,
-        summary: llmResult.summary,
-        markdownBody: llmResult.markdownBody,
-        riesgoPaisBp,
-        riesgoPaisAsOf,
-        portfolioSnapshot,
-        // Feature 013: zero/negative-value administrative positions (excluded
-        // from drift/caps; [] when none).
-        administrativePositions,
-        // Feature 014: cross-broker duplicate-holdings groups ([] when none).
-        duplications,
-        // Feature 019: earmarked-broker positions ([] when none).
-        earmarkedPositions,
-        macroContext,
-        portfolioTotals,
-        positionChanges,
-        // Feature 012: deterministic macro week-over-week comparison.
-        macroChanges,
-        // Feature 010: code-computed sections (null when targets unavailable).
-        driftByBucket,
-        driftByAssetClass,
-        concentrationCaps,
-        // Feature 010: LLM-emitted sections (null when the model omitted them).
-        watchlist: llmResult.watchlist || null,
-        weekOverWeek: llmResult.weekOverWeek || null,
-        frameworkAmendments: llmResult.frameworkAmendments || null,
-        tokensIn: llmResult.usage.inputTokens + macroUsage.inputTokens,
-        tokensOut: llmResult.usage.outputTokens + macroUsage.outputTokens,
-        costUsd: Number((llmResult.usage.costUsd + macroUsage.costUsd).toFixed(4)),
-        durationMs: this._clock().getTime() - startedAt.getTime(),
-        instructionsHistoryRowKey,
-      });
+      let analysis;
+      let orders;
+      try {
+        analysis = new WeeklyAnalysis({
+          date: targetDate,
+          status: 'completed',
+          generatedAt: startedAt,
+          modelUsed: model,
+          promptVersion: INSTRUCTIONS_PROMPT_VERSION,
+          summary: llmResult.summary,
+          markdownBody: llmResult.markdownBody,
+          riesgoPaisBp,
+          riesgoPaisAsOf,
+          portfolioSnapshot,
+          // Feature 013: zero/negative-value administrative positions (excluded
+          // from drift/caps; [] when none).
+          administrativePositions,
+          // Feature 014: cross-broker duplicate-holdings groups ([] when none).
+          duplications,
+          // Feature 019: earmarked-broker positions ([] when none).
+          earmarkedPositions,
+          macroContext,
+          portfolioTotals,
+          positionChanges,
+          // Feature 012: deterministic macro week-over-week comparison.
+          macroChanges,
+          // Feature 010: code-computed sections (null when targets unavailable).
+          driftByBucket,
+          driftByAssetClass,
+          concentrationCaps,
+          // Feature 010: LLM-emitted sections (null when the model omitted them).
+          watchlist: llmResult.watchlist || null,
+          weekOverWeek: llmResult.weekOverWeek || null,
+          frameworkAmendments: llmResult.frameworkAmendments || null,
+          tokensIn: llmResult.usage.inputTokens + macroUsage.inputTokens,
+          tokensOut: llmResult.usage.outputTokens + macroUsage.outputTokens,
+          costUsd: Number((llmResult.usage.costUsd + macroUsage.costUsd).toFixed(4)),
+          durationMs: this._clock().getTime() - startedAt.getTime(),
+          instructionsHistoryRowKey,
+        });
 
-      const orders = (llmResult.orders || []).map((o, idx) => new SuggestedOrder({
-        analysisDate: targetDate,
-        index: idx,
-        broker: o.broker,
-        symbol: o.symbol,
-        side: o.side,
-        quantity: o.quantity,
-        rationale: o.rationale,
-        conviction: o.conviction,
-      }));
+        orders = (llmResult.orders || []).map((o, idx) => new SuggestedOrder({
+          analysisDate: targetDate,
+          index: idx,
+          broker: o.broker,
+          symbol: o.symbol,
+          side: o.side,
+          quantity: o.quantity,
+          rationale: o.rationale,
+          conviction: o.conviction,
+        }));
+      } catch (buildErr) {
+        // The paid LLM call already happened: persist a failed row carrying its
+        // usage so the spend is recorded, instead of losing it to a bare throw.
+        return await this._persistFailed({
+          ...capturedBase,
+          llmUsage: llmResult.usage,
+          errorMessage: `analysis result rejected after LLM call: ${buildErr && buildErr.name ? buildErr.name : 'Error'}: ${buildErr && buildErr.message ? buildErr.message : String(buildErr)}`,
+        });
+      }
 
       // 8. Persist.
       await this._analysisRepository.upsert(analysis, orders);
