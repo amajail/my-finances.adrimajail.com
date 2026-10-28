@@ -4,6 +4,25 @@ Full project review performed 2026-07-21: feature inventory (specs 001–016), c
 
 The single most important finding is not a new feature at all: **two merged features never reached `main`** (see P0-1). Second, the IOL/IBKR MCP connectors are now reachable from Claude Code sessions, which unlocks the long-desired automated position sync as a skill rather than a manual Desktop ritual.
 
+## Status update — 2026-10-28
+
+Reconciled against the code during the 2026-10-28 system assessment (`docs/research/system-assessment-2026-10-28.md` §6). Everything below this section is the original 2026-07-21 plan and is kept for history; where it conflicts with this table, this table wins.
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| P0-1 Recover 014 + 015 | **Shipped** | `src/domain/services/DuplicateHoldingsDetector.js`; `specs/015-analysis-token-diet-v2/` |
+| P0-2 CI: lint | **Shipped** | `eslint.config.js`, `.prettierrc`, `npm run lint` |
+| P0-2 CI: pinning, Node 22 | **Shipped** | `@amajail/ui` pinned to tag `#v0.2.0`; `engines.node >=22.0.0` |
+| P0-2 CI: coverage floor, dashboard tests | Not re-verified | Not checked this pass |
+| P1-1 Sync skill v1 | **Shipped** | `.claude/skills/sync-positions/` |
+| P1-2 MCP write tools | **Shipped** (spec 018) | `specs/018-mcp-write-tools/`; write tools in `src/functions/mcp.js` |
+| P2-1 Calendar | **Shipped** (spec 017) | `specs/017-dividend-maturity-calendar/`; `getCalendarEvents` wired into `GenerateWeeklyAnalysis` |
+| P2-4 Typography | **Shipped** | `@plugin "@tailwindcss/typography"` in `dashboard/src/styles/global.css` |
+| P2-2 What-if simulation | **Open** — no simulation code exists. Spec number is no longer ~018 (taken by MCP write tools; 019 is earmarked positions), so the next free number applies | `grep -ri simulat src` finds nothing |
+| P2-3 Dashboard refactor R1 | Partial / not verified | `dashboard/src/lib/{format,load,api}.js` exist; per-section split of `analysis-detail` not checked |
+| P3-1 Backend refactor R2 | Partial / not verified | Shared `runTimer` exists in `src/functions/_shared.js`; base repository and `GenerateWeeklyAnalysis` split not done (file is now 838 lines) |
+| P3-2 Scorecard outcome P&L, P1-3 / P3-3 instruction edits | Cannot verify from code | Scorecard code only covers execution status; instruction-body edits live in the DB |
+
 ## Priority table
 
 | # | Item | Effort | Value | Vehicle |
@@ -89,7 +108,7 @@ The weekly analysis has flagged the same off-system-cash imbalance repeatedly wi
 - **Dividends:** need a source. Options: `yahoo-finance2` calendar/dividend events (already a dependency, used by RefreshPrices) for US-listed holdings; IOL `get_next_corporate_events` connector data captured at sync time for local instruments.
 - Shape: one `GET /api/calendar` endpoint (upcoming events, ordered), one dashboard page, optional `get_calendar` MCP tool. Could also feed the weekly analysis context ("BOND-X matures in 12 days — reinvestment suggestion?") — that tie-in is the differentiating value.
 
-## P2-2 — What-if simulation (~spec 018)
+## P2-2 — What-if simulation (spec number TBD; ~018 is taken)
 
 Input a hypothetical order list → recompute allocation drift, concentration caps, and portfolio totals **reusing the existing domain services** (`AllocationDriftCalculator`, `PortfolioCalculator`, and the cap logic used by the weekly analysis). Stateless `POST /api/analysis/simulate` + a dashboard page; no persistence in v1. Natural companion to the analysis-detail page ("what does the portfolio look like if I execute these suggested orders?") — consider a "simulate these orders" button there as the entry point.
 
