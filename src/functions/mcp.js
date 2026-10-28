@@ -63,6 +63,38 @@ function toNumber(value) {
   return Number(value);
 }
 
+/**
+ * Parse an optional integer tool arg. Clients may send integers as strings.
+ * clamp: out-of-range values are clamped instead of rejected.
+ * @returns {number|undefined} fallback (or undefined) when the arg was not provided
+ * @throws {Error} name 'ValidationError' for a non-integer or out-of-range value
+ */
+function toInteger(value, { name, min = -Infinity, max = Infinity, fallback, clamp = false }) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = Number(value);
+  if (!Number.isInteger(n)) {
+    const e = new Error(`${name} must be an integer`);
+    e.name = 'ValidationError';
+    throw e;
+  }
+  if (n < min || n > max) {
+    if (clamp) return Math.max(min, Math.min(max, n));
+    const e = new Error(`${name} must be between ${min} and ${max}`);
+    e.name = 'ValidationError';
+    throw e;
+  }
+  return n;
+}
+
+/** Stored token/cost telemetry of an analysis (attempts/stopReason are not persisted). */
+function usageOf(analysis) {
+  return {
+    tokensIn: analysis.tokensIn,
+    tokensOut: analysis.tokensOut,
+    costUsd: analysis.costUsd,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // list_positions
 // ---------------------------------------------------------------------------
@@ -113,7 +145,7 @@ app.mcpTool('mcpPortfolioSummary', {
 app.mcpTool('mcpListWeeklyAnalyses', {
   toolName: 'list_weekly_analyses',
   description:
-    'List past weekly AI portfolio analyses, newest first. Returns date, status, and (for completed runs) a short summary. Use get_weekly_analysis with a date for full detail.',
+    'List past weekly AI portfolio analyses, newest first. Returns date, status, token/cost usage (tokensIn, tokensOut, costUsd), and (for completed runs) a short summary. Use get_weekly_analysis with a date for full detail.',
   toolProperties: [
     {
       propertyName: 'limit',
@@ -123,14 +155,14 @@ app.mcpTool('mcpListWeeklyAnalyses', {
     },
   ],
   handler: tool('list_weekly_analyses', async (args) => {
-    const parsed = parseInt(args.limit, 10);
-    const limit = Number.isNaN(parsed) ? 20 : Math.max(1, Math.min(200, parsed));
+    const limit = toInteger(args.limit, { name: 'limit', min: 1, max: 200, fallback: 20, clamp: true });
     const rows = await container.getAnalysisRepository().getLatest(limit);
     const items = rows.map((a) => {
       const base = {
         date: a.date,
         status: a.status,
         generatedAt: a.generatedAt instanceof Date ? a.generatedAt.toISOString() : a.generatedAt,
+        ...usageOf(a),
       };
       return a.isCompleted()
         ? { ...base, summary: a.summary }
@@ -146,7 +178,7 @@ app.mcpTool('mcpListWeeklyAnalyses', {
 app.mcpTool('mcpGetWeeklyAnalysis', {
   toolName: 'get_weekly_analysis',
   description:
-    'Get the full detail of one weekly AI portfolio analysis by date (YYYY-MM-DD), including the summary, narrative body, and recommended orders with their execution status.',
+    'Get the full detail of one weekly AI portfolio analysis by date (YYYY-MM-DD), including the summary, narrative body, token/cost usage (tokensIn, tokensOut, costUsd), and recommended orders with their execution status.',
   toolProperties: [
     {
       propertyName: 'date',
@@ -158,11 +190,11 @@ app.mcpTool('mcpGetWeeklyAnalysis', {
   handler: tool('get_weekly_analysis', async (args) => {
     const date = args.date;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) {
-      return { error: 'invalid date format; expected YYYY-MM-DD' };
+      return { error: 'invalid date format; expected YYYY-MM-DD', code: 'ValidationError' };
     }
     const result = await container.getAnalysisRepository().getByDate(date);
     if (!result) {
-      return { error: `no analysis exists for ${date}` };
+      return { error: `no analysis exists for ${date}`, code: 'NotFound' };
     }
     const { analysis, orders } = result;
     const body = {
@@ -172,6 +204,7 @@ app.mcpTool('mcpGetWeeklyAnalysis', {
       modelUsed: analysis.modelUsed,
       portfolioTotals: analysis.portfolioTotals || null,
       macroContext: analysis.macroContext || null,
+      ...usageOf(analysis),
     };
     if (analysis.isCompleted()) {
       body.summary = analysis.summary;
@@ -233,7 +266,7 @@ app.mcpTool('mcpUpdatePosition', {
     {
       propertyName: 'notes',
       propertyType: 'string',
-      description: 'Free-form notes for the position.',
+      description: 'Free-form notes for the position. Send an empty string to clear existing notes.',
       isRequired: false,
     },
     {
@@ -261,7 +294,8 @@ app.mcpTool('mcpUpdatePosition', {
       rowKey: args.rowKey,
       quantity: toNumber(args.quantity),
       averageCost: toNumber(args.averageCost),
-      notes: args.notes !== undefined && args.notes !== null ? args.notes : undefined,
+      // '' is passed through deliberately so notes can be cleared.
+      notes: args.notes !== undefined && args.notes !== null ? String(args.notes) : undefined,
       status: args.status || undefined,
       maturityDate: args.maturityDate || undefined,
       confirm: args.confirm === true || String(args.confirm).toLowerCase() === 'true',
@@ -393,7 +427,7 @@ app.mcpTool('mcpSetOrderExecutionStatus', {
   handler: tool('set_order_execution_status', async (args) => {
     return container.getSetOrderExecutionStatus().execute({
       date: args.date,
-      index: args.index,
+      index: toInteger(args.index, { name: 'index', min: 0 }),
       status: args.status,
       executionPrice: toNumber(args.executionPrice),
       note: args.note || undefined,
@@ -434,6 +468,8 @@ app.mcpTool('mcpListAuditEntries', {
     },
   ],
   handler: tool('list_audit_entries', async (args) => {
-    return container.getListAuditEntries().execute({ limit: args.limit });
+    return container.getListAuditEntries().execute({
+      limit: toInteger(args.limit, { name: 'limit', min: 1, max: 100, fallback: 20, clamp: true }),
+    });
   }),
 });
