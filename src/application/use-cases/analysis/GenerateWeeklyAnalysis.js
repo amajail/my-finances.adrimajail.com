@@ -24,6 +24,7 @@ const WeeklyAnalysis = require('../../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../../domain/entities/SuggestedOrder');
 const PositionChangeCalculator = require('../../../domain/services/PositionChangeCalculator');
 const MacroChangeCalculator = require('../../../domain/services/MacroChangeCalculator');
+const SustainedTriggerEvaluator = require('../../../domain/services/SustainedTriggerEvaluator');
 const PendingOrderTracker = require('../../../domain/services/PendingOrderTracker');
 const DuplicateHoldingsDetector = require('../../../domain/services/DuplicateHoldingsDetector');
 const AllocationDriftCalculator = require('../../../domain/services/AllocationDriftCalculator');
@@ -182,6 +183,8 @@ class GenerateWeeklyAnalysis extends UseCase {
     let positionChanges = null;
     // Feature 012: deterministic macro week-over-week (null = no prior panel).
     let macroChanges = null;
+    // Feature 021: code-computed durations of the "sustained Nd" macro triggers.
+    let sustainedTriggers = null;
     // Feature 014: cross-broker duplicate-holdings groups (null until computed).
     let duplications = null;
     let riesgoPaisBp = null;
@@ -327,6 +330,15 @@ class GenerateWeeklyAnalysis extends UseCase {
         previousAnalysis ? previousAnalysis.macroContext : null,
         macroContext
       );
+      // 4c. Feature 021: how long each "sustained Nd" framework trigger has held,
+      //     from prior analyses' stored macro panels. Computed in code so the
+      //     model only reads the result; unavailable weeks are unknown, not breaks.
+      const priorMacroHistory = await this._loadPriorMacroHistory(targetDate);
+      sustainedTriggers = SustainedTriggerEvaluator.evaluate({
+        currentMacro: macroContext,
+        priorAnalyses: priorMacroHistory,
+        targetDate,
+      });
       // Mirror riesgo país onto the legacy columns for backward compat (FR-011).
       const rp = macroContext.riesgoPais;
       riesgoPaisBp = rp && rp.available && typeof rp.value === 'number' ? rp.value : null;
@@ -355,6 +367,7 @@ class GenerateWeeklyAnalysis extends UseCase {
           portfolioTotals,
           positionChanges,
           macroChanges,
+          sustainedTriggers,
           riesgoPaisBp,
           riesgoPaisAsOf,
           instructionsHistoryRowKey,
@@ -402,11 +415,12 @@ class GenerateWeeklyAnalysis extends UseCase {
         concentrationCaps,
         upcomingEvents,
         pendingChains,
+        sustainedTriggers,
       });
 
       const capturedBase = {
         targetDate, startedAt, model, portfolioSnapshot, administrativePositions, earmarkedPositions, duplications,
-        macroContext, macroUsage, portfolioTotals, positionChanges, macroChanges,
+        macroContext, macroUsage, portfolioTotals, positionChanges, macroChanges, sustainedTriggers,
         riesgoPaisBp, riesgoPaisAsOf, instructionsHistoryRowKey,
       };
 
@@ -481,6 +495,8 @@ class GenerateWeeklyAnalysis extends UseCase {
           positionChanges,
           // Feature 012: deterministic macro week-over-week comparison.
           macroChanges,
+          // Feature 021: sustained-trigger durations (null only if never computed).
+          sustainedTriggers,
           // Feature 010: code-computed sections (null when targets unavailable).
           driftByBucket,
           driftByAssetClass,
@@ -565,7 +581,7 @@ class GenerateWeeklyAnalysis extends UseCase {
     earmarkedPositions = [],
     duplications = null,
     macroContext = null, macroUsage = null, llmUsage = null, portfolioTotals = null,
-    positionChanges = null, macroChanges = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
+    positionChanges = null, macroChanges = null, sustainedTriggers = null, riesgoPaisBp = null, riesgoPaisAsOf = null,
   }) {
     // Feature 006: whatever context was gathered before the failure is
     // preserved on the failed row (macro, totals, position changes) and the
@@ -593,6 +609,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       portfolioTotals,
       positionChanges,
       macroChanges,
+      sustainedTriggers,
       riesgoPaisBp,
       riesgoPaisAsOf,
       tokensIn: usage.inputTokens || 0,
@@ -685,6 +702,25 @@ class GenerateWeeklyAnalysis extends UseCase {
     }
   }
 
+  /**
+   * Feature 021: prior completed analyses' macro panels, newest first, for the
+   * sustained-trigger day counts. One `getLatest` call carries them (rows are
+   * already parsed). A failure degrades to "no history" — the run continues.
+   * @private
+   */
+  async _loadPriorMacroHistory(targetDate) {
+    try {
+      const limit = Math.ceil(SustainedTriggerEvaluator.MAX_REQUIRED_DAYS / 7) + 3;
+      const recent = await this._analysisRepository.getLatest(limit);
+      return (recent || [])
+        .filter((a) => a && a.date < targetDate && a.status === 'completed')
+        .map((a) => ({ date: a.date, status: a.status, macroContext: a.macroContext || null }));
+    } catch (err) {
+      logger.warn('Could not load prior macro history; sustained triggers treated as having no history', { errorType: err && err.name });
+      return [];
+    }
+  }
+
   _snapshotFromSummary(summary) {
     if (!summary || !Array.isArray(summary.positions)) return [];
     return summary.positions
@@ -701,7 +737,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       }));
   }
 
-  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], earmarkedPositions = [], duplications = null, concentrationCaps = null, upcomingEvents = null, pendingChains = [] }) {
+  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], earmarkedPositions = [], duplications = null, concentrationCaps = null, upcomingEvents = null, pendingChains = [], sustainedTriggers = null }) {
     const adminPositions = Array.isArray(administrativePositions) ? administrativePositions : [];
     const earmarkedList = Array.isArray(earmarkedPositions) ? earmarkedPositions : [];
     // Feature 019: identify raw summary positions already classified earmarked
@@ -901,6 +937,34 @@ class GenerateWeeklyAnalysis extends UseCase {
       parts.push('```json', JSON.stringify(availableMacro), '```');
     } else {
       parts.push('unavailable');
+    }
+    // Feature 021: code-computed durations of the framework's "sustained Nd"
+    // triggers, right after the readings they qualify. Omitted when there is no
+    // macro panel (nothing to qualify).
+    if (macroContext && Array.isArray(sustainedTriggers) && sustainedTriggers.length > 0) {
+      parts.push(
+        '',
+        '## sustainedTriggers',
+        'Code-computed duration of each "sustained" framework trigger, ending at the current reading. Report a trigger FIRED only when `durationMet` is true. Do not estimate duration yourself. If `includesUnknown` is true, say part of the span rests on weeks with unavailable data; if `historyLimited` is true, say the count is a lower bound.',
+        '```json',
+        JSON.stringify(sustainedTriggers.map((t) => {
+          const row = {
+            key: t.key,
+            current: t.currentValue,
+            asOf: t.currentAsOf,
+            condition: `${t.comparator} ${t.threshold} ${t.unit}${t.key === 'bcraReserves' ? ' (net)' : ''} for ${t.requiredDays}d`,
+            status: t.status,
+            heldDays: t.heldDays,
+          };
+          if (t.daysRemaining !== null && t.daysRemaining !== undefined) row.daysRemaining = t.daysRemaining;
+          row.durationMet = t.durationMet;
+          row.includesUnknown = t.includesUnknown;
+          row.historyLimited = t.historyLimited;
+          if (t.note) row.note = t.note;
+          return row;
+        })),
+        '```'
+      );
     }
     return parts.join('\n');
   }

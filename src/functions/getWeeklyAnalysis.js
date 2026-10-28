@@ -88,6 +88,9 @@ app.http('getWeeklyAnalysis', {
         // Feature 012: deterministic macro week-over-week comparison (null on
         // pre-feature rows and first runs).
         macroChanges: analysis.macroChanges,
+        // Feature 021: code-computed "sustained Nd" macro trigger durations
+        // (null on pre-feature rows).
+        sustainedTriggers: analysis.sustainedTriggers,
         // Feature 013: administrative / non-investable positions (computed value
         // <= 0; excluded from drift/caps). [] on pre-feature rows and when none.
         administrativePositions: analysis.administrativePositions,

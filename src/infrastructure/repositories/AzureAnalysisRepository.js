@@ -315,6 +315,11 @@ class AzureAnalysisRepository extends AzureTableRepository {
     if (Array.isArray(wa.confirmationItems) && wa.confirmationItems.length > 0) {
       entity.confirmationItemsJson = JSON.stringify(wa.confirmationItems);
     }
+    // Feature 021: sustained-trigger durations. Only written when computed; a
+    // re-run upserts with 'Replace', so the column always reflects the latest run.
+    if (Array.isArray(wa.sustainedTriggers)) {
+      entity.sustainedTriggersJson = JSON.stringify(wa.sustainedTriggers);
+    }
     return entity;
   }
 
@@ -355,6 +360,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
     const earmarkedPositions = this._parseJsonColumn(entity.earmarkedPositionsJson, entity.rowKey, 'earmarkedPositionsJson', []);
     // Feature 020: confirmation items (absent on pre-feature rows / none → []).
     const confirmationItems = this._parseJsonColumn(entity.confirmationItemsJson, entity.rowKey, 'confirmationItemsJson', []);
+    // Feature 021: sustained-trigger durations (absent on pre-feature rows → null).
+    const sustainedTriggers = this._parseJsonColumn(entity.sustainedTriggersJson, entity.rowKey, 'sustainedTriggersJson', null);
     return new WeeklyAnalysis({
       date: entity.rowKey,
       status: entity.status,
@@ -396,6 +403,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
       earmarkedPositions,
       // Feature 020:
       confirmationItems,
+      // Feature 021:
+      sustainedTriggers,
     });
   }
 

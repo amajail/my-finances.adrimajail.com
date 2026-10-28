@@ -65,6 +65,13 @@ describe('get_weekly_analysis', () => {
     mockRepo.getByDate.mockResolvedValue({ analysis: analysis(), orders: [] });
     expect((await call('get_weekly_analysis', { date: '2026-10-24' })).confirmationItems).toEqual([]);
   });
+  it('exposes sustainedTriggers (feature 021), null for rows without them', async () => {
+    const rows = [{ key: 'riesgoPais', status: 'building', heldDays: 14, durationMet: false }];
+    mockRepo.getByDate.mockResolvedValue({ analysis: analysis({ sustainedTriggers: rows }), orders: [] });
+    expect((await call('get_weekly_analysis', { date: '2026-10-24' })).sustainedTriggers).toEqual(rows);
+    mockRepo.getByDate.mockResolvedValue({ analysis: analysis(), orders: [] });
+    expect((await call('get_weekly_analysis', { date: '2026-10-24' })).sustainedTriggers).toBeNull();
+  });
   it('returns codes on errors', async () => {
     expect((await call('get_weekly_analysis', { date: 'bad' })).code).toBe('ValidationError');
     mockRepo.getByDate.mockResolvedValue(null);
