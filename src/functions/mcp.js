@@ -178,7 +178,7 @@ app.mcpTool('mcpListWeeklyAnalyses', {
 app.mcpTool('mcpGetWeeklyAnalysis', {
   toolName: 'get_weekly_analysis',
   description:
-    'Get the full detail of one weekly AI portfolio analysis by date (YYYY-MM-DD), including the summary, narrative body, token/cost usage (tokensIn, tokensOut, costUsd), and recommended orders with their execution status.',
+    'Get the full detail of one weekly AI portfolio analysis by date (YYYY-MM-DD), including the summary, narrative body, token/cost usage (tokensIn, tokensOut, costUsd), and recommended orders with their execution status and age in weeks (ageWeeks), plus confirmationItems: orders pending too long or probably filled that need the owner to record an outcome (resolve via set_order_execution_status on the item\'s lastDate/lastIndex; use skipped with a note such as "still wanted" to keep one).',
   toolProperties: [
     {
       propertyName: 'date',
@@ -219,10 +219,15 @@ app.mcpTool('mcpGetWeeklyAnalysis', {
         conviction: o.conviction,
         executionStatus: o.executionStatus || 'pending',
         executionPrice: o.executionPrice != null ? o.executionPrice : null,
+        // Feature 020: prior consecutive weeks pending when issued (0 = new).
+        ageWeeks: o.ageWeeks || 0,
       }));
+      // Feature 020: orders awaiting owner confirmation ([] when none).
+      body.confirmationItems = analysis.confirmationItems || [];
     } else {
       body.errorMessage = analysis.errorMessage;
       body.orders = [];
+      body.confirmationItems = [];
     }
     return body;
   }),

@@ -50,6 +50,21 @@ describe('get_weekly_analysis', () => {
     const out = await call('get_weekly_analysis', { date: '2026-10-24' });
     expect(out).toMatchObject({ tokensIn: 100, tokensOut: 50, costUsd: 0.12 });
   });
+  it('exposes ageWeeks per order and confirmationItems (feature 020), defaulting for old rows', async () => {
+    const item = { broker: 'BROKER', symbol: 'SYMBOL', side: 'buy', quantity: 5, ageWeeks: 3, originDate: '2026-10-03', lastDate: '2026-10-17', lastIndex: 0, reason: 'stale', proposedStatus: null };
+    mockRepo.getByDate.mockResolvedValue({
+      analysis: analysis({ confirmationItems: [item] }),
+      orders: [
+        { index: 0, broker: 'BROKER', symbol: 'SYMBOL', side: 'buy', quantity: 5, rationale: 'r', conviction: 'low', ageWeeks: 2 },
+        { index: 1, broker: 'BROKER', symbol: 'OTHER', side: 'sell', quantity: 1, rationale: 'r', conviction: 'low' },
+      ],
+    });
+    const out = await call('get_weekly_analysis', { date: '2026-10-24' });
+    expect(out.orders.map((o) => o.ageWeeks)).toEqual([2, 0]);
+    expect(out.confirmationItems).toEqual([item]);
+    mockRepo.getByDate.mockResolvedValue({ analysis: analysis(), orders: [] });
+    expect((await call('get_weekly_analysis', { date: '2026-10-24' })).confirmationItems).toEqual([]);
+  });
   it('returns codes on errors', async () => {
     expect((await call('get_weekly_analysis', { date: 'bad' })).code).toBe('ValidationError');
     mockRepo.getByDate.mockResolvedValue(null);

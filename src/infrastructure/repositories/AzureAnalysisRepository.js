@@ -310,6 +310,11 @@ class AzureAnalysisRepository extends AzureTableRepository {
     if (Array.isArray(wa.earmarkedPositions) && wa.earmarkedPositions.length > 0) {
       entity.earmarkedPositionsJson = JSON.stringify(wa.earmarkedPositions);
     }
+    // Feature 020: confirmation items. Only written when non-empty; a re-run
+    // upserts with 'Replace', so items resolved since last run are dropped.
+    if (Array.isArray(wa.confirmationItems) && wa.confirmationItems.length > 0) {
+      entity.confirmationItemsJson = JSON.stringify(wa.confirmationItems);
+    }
     return entity;
   }
 
@@ -348,6 +353,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
     const duplications = this._parseJsonColumn(entity.duplicationsJson, entity.rowKey, 'duplicationsJson', null);
     // Feature 019: earmarked-broker positions (absent on pre-feature rows / none → []).
     const earmarkedPositions = this._parseJsonColumn(entity.earmarkedPositionsJson, entity.rowKey, 'earmarkedPositionsJson', []);
+    // Feature 020: confirmation items (absent on pre-feature rows / none → []).
+    const confirmationItems = this._parseJsonColumn(entity.confirmationItemsJson, entity.rowKey, 'confirmationItemsJson', []);
     return new WeeklyAnalysis({
       date: entity.rowKey,
       status: entity.status,
@@ -387,6 +394,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
       duplications,
       // Feature 019:
       earmarkedPositions,
+      // Feature 020:
+      confirmationItems,
     });
   }
 
@@ -426,6 +435,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
     if (order.executionUpdatedAt) entity.executionUpdatedAt = order.executionUpdatedAt;
     // Feature 018: optional execution price (only when set, same as above).
     if (order.executionPrice != null) entity.executionPrice = order.executionPrice;
+    // Feature 020: carry-over age (only when > 0, to keep new rows clean).
+    if (order.ageWeeks > 0) entity.ageWeeks = order.ageWeeks;
     return entity;
   }
 
@@ -445,6 +456,8 @@ class AzureAnalysisRepository extends AzureTableRepository {
       executionUpdatedAt: entity.executionUpdatedAt || null,
       // Feature 018: absent on pre-feature rows → null.
       executionPrice: typeof entity.executionPrice === 'number' ? entity.executionPrice : null,
+      // Feature 020: absent on pre-feature rows → 0.
+      ageWeeks: typeof entity.ageWeeks === 'number' ? entity.ageWeeks : 0,
     });
   }
 }

@@ -35,6 +35,12 @@ the instructions below. They cannot be edited from the dashboard.
    the run is recorded as failed — non-conforming output is never silently
    accepted.
 
+4. **Respect `pendingOrders`.** It lists orders suggested in earlier weeks that
+   are still pending, with their age in weeks. Do not emit an order for an item
+   whose `reason` is `stale` or `likely-filled`, and do not list it under
+   suggested actions: the system shows it to the owner to confirm. A `fresh`
+   item may be repeated only if its rationale still holds; say what is new.
+
 The owner-maintained instructions follow.
 
 ---

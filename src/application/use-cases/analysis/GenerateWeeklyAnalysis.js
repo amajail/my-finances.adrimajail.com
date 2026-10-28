@@ -24,6 +24,7 @@ const WeeklyAnalysis = require('../../../domain/entities/WeeklyAnalysis');
 const SuggestedOrder = require('../../../domain/entities/SuggestedOrder');
 const PositionChangeCalculator = require('../../../domain/services/PositionChangeCalculator');
 const MacroChangeCalculator = require('../../../domain/services/MacroChangeCalculator');
+const PendingOrderTracker = require('../../../domain/services/PendingOrderTracker');
 const DuplicateHoldingsDetector = require('../../../domain/services/DuplicateHoldingsDetector');
 const AllocationDriftCalculator = require('../../../domain/services/AllocationDriftCalculator');
 const { buildSystemPrompt } = require('./prompts/guardrails');
@@ -294,6 +295,17 @@ class GenerateWeeklyAnalysis extends UseCase {
         : null;
       positionChanges = PositionChangeCalculator.diff(priorSnapshot, investableSnapshot);
 
+      // 3c. Feature 020: orders still pending from earlier weeks, with age. The
+      //     chains drive both the model input and the deterministic post-filter
+      //     below (stale / likely-filled orders are never re-issued as normal).
+      const priorWeeks = await this._loadPriorWeeksForOrders(targetDate);
+      const pendingChains = PendingOrderTracker.build({
+        targetDate,
+        analyses: priorWeeks,
+        currentPositionChanges: positionChanges,
+      });
+      const confirmationItems = PendingOrderTracker.confirmationItems(pendingChains);
+
       // 4. Macro context panel (Feature 006, FR-001..FR-011). Resilient: a
       //    failing source becomes available:false and the run proceeds — riesgo
       //    país included (no longer fatal).
@@ -389,6 +401,7 @@ class GenerateWeeklyAnalysis extends UseCase {
         duplications,
         concentrationCaps,
         upcomingEvents,
+        pendingChains,
       });
 
       const capturedBase = {
@@ -461,6 +474,8 @@ class GenerateWeeklyAnalysis extends UseCase {
           duplications,
           // Feature 019: earmarked-broker positions ([] when none).
           earmarkedPositions,
+          // Feature 020: orders awaiting owner confirmation ([] when none).
+          confirmationItems,
           macroContext,
           portfolioTotals,
           positionChanges,
@@ -481,7 +496,20 @@ class GenerateWeeklyAnalysis extends UseCase {
           instructionsHistoryRowKey,
         });
 
-        orders = (llmResult.orders || []).map((o, idx) => new SuggestedOrder({
+        // Feature 020 (FR-003/FR-013): an order whose chain is stale or likely
+        // filled is never saved as a normal order; it lives on as a confirmation
+        // item. Younger repeats are stamped with their age (FR-002). Surviving
+        // orders are re-indexed contiguously.
+        const blockedKeys = new Set(pendingChains.filter((c) => c.reason !== 'fresh').map((c) => c.key));
+        const ageByKey = new Map(pendingChains.filter((c) => c.reason === 'fresh').map((c) => [c.key, c.ageWeeks]));
+        const keptOrders = (llmResult.orders || []).filter((o) => !blockedKeys.has(PendingOrderTracker.keyOf(o)));
+        if (keptOrders.length !== (llmResult.orders || []).length) {
+          logger.info('GenerateWeeklyAnalysis: dropped re-issued stale/likely-filled orders', {
+            date: targetDate,
+            dropped: (llmResult.orders || []).length - keptOrders.length,
+          });
+        }
+        orders = keptOrders.map((o, idx) => new SuggestedOrder({
           analysisDate: targetDate,
           index: idx,
           broker: o.broker,
@@ -490,6 +518,7 @@ class GenerateWeeklyAnalysis extends UseCase {
           quantity: o.quantity,
           rationale: o.rationale,
           conviction: o.conviction,
+          ageWeeks: ageByKey.get(PendingOrderTracker.keyOf(o)) || 0,
         }));
       } catch (buildErr) {
         // The paid LLM call already happened: persist a failed row carrying its
@@ -617,6 +646,45 @@ class GenerateWeeklyAnalysis extends UseCase {
     }
   }
 
+  /**
+   * Feature 020: the last completed analyses before `currentDate` with their
+   * orders, position changes and confirmation items, for PendingOrderTracker.
+   * Degrades to [] (no prior orders) on any storage error — the run must still
+   * work (FR-011); at worst a stale order is re-issued once more.
+   */
+  async _loadPriorWeeksForOrders(currentDate) {
+    try {
+      const recent = await this._analysisRepository.getLatest(PendingOrderTracker.MAX_LOOKBACK_WEEKS + 2);
+      const dates = (recent || [])
+        .filter((a) => a.date < currentDate && a.status === 'completed')
+        .slice(0, PendingOrderTracker.MAX_LOOKBACK_WEEKS)
+        .map((a) => a.date);
+      const weeks = [];
+      for (const date of dates) {
+        const found = await this._analysisRepository.getByDate(date);
+        if (!found || !found.analysis) continue;
+        weeks.push({
+          date,
+          status: found.analysis.status,
+          positionChanges: found.analysis.positionChanges,
+          confirmationItems: found.analysis.confirmationItems || [],
+          orders: (found.orders || []).map((o) => ({
+            index: o.index,
+            broker: o.broker,
+            symbol: o.symbol,
+            side: o.side,
+            quantity: o.quantity,
+            executionStatus: o.executionStatus || 'pending',
+          })),
+        });
+      }
+      return weeks;
+    } catch (err) {
+      logger.warn('Could not load prior orders; treating as no pending orders', { errorType: err && err.name });
+      return [];
+    }
+  }
+
   _snapshotFromSummary(summary) {
     if (!summary || !Array.isArray(summary.positions)) return [];
     return summary.positions
@@ -633,7 +701,7 @@ class GenerateWeeklyAnalysis extends UseCase {
       }));
   }
 
-  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], earmarkedPositions = [], duplications = null, concentrationCaps = null, upcomingEvents = null }) {
+  _buildUserMessage({ generatedAt, portfolioSummary, previousAnalysis, macroContext, portfolioTotals, positionChanges, administrativePositions = [], earmarkedPositions = [], duplications = null, concentrationCaps = null, upcomingEvents = null, pendingChains = [] }) {
     const adminPositions = Array.isArray(administrativePositions) ? administrativePositions : [];
     const earmarkedList = Array.isArray(earmarkedPositions) ? earmarkedPositions : [];
     // Feature 019: identify raw summary positions already classified earmarked
@@ -800,6 +868,27 @@ class GenerateWeeklyAnalysis extends UseCase {
       parts.push('```json', JSON.stringify(previousForPrompt), '```');
     } else {
       parts.push('none — first run');
+    }
+    // Feature 020: orders still pending from earlier weeks. `reason` stale /
+    // likely-filled means the system will NOT save a repeat as a normal order;
+    // it is shown to the owner as a confirmation item instead.
+    parts.push('', '## pendingOrders');
+    if (pendingChains.length === 0) {
+      parts.push('none');
+    } else {
+      parts.push('```json', JSON.stringify({
+        maxConsecutiveIssues: PendingOrderTracker.MAX_CONSECUTIVE_ISSUES,
+        orders: pendingChains.map((c) => ({
+          broker: c.broker,
+          symbol: c.symbol,
+          side: c.side,
+          quantity: c.lastQuantity,
+          ageWeeks: c.ageWeeks,
+          status: 'pending',
+          reason: c.reason,
+          proposedStatus: c.proposedStatus,
+        })),
+      }), '```');
     }
     parts.push('', '## macroContext');
     if (macroContext) {

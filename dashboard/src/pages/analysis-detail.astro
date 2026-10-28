@@ -213,6 +213,31 @@ import Layout from '../layouts/Layout.astro';
     </table>
   </section>
 
+  <section id="confirmation-section" class="card mb-6 overflow-x-auto hidden">
+    <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-baseline justify-between">
+      <h2 class="font-semibold">Needs your confirmation</h2>
+      <span class="text-xs text-[var(--color-muted)]" id="confirmation-count">—</span>
+    </div>
+    <p class="px-4 py-2 text-xs text-[var(--color-muted)]">
+      These orders were not repeated this week. Open the linked week and record an outcome on the order
+      (executed, partial or skipped). To keep one, mark it skipped with a note such as "still wanted"; a fresh order may then follow.
+    </p>
+    <table class="w-full text-sm">
+      <thead class="bg-[var(--color-surface-2)]">
+        <tr class="text-xs uppercase text-[var(--color-muted)]">
+          <th class="text-left px-4 py-2">Broker</th>
+          <th class="text-left px-4 py-2">Symbol</th>
+          <th class="text-left px-4 py-2">Side</th>
+          <th class="text-right px-4 py-2">Qty</th>
+          <th class="text-left px-4 py-2">Age</th>
+          <th class="text-left px-4 py-2">Why</th>
+          <th class="text-left px-4 py-2">Resolve</th>
+        </tr>
+      </thead>
+      <tbody id="confirmation-tbody"></tbody>
+    </table>
+  </section>
+
   <section id="orders-section" class="card mb-6 overflow-x-auto hidden">
     <div class="px-4 py-3 border-b border-[var(--color-border)] flex items-baseline justify-between">
       <h2 class="font-semibold">Suggested orders</h2>
@@ -260,7 +285,7 @@ import Layout from '../layouts/Layout.astro';
   import {
     renderMacroWow, renderDrift, renderCaps, renderWatchlist, renderWeekOverWeek, renderAmendments,
   } from '../lib/analysis-detail/drift.js';
-  import { renderOrders } from '../lib/analysis-detail/orders.js';
+  import { renderOrders, renderConfirmationItems } from '../lib/analysis-detail/orders.js';
 
   function show(el) { el.classList.remove('hidden'); }
 
@@ -337,6 +362,9 @@ import Layout from '../layouts/Layout.astro';
         if (Array.isArray(detail.orders) && detail.orders.length > 0) {
           renderOrders(detail, date, load);
         }
+
+        // Feature 020: orders pending too long or probably filled.
+        renderConfirmationItems(detail);
 
         if (detail.markdownBody) {
           const raw = marked.parse(detail.markdownBody, { gfm: true, breaks: false });

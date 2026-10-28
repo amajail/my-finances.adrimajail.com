@@ -24,6 +24,8 @@ const KNOWN_BROKERS = ['galicia', 'iol', 'ibkr', 'bullmarket', 'cash'];
 // Feature 007: owner-set execution outcome for a suggestion. Default 'pending'.
 const EXECUTION_STATUSES = ['pending', 'executed', 'partial', 'skipped'];
 const NOTE_MAX = 500;
+// Feature 020: prior consecutive weeks an order was already pending when re-issued.
+const MAX_AGE_WEEKS = 8;
 
 class SuggestedOrder {
   /**
@@ -61,6 +63,10 @@ class SuggestedOrder {
     this._executionPrice = data.executionPrice !== undefined && data.executionPrice !== null
       ? Number(data.executionPrice)
       : null;
+    // Feature 020: carry-over age in weeks (0 = new). Absent on pre-feature rows.
+    this._ageWeeks = data.ageWeeks !== undefined && data.ageWeeks !== null
+      ? Number(data.ageWeeks)
+      : 0;
 
     this._validate();
     Object.freeze(this);
@@ -103,6 +109,10 @@ class SuggestedOrder {
       errors.push('executionPrice must be a positive number when provided');
     }
 
+    if (!Number.isInteger(this._ageWeeks) || this._ageWeeks < 0 || this._ageWeeks > MAX_AGE_WEEKS) {
+      errors.push(`ageWeeks must be an integer between 0 and ${MAX_AGE_WEEKS} inclusive`);
+    }
+
     if (errors.length > 0) {
       throw new ValidationError(
         errors.join('; '),
@@ -123,6 +133,7 @@ class SuggestedOrder {
   get executionNote() { return this._executionNote; }
   get executionUpdatedAt() { return this._executionUpdatedAt; }
   get executionPrice() { return this._executionPrice; }
+  get ageWeeks() { return this._ageWeeks; }
   isMarked() { return this._executionStatus !== 'pending'; }
 
   /**
@@ -149,6 +160,7 @@ class SuggestedOrder {
       executionNote: this._executionNote,
       executionUpdatedAt: this._executionUpdatedAt,
       executionPrice: this._executionPrice,
+      ageWeeks: this._ageWeeks,
     };
   }
 
