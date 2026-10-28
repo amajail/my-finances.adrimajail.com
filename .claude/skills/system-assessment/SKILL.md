@@ -32,7 +32,8 @@ and brainstorm.
   connector tool. This skill has no business writing.
 - **Bash whitelist:** `npm run test:unit`, `npm run lint`,
   `npm run format:check`, `git log`, `git diff` (informational), `gh run list`,
-  `gh pr list`, and read-only `az` queries (Step 3, owner-approved).
+  `gh pr list`, `node ~/repos/dev-kit/scripts/privacy-scan.js --staged|--range`
+  (Step 9 gate), and read-only `az` queries (Step 3, owner-approved).
 - **Never run:** `npm run format` (mutates), `npm run test:coverage` (writes
   `coverage/`), `npm test` / `test:integration` (hit external network
   providers, so flaky and not a code-health signal).
@@ -49,18 +50,38 @@ and brainstorm.
   options and mark one "(Recommended)". If the tool is unavailable, print the
   same question as a plain-text numbered list (`1.`, `2.`, ...) with the
   recommended default marked, and wait for the owner's reply. Record each
-  answer for Step 8; do not act on it.
+  answer for Step 8; do not act on it. Once the findings are gathered, up to 4
+  questions may go in one `AskUserQuestion` call (e.g. Steps 3-6 together); each
+  stays its own decision with its own recommended option.
+- **Spend tokens once:** send independent calls in one message (Step 1 reads, the
+  Step 3 shell commands). Launch the Step 4 review in the background right after
+  Step 2 and use the wait for Steps 5-7. Invoke `claude-api` once, in Step 2
+  only, and take from it just the lineup table with its cache date and the
+  thinking / `tool_choice` / sampling / tool-type notes; never reload it.
 - "What is current" Claude facts (lineup, ids, pricing, migration notes) are
   never hardcoded here and never answered from memory — they come from the
   `claude-api` skill at run time (Step 2). Say in Open Questions that they
   were current as of that skill's cache date.
 
+## Step 0 — Carry forward from the last assessment (R)
+
+`ls docs/research/system-assessment-*.md`. If one exists, read only its Sections
+7 and 8 (decisions, open questions), not the whole report. Build a delta list:
+which chosen actions have shipped since its date (`git log --since`, a grep for
+the thing), which open questions are still open, which facts are still unread
+(e.g. `analysis.imfModel`). Do not re-ask a decision already made unless the
+fact under it changed. The report opens with a "Changes since last assessment"
+section built from this list. No earlier report: say "first run" and continue.
+
 ## Step 1 — Establish the live baseline (R)
 
 1. `list_weekly_analyses` (limit ~12). Note count, statuses, date cadence.
-2. `get_weekly_analysis` for the newest `completed` date. Extract only
-   `modelUsed`, the `markdownBody` section headers present, and the order
-   count. Drop everything else — the narrative and orders carry real holdings.
+2. `get_weekly_analysis` for the newest `completed` date, once. Extract only
+   `modelUsed`, the `markdownBody` section headers present, its approximate
+   length, and the order count. Drop everything else — the narrative and orders
+   carry real holdings. Step 6 reuses this payload.
+3. Note every `symbol` value that appears in any payload read this run, in a
+   scratchpad file (never in the repo). Step 8 greps the report for them.
 
 Neither tool returns `tokensIn`/`tokensOut`/`costUsd`/`attempts`/`stopReason`
 even though the `WeeklyAnalysis` entity stores them. That gap caps Steps 3 and
@@ -83,7 +104,10 @@ are missing from `MODEL_RATES`. A missing id only skews `costUsd` (it falls
 back to `DEFAULT_RATES`); the cost cap is token-based and unaffected.
 
 **API-compatibility check** against those migration notes for the target
-model. The LLM client depends on: forced `tool_choice: {type: 'tool'}` in
+model. Start with one grep over the client:
+`grep -nE "tool_choice|thinking|temperature|top_p|top_k|budget_tokens|cache_control|max_tokens|web_search_" src/infrastructure/llm/AnthropicLLMClient.js`.
+Check forced `tool_choice` first: it was the blocking item last time, and it
+decides whether option (a) below is safe. The LLM client depends on: forced `tool_choice: {type: 'tool'}` in
 `_submitOnce` and `classify`, `cache_control: ephemeral` on the system prompt,
 `max_tokens` as a truncation ceiling, `tool_choice: {type: 'auto'}` plus the
 `web_search_*` server tool in `classifyWithWebSearch`, and no `thinking`,
@@ -98,7 +122,8 @@ check is clean; (b) small PR: new id in `MODEL_RATES`, update `DEFAULTS.model`
 and any client changes the check demands; (c) stay; (d) provider question —
 point to `docs/research/llm-provider-abstraction.md`. Also offer a trial: run
 one week on the new model and compare outputs with `analysis-quality-review`
-before switching for good. Recommend per the compatibility result.
+before switching for good. Recommend per the compatibility result. If the
+newest tier is blocked, offer the newest tier that is not.
 
 ## Step 3 — Logs and errors (R, then B)
 
@@ -107,25 +132,40 @@ before switching for good. Recommend per the compatibility result.
 - `list_audit_entries` (limit ~20): skim for anomalies (failed refresh ratios,
   unexpected writers). Report counts and operations only — targets contain
   holdings.
-- Fix proxy: `git log --oneline -60 | grep -iE "^[0-9a-f]+ fix"`.
-- CI: `gh run list --workflow pr-checks.yml --limit 5` and
-  `gh run list --workflow deploy-azure-function.yml --limit 3`.
-- **Optional, owner-approved per run:** read-only App Insights
-  (`az monitor app-insights query --app <name> --analytics-query "exceptions |
-where timestamp > ago(30d) | summarize count() by problemId, outerMessage"`).
-  This is the only source of runtime errors, since the timer handlers swallow
-  failures into `context.log.error`. First check `command -v az` and
-  `az account show`; if unavailable or the owner declines, say so and skip. The
-  app name is in `CLAUDE.local.md`, else ask. Never run queries unasked and
-  never write raw payloads into the report.
+- Fix proxy, CI and `az` check go in **one** Bash call, since they are
+  independent: `git log --oneline -60 | grep -iE "^[0-9a-f]+ fix"`,
+  `gh run list --workflow pr-checks.yml --limit 5`,
+  `gh run list --workflow deploy-azure-function.yml --limit 3`,
+  `command -v az && az account show`.
+- **Optional, owner-approved per run:** read-only App Insights, counts only.
+  If `az` is unavailable or the owner declines, say so and skip. Component:
+  `CLAUDE.local.md` first; else `az resource list --resource-type
+microsoft.insights/components --query "[].{name:name,rg:resourceGroup}" -o tsv`
+  and pick the one matching this repo (ask only if ambiguous). After a
+  successful run, offer to save its name and resource group to `CLAUDE.local.md`
+  (gitignored) so later runs skip discovery — only on an explicit yes. Run all
+  three queries with `--analytics-query`, 30 days:
+  1. `exceptions | summarize count() by problemId, outerMessage`
+  2. `union requests, traces, exceptions | summarize n=count() by itemType` —
+     an empty result in 1 only means "clean" if this shows telemetry exists.
+  3. `traces | summarize n=count() by severityLevel` — the timer handlers
+     swallow failures into `context.log.error`, so they land in traces, not
+     exceptions. If audit entries show failed refreshes but no trace above
+     severity 1 exists, report that as a visibility finding.
+     Never run queries unasked and never write raw payloads into the report.
 
 ## Step 4 — Code-quality pass (R)
 
-Delegate to `/code-review low` (or `medium`) on the fixed path targets
+Delegate to `/code-review medium` on the fixed path targets
 `src/application/use-cases/analysis`, `src/infrastructure/llm` and
 `src/functions/mcp.js` — as path targets, never against a diff, never with
-`--fix`/`--comment`. First confirm the paths exist. Hold findings for the
-Step 3 checkpoint; do not fix anything.
+`--fix`/`--comment`. First confirm the paths exist. Launch it in the background
+right after Step 2. Hold findings for the Step 3 checkpoint; do not fix
+anything. A `low` pass is not a substitute: last time it returned "none" after
+3 tool calls and ~12 s and the `medium` re-run found 10 issues. Treat any result
+that thin as unverified, never as clean, and say so in the report. Build the
+report's findings table directly from the review's returned list and take the
+count from it.
 
 **Brainstorm (shared with Step 3):** present failures, CI health and review
 findings together. Options per item: track as ad-hoc fix, track as a speckit
@@ -148,8 +188,14 @@ changes are code PRs, not Settings tweaks.
 ## Step 6 — Token consumption (R, then B)
 
 Only structural proxies are observable (Step 1 gap): `markdownBody` length and
-section-count trend across the last few `get_weekly_analysis` calls — numbers
-only, never content. Point at `docs/research/foundry-feasibility.md` (eval
+section-count trend — numbers only, never content, labelled approximate. Reuse
+the Step 1 payload and fetch at most two more dates, spaced weeks apart. Also
+record the static prompt size (`wc -c` on the active preamble and the default
+instructions body) and compare it with the minimum cacheable prefix in the
+`claude-api` notes, since weekly cadence outlasts the cache TTL. Check whether
+`costUsd` counts cache tokens
+(`grep -nE "cache_creation|cache_read" src/infrastructure/llm/AnthropicLLMClient.js`).
+Point at `docs/research/foundry-feasibility.md` (eval
 harness + OpenTelemetry `gen_ai` span) as the real fix instead of re-deriving
 one. A candidate feature to surface: expose the stored token, cost, attempts
 and stop-reason fields through `get_weekly_analysis`.
@@ -162,7 +208,15 @@ Re-derive backlog state live; never quote a doc or this skill as current fact.
 Read `docs/roadmap-2026-07.md` and the memory project entries, then grep the
 code for every item the roadmap calls missing or deferred (for example check
 `src/domain/services/` for `DuplicateHoldingsDetector`; the roadmap has
-claimed it absent after it shipped). List ideas that fall out of Steps 1-6.
+claimed it absent after it shipped). One batched check covers most items:
+`ls src/domain/services/ specs/`,
+`grep -n typography dashboard/package.json`,
+`ls eslint.config.* .prettierrc*`,
+`grep -rliE "what-?if|simulat" src dashboard/src`. Items that only live in the
+DB-stored instructions cannot be verified from code; say so. List the stale
+roadmap lines in the report and offer (Step 9) to refresh
+`docs/roadmap-2026-07.md` as a separate change. List ideas that fall out of
+Steps 1-6.
 
 **Brainstorm:** present a numbered menu of what is genuinely open plus new
 ideas; the owner picks, the skill does not decide.
@@ -173,13 +227,18 @@ Assemble only what Steps 2-7 already decided, using
 `.claude/skills/system-assessment/report-template.md`. Write
 `docs/research/system-assessment-YYYY-MM-DD.md` (run date). No new questions
 here. Header records this session's own model id. Before saving, grep the
-draft for tickers, numbers that look like quantities or prices, and account
-ids; remove anything found.
+draft with the Step 1 symbol list (`grep -nwFf <scratchpad symbol file> <report>`)
+and for numbers that look like quantities or prices (`[0-9]{1,3}(,[0-9]{3})+`,
+`[0-9]+\.[0-9]{2,}`, `US\$`); remove anything found. A hand-typed ticker list is
+not enough: it only catches symbols you remembered.
 
 ## Step 9 — Close out (B)
 
 Show the file path. Ask whether to commit it (ad-hoc work needs an explicit
-yes per CLAUDE.md; branch `docs/…` off `main`, never commit to `main`) and
-whether to add it to the Contents list in `docs/research/README.md`. Never
-commit or push without that yes. End by restating what the owner chose to do
-next.
+yes per CLAUDE.md; branch `docs/…` off `main`, never commit to `main`),
+whether to add it to the Contents list in `docs/research/README.md`, and
+whether to refresh a stale roadmap. On a yes, stage by explicit path, then run
+`node ~/repos/dev-kit/scripts/privacy-scan.js --staged` and commit only if it is
+clean. The scanner cannot know real tickers unless `.claude/private-symbols.txt`
+exists, so the Step 8 symbol grep stays required. Never commit or push without
+that yes. End by restating what the owner chose to do next.

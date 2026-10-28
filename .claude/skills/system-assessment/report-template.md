@@ -4,6 +4,11 @@ Status: exploratory assessment, no real holdings data (quantities, PPC, account
 identifiers, or symbols) — per docs/research/README.md convention.
 Model used for this assessment run: <this session's own model id>
 
+## Changes Since Last Assessment
+
+<!-- From Step 0: previous report date, which chosen actions have shipped, which open
+questions are still open. "First run" if there is no earlier report. -->
+
 ## 1. Model Version
 
 <!-- Four-way diff (live modelUsed, coded default, MODEL_RATES keys, IMF model) vs the
