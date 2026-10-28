@@ -30,6 +30,8 @@ Item shape:
   "quantity": 1,
   "ageWeeks": 4,
   "originDate": "2026-01-02",
+  "lastDate": "2026-01-23",
+  "lastIndex": 0,
   "reason": "stale",
   "proposedStatus": null
 }
@@ -41,8 +43,9 @@ Item shape:
 
 1. An order whose chain is stale or likely-filled never appears in `orders[]` of a newly generated analysis; it appears only in `confirmationItems`.
 2. An order within the threshold may appear in `orders[]` with `ageWeeks >= 1`.
-3. Resolving an order via the existing execution-status write (`PUT` order status / MCP `set_order_execution_status`) removes its chain from the next generated analysis. The write contract is unchanged.
-4. Analyses generated before this feature return `ageWeeks: 0` on orders and `confirmationItems: []`.
+3. To resolve an item, record an outcome on the order row at `lastDate` and `lastIndex` with the existing write. "Still wanted" is `skipped` with a note such as "still wanted"; the chain ends and a fresh order may follow. An unresolved item keeps counting as pending in later runs.
+4. Resolving an order via the existing execution-status write (`PUT` order status / MCP `set_order_execution_status`) removes its chain from the next generated analysis. The write contract is unchanged.
+5. Analyses generated before this feature return `ageWeeks: 0` on orders and `confirmationItems: []`.
 
 ## Model input (internal, `## pendingOrders` block)
 

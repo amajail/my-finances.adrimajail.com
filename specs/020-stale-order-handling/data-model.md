@@ -23,7 +23,9 @@ Computed by `PendingOrderTracker` for the target date from the last 8 completed 
 | `ageWeeks` | integer 1..8 | number of consecutive pending weeks |
 | `lastQuantity` | number | quantity in the most recent instance |
 | `proposedStatus` | `executed` \| `partial` \| null | cross-week fill proposal (never `skipped`) |
-| `reason` | `fresh` \| `stale` \| `likely-filled` | `stale` when `ageWeeks > STALE_AFTER_WEEKS`; `likely-filled` when `proposedStatus` is set; `fresh` otherwise |
+| `reason` | `fresh` \| `stale` \| `likely-filled` | `stale` when `ageWeeks >= MAX_CONSECUTIVE_ISSUES`; `likely-filled` when `proposedStatus` is set; `fresh` otherwise |
+
+Carry-forward: a `confirmationItem` stored on the most recent prior analysis counts as a pending instance of its key (age +1, `lastDate`/`lastIndex` unchanged) until the order row it points to is resolved.
 
 State: a chain is created by the first pending instance, grows by one per consecutive week, and ends when a week has no matching order, or the matching order is marked `executed`, `partial` or `skipped`.
 
@@ -35,6 +37,8 @@ State: a chain is created by the first pending instance, grows by one per consec
 | `quantity` | number | quantity in the most recent instance |
 | `ageWeeks` | integer | |
 | `originDate` | ISO date | |
+| `lastDate` | ISO date | analysis date of the most recent order row (or carried item) in the chain; the row the owner resolves |
+| `lastIndex` | integer | order index of that row within `lastDate` |
 | `reason` | `stale` \| `likely-filled` | |
 | `proposedStatus` | `executed` \| `partial` \| null | present for `likely-filled` |
 
@@ -42,7 +46,7 @@ Stored as `confirmationItemsJson` (array, `[]` when none) on `portfolioAnalysis`
 
 ## Constants
 
-`STALE_AFTER_WEEKS = 3` exported from `PendingOrderTracker`; an order is stale when `ageWeeks > STALE_AFTER_WEEKS`. `MAX_LOOKBACK_WEEKS = 8`.
+`MAX_CONSECUTIVE_ISSUES = 3` exported from `PendingOrderTracker`; a chain is escalated when it already has `ageWeeks >= MAX_CONSECUTIVE_ISSUES` prior pending weeks (a repeat would be the 4th issue). `MAX_LOOKBACK_WEEKS = 8`.
 
 ## Relationships
 

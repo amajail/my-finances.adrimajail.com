@@ -32,5 +32,5 @@
 ## Notes
 
 - The input mentions the existing matcher component by name; the spec refers to it only as "matching" behaviour.
-- Defaults chosen instead of clarification markers: age counted in completed analyses; failed runs do not age orders; threshold configurable at "more than 3 weeks".
+- Defaults chosen instead of clarification markers: age counted in completed analyses; failed runs do not age orders; limit of 3 consecutive issues configurable (default 3).
 - Spec contains placeholders only (constitution §I).

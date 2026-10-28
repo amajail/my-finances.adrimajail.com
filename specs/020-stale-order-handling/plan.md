@@ -9,7 +9,7 @@
 The weekly analysis re-issues the same pending order for weeks because (a) it only sees the single previous week's orders, with no age, and (b) the prompt rule "do not silently repeat" is advice, not enforcement. The plan makes the guarantee deterministic and keeps the model out of the loop where it can fail:
 
 1. A pure domain service, `PendingOrderTracker`, builds per-order "chains" (same broker + symbol + side, pending, in consecutive completed analyses) with an age in weeks, from the last 8 completed analyses and their stored position changes.
-2. `GenerateWeeklyAnalysis` injects the chains into the model input (`## pendingOrders`), then post-filters the model's `orders[]` in code: orders matching a stale chain (age > threshold) or a probable-fill chain are removed and recorded as confirmation items; orders matching a younger chain are stamped with `ageWeeks` (carry-over label).
+2. Unresolved confirmation items of the prior analysis count as pending chain members, so escalation cannot be bypassed by skipping a week. `GenerateWeeklyAnalysis` injects the chains into the model input (`## pendingOrders`), then post-filters the model's `orders[]` in code: orders matching a stale chain (already pending in the last 3 consecutive weeks) or a probable-fill chain are removed and recorded as confirmation items; orders matching a younger chain are stamped with `ageWeeks` (carry-over label).
 3. `OrderExecutionMatcher` gains a multi-week mode with greedy consumption so one position change satisfies at most one order; the read path and the tracker both use it. Proposals stay display-only.
 4. The API/MCP expose `ageWeeks` on orders and a `confirmationItems` list on the analysis. The dashboard renders the list as a panel.
 
@@ -92,7 +92,7 @@ tests/unit/
 └── functions/                           # getWeeklyAnalysis read path
 ```
 
-**Structure Decision**: extend the existing clean-architecture layout; one new domain service, no new use case or table. The staleness threshold is a single exported constant (`STALE_AFTER_WEEKS = 3`) owned by `PendingOrderTracker` and referenced by the use case and prompt builder, never repeated in prompt prose (FR-006).
+**Structure Decision**: extend the existing clean-architecture layout; one new domain service, no new use case or table. The staleness threshold is a single exported constant (`MAX_CONSECUTIVE_ISSUES = 3`) owned by `PendingOrderTracker` and referenced by the use case and prompt builder, never repeated in prompt prose (FR-006).
 
 ## Complexity Tracking
 

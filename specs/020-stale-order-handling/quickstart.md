@@ -17,7 +17,7 @@ npx jest tests/unit/domain/services/PendingOrderTracker.test.js \
 
 Expected: all pass. They cover, with placeholder data:
 
-- Aging: a pending order in 4 consecutive completed weeks has `ageWeeks = 4` and reason `stale`; exactly 3 is `fresh`.
+- Aging: a pending order in 3 consecutive completed weeks has `ageWeeks = 3` and reason `stale`; 2 is `fresh`. An escalated item is carried forward: weeks 5 and 6 still list it (age 4, 5) and the model cannot re-issue it as new until the owner marks `lastDate`/`lastIndex` as `skipped`.
 - Chain breaks: a week with no matching order, a non-pending status, or an opposite-side order ends the chain; failed analyses are skipped, not counted.
 - Cross-week fill: a later increase covering the quantity proposes `executed`, a smaller one `partial`, none leaves `null` (never `skipped`); weeks with unknown changes are ignored.
 - No double count: two pending orders for the same broker+symbol+side share one change.

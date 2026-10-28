@@ -17,7 +17,7 @@ No `NEEDS CLARIFICATION` items remained after the spec. The decisions below come
 ## R3. Order identity across weeks
 
 - **Decision**: an order's identity is `broker + symbol + side`. A chain is the run of consecutive completed analyses, walking back from the most recent prior one, in which an order with that key exists and is `pending`. The walk stops at the first week without such an order, or whose matching order has a non-pending status.
-- **Rationale**: the re-issued order is a new row each week (new date, new index), so marking the original row never resolves its re-issues; chain identity by key is the only stable link. Quantity is deliberately not part of the key (the model may re-issue with a slightly different size).
+- **Rationale**: the re-issued order is a new row each week (new date, new index), so marking the original row never resolves its re-issues; chain identity by key is the only stable link. A confirmation item stored on the previous analysis counts as a pending instance of its key (age +1), so an escalated order stays in its chain until the owner resolves it; without this the filter itself would end the chain and the order would return as new after one week. Quantity is deliberately not part of the key (the model may re-issue with a slightly different size).
 - **Alternatives considered**: add a persistent `originOrderId`. Rejected for now: needs a schema change on every row and a backfill; the key-based walk reproduces the same answer from existing data.
 
 ## R4. How far back to look
@@ -55,10 +55,24 @@ No `NEEDS CLARIFICATION` items remained after the spec. The decisions below come
 
 ## R10. Prompt change
 
-- **Decision**: add a `## pendingOrders` block to the user message built in `_buildUserMessage` and one short entry in `weekly-rebalance-v1.md` describing it. The threshold value comes from the exported constant, interpolated into the block, never typed into the prompt file.
+- **Decision**: add a `## pendingOrders` block to the user message built in `_buildUserMessage` and one short entry in `weekly-rebalance-v1.md` describing it. The limit (3) comes from the exported `MAX_CONSECUTIVE_ISSUES` constant, interpolated into the block, never typed into the prompt file.
 - **Rationale**: FR-006 (single setting). This is a committed-prompt change, so it ships through this feature's PR, not the owner's instructions document.
 
 ## R11. Dashboard
 
 - **Decision**: render `confirmationItems` as a small panel above the order list and show `ageWeeks` as a badge. Owners resolve items with the existing execution-status control; no new write path.
 - **Rationale**: SC-004 (one confirmation per order) is met by the existing status action on the original or latest order row.
+
+## R12. Resolving an escalated order ("still wanted")
+
+- **Decision**: the owner records the old order, at the `lastDate` and `lastIndex` shown on the confirmation item, as `executed`, `partial` or `skipped`. "Still wanted" is `skipped` with a note such as "still wanted": the chain ends and the next analysis may issue a fresh order with age 0.
+- **Rationale**: reuses the existing write path and freeze rule (marking an old week freezes only that old week); no new status value or endpoint.
+- **Alternatives considered**: a new `snoozed` status. Rejected: a schema and enum change for one use.
+
+## R13. Prompt and narrative consistency
+
+- **Decision**: the prompt tells the model not to list items marked `stale` or `likely-filled` in Suggested Actions, because the system lists them as confirmation items. The code filter remains the guarantee if the model ignores this.
+
+## R14. Which weeks count as fills
+
+- **Decision**: only completed weeks strictly after the order's issue week. A position change in the issue week predates the order, so it cannot be its fill. The existing single-week `propose` in the read path is left unchanged but should be re-examined against feature 007's intent during implementation (task T024).

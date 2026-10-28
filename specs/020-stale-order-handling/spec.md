@@ -30,18 +30,18 @@ When the weekly analysis runs, it is told which orders it suggested in recent we
 
 ### User Story 2 - Orders pending too long are escalated, not silently re-issued (Priority: P1)
 
-An order that has stayed `pending` for more than 3 weeks is no longer repeated as a normal suggestion. Instead the weekly analysis surfaces it in a distinct "needs your confirmation" item that asks the owner whether it was executed, skipped or is still wanted.
+An order that has already been issued as `pending` in 3 consecutive weeks (so another repeat would be its 4th) is no longer repeated as a normal suggestion. Instead the weekly analysis surfaces it in a distinct "needs your confirmation" item that asks the owner whether it was executed, skipped or is still wanted.
 
 **Why this priority**: Silent re-issue of an unchanged order for 4 to 8 weeks is the observable defect. Escalation turns an ambiguous status into an owner decision.
 
-**Independent Test**: Seed prior analyses so that one order has been `pending` for 4 consecutive weeks. Run the analysis and confirm the order is not issued as a normal order and appears in the confirmation item with its age.
+**Independent Test**: Seed prior analyses so that one order has been `pending` in 3 consecutive weeks. Run the analysis and confirm the order is not issued as a normal order and appears in the confirmation item with its age.
 
 **Acceptance Scenarios**:
 
-1. **Given** an order `pending` for more than 3 weeks, **When** the analysis runs, **Then** it is not re-issued as a normal suggested order and is listed under a clearly labelled item asking the owner to confirm its outcome.
-2. **Given** an order `pending` for exactly 3 weeks, **When** the analysis runs, **Then** it may still be re-issued as a labelled carry-over (threshold is "more than 3 weeks").
+1. **Given** an order that was `pending` in each of the last 3 weeks, **When** the analysis runs, **Then** it is not re-issued as a normal suggested order and is listed under a clearly labelled item asking the owner to confirm its outcome.
+2. **Given** an order that was `pending` in each of the last 2 weeks, **When** the analysis runs, **Then** it may still be re-issued as a labelled carry-over (this would be its third consecutive issue; the limit is 3).
 3. **Given** the owner records the order as `executed` or `skipped`, **When** the next analysis runs, **Then** the order no longer appears as pending or in the confirmation item.
-4. **Given** the analysis judges that a stale order is still wanted, **When** the owner confirms it, **Then** it can be re-issued as a fresh order with its age reset.
+4. **Given** an escalated order that the owner still wants, **When** the owner records the old order as `skipped` with a note such as "still wanted", **Then** the chain ends and the next analysis may issue a fresh order with its age reset.
 
 ---
 
@@ -78,7 +78,7 @@ When a prior order is still `pending` but the portfolio's recorded position chan
 
 - **FR-001**: The weekly analysis input MUST include, for each order suggested in the preceding weeks that is still `pending`, its originating week, age in whole weeks, broker, symbol, side and recorded status.
 - **FR-002**: The analysis MUST label any repeated suggestion of a previously suggested order as a carry-over and state its age in weeks.
-- **FR-003**: An order that has been `pending` for more than 3 weeks MUST NOT be re-issued as a normal suggested order.
+- **FR-003**: An order that was `pending` in each of the last 3 consecutive weeks (a repeat would be its 4th consecutive issue) MUST NOT be re-issued as a normal suggested order.
 - **FR-004**: Each such stale order MUST appear in the analysis output as a distinct confirmation item asking the owner whether it was executed, skipped or is still wanted, showing its age.
 - **FR-005**: Once an order's status is recorded as `executed`, `partial` or `skipped`, it MUST drop out of the pending and confirmation lists on the next analysis.
 - **FR-006**: The 3-week staleness threshold MUST be a single named setting, not duplicated across prompt text and code.
@@ -88,20 +88,22 @@ When a prior order is still `pending` but the portfolio's recorded position chan
 - **FR-010**: When position changes are unknown for a week, no proposal MUST be made from that week.
 - **FR-011**: The first analysis after this feature ships MUST work with no prior orders or with prior orders lacking the information needed to age them, without error.
 - **FR-013**: A pending order for which later position changes show a matching fill (`executed` or `partial` proposal) MUST NOT be re-issued as a normal suggestion; it appears as a confirmation item for the owner to resolve.
+- **FR-014**: An unresolved confirmation item MUST keep counting as a pending order in every following run until the owner records an outcome, so escalation cannot be bypassed by simply not re-issuing it for a week.
+- **FR-015**: Each confirmation item MUST identify the most recent order row it refers to (analysis date and order index) so the owner can resolve it in one action.
 - **FR-012**: No real quantities, prices or holdings MUST be written to any tracked file, test fixture, log or commit as part of this feature; tests use placeholder data.
 
 ### Key Entities
 
 - **Suggested order**: a recommendation from one weekly analysis; attributes include originating week, broker, symbol, side, quantity, conviction and recorded execution status.
 - **Prior-order context**: the per-run summary of still-pending orders given to the analysis, with age in weeks and status.
-- **Stale-order confirmation item**: an output entry for an order pending more than 3 weeks, asking the owner to resolve it.
+- **Stale-order confirmation item**: an output entry for an order pending in 3 consecutive weeks, or whose fill is visible in later position changes, asking the owner to resolve it; it identifies the most recent order row to resolve.
 - **Fill proposal**: a proposed execution status (`executed`, `partial`) for a pending order, derived from position changes and requiring owner confirmation.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: No order is issued as a normal suggestion for more than 3 consecutive weeks while its status stays `pending`; an order reaching the fourth week is escalated instead (0 silent repeats beyond week 3).
+- **SC-001**: No order is issued as a normal suggestion in more than 3 consecutive weeks while its status stays `pending`; the would-be fourth issue is escalated instead and stays escalated (never silently re-issued) until the owner resolves it.
 - **SC-002**: In a replay of the 8 observed weeks, every order repeated beyond week 3 is escalated to a confirmation item rather than re-issued.
 - **SC-003**: For every pending order whose matching position change exists in a later completed week, a fill proposal is produced; in a replay of the observed weeks, no pending order with a verifiable matching change is left without a proposal.
 - **SC-004**: The owner can resolve a stale order (executed, skipped or still wanted) in a single confirmation per order.
@@ -110,7 +112,7 @@ When a prior order is still `pending` but the portfolio's recorded position chan
 ## Assumptions
 
 - "Age" is counted in completed weekly analyses since the order was first suggested, not calendar days, so irregular run cadence does not distort it.
-- The 3-week threshold comes from the owner's request; it is a configurable value, with "more than 3 weeks" as the default.
+- The limit of 3 consecutive issues comes from the owner's request; it is a single configurable value.
 - Recorded execution status is owner-reported; the existing propose-only rule stays: the system proposes, the owner confirms.
 - Position-change data from earlier features is available for completed weeks; weeks where it is unknown are skipped for matching (FR-010).
 - Out of scope: minimum notional rules for tiny orders, quantifying target-weight gaps, trigger-coherence rules, and any outcome P&L scoring (tracked separately in the roadmap and the suggestion-scorecard feature).
