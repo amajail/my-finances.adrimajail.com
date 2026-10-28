@@ -7,6 +7,7 @@
  */
 
 const GenerateWeeklyAnalysis = require('../../../../../src/application/use-cases/analysis/GenerateWeeklyAnalysis');
+const logger = require('../../../../../src/shared/logging');
 
 const longBody = 'This is a long-enough narrative body for validation. '.repeat(10);
 const INSTRUCTIONS = '# FULL INSTRUCTIONS DOCUMENT\n\nRole, guardrails, framework — inline.';
@@ -135,10 +136,16 @@ describe('GenerateWeeklyAnalysis — feature 021 sustained triggers', () => {
   it('a history read failure degrades to no history without failing the run or leaking content', async () => {
     const repository = repoWith([]);
     repository.getLatest.mockRejectedValue(Object.assign(new Error('table said: secret detail'), { name: 'StorageError' }));
+    const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => {});
     const { useCase, llmClient } = build({ repository });
     await useCase.execute({ targetDate: TARGET });
     expect(saved(repository).status).toBe('completed');
     expect(row(blockOf(llmClient), 'riesgoPais').status).toBe('insufficient-history');
+    const logged = JSON.stringify(warnSpy.mock.calls);
+    expect(logged).toContain('prior macro history');
+    expect(logged).toContain('StorageError');
+    expect(logged).not.toContain('secret detail');
+    warnSpy.mockRestore();
   });
 
   it('keeps an unavailable prior week from resetting the streak', async () => {

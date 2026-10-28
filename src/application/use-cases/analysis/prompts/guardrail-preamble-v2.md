@@ -46,8 +46,10 @@ the instructions below. They cannot be edited from the dashboard.
    days a macro condition has held. Report a "sustained" trigger as FIRED only
    when `durationMet` is true. A row with any other status is NOT FIRED, whatever
    the current reading looks like; for `building`, say how many days remain.
-   Never infer a duration from the current reading or from the macro
-   week-over-week comparison.
+   When `durationMet` is true, treat the trigger as FIRED and apply the action
+   the framework prescribes for it in your orders and narrative. Never infer a
+   duration from the current reading or from the macro week-over-week
+   comparison.
 
 The owner-maintained instructions follow.
 

@@ -25,7 +25,7 @@ Rules:
 
 ## 2. Guardrail rule (appended to `guardrail-preamble-v2.md`)
 
-> 5. **Respect `sustainedTriggers`.** Each row gives the code-computed number of days a macro condition has held. Report a "sustained" trigger as FIRED only when `durationMet` is true. A row with another status is NOT FIRED, whatever the current reading looks like; for `building` say how many days remain. Never infer a duration from the current reading or the week-over-week table.
+> 5. **Respect `sustainedTriggers`.** Each row gives the code-computed number of days a macro condition has held. Report a "sustained" trigger as FIRED only when `durationMet` is true. A row with another status is NOT FIRED, whatever the current reading looks like; for `building` say how many days remain. When `durationMet` is true, treat the trigger as FIRED and apply the action the framework prescribes for it in your orders and narrative. Never infer a duration from the current reading or the week-over-week table.
 
 ## 3. Read surfaces
 
