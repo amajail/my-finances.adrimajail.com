@@ -13,7 +13,12 @@ jest.mock('@azure/functions', () => ({
   app: { timer: jest.fn() },
 }));
 
-const { SCHEDULE } = require('../../../src/functions/refreshPricesTimer');
+const mockExecute = jest.fn();
+jest.mock('../../../src/application/di/container', () => ({
+  getRefreshPrices: () => ({ execute: mockExecute }),
+}));
+
+const { SCHEDULE, handler } = require('../../../src/functions/refreshPricesTimer');
 
 describe('refreshPricesTimer schedule', () => {
   it('fires at 16:30 local time (NYSE close + 30 min) on weekdays', () => {
@@ -24,5 +29,34 @@ describe('refreshPricesTimer schedule', () => {
 
   it('is a six-field NCRONTAB expression (Azure Functions format)', () => {
     expect(SCHEDULE.split(/\s+/)).toHaveLength(6);
+  });
+});
+
+describe('refreshPricesTimer handler', () => {
+  let context;
+  beforeEach(() => {
+    mockExecute.mockReset();
+    context = { log: Object.assign(jest.fn(), { error: jest.fn() }), warn: jest.fn() };
+  });
+
+  it('does not warn when every instrument refreshed', async () => {
+    mockExecute.mockResolvedValue({ totalSymbols: 3, succeeded: 3, failed: 0 });
+    await handler({}, context);
+    expect(context.warn).not.toHaveBeenCalled();
+  });
+
+  it('warns with counts only when some instruments failed', async () => {
+    mockExecute.mockResolvedValue({ totalSymbols: 3, succeeded: 2, failed: 1 });
+    await handler({}, context);
+    expect(context.warn).toHaveBeenCalledWith(expect.stringContaining('1 failed of 3'), {
+      failed: 1, succeeded: 2, totalSymbols: 3,
+    });
+  });
+
+  it('does not warn when the task itself threw (runTimer logs the error)', async () => {
+    mockExecute.mockRejectedValue(new Error('boom'));
+    await handler({}, context);
+    expect(context.warn).not.toHaveBeenCalled();
+    expect(context.log.error).toHaveBeenCalled();
   });
 });
