@@ -176,7 +176,7 @@ describe('GenerateWeeklyAnalysis (happy path)', () => {
     await useCase.execute({ targetDate: '2026-05-15' });
 
     expect(llmClient.submitAnalysis).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'claude-opus-4-7', maxInputTokens: 80000, maxOutputTokens: 8000 })
+      expect.objectContaining({ model: 'claude-opus-5', maxInputTokens: 80000, maxOutputTokens: 8000 })
     );
   });
 
