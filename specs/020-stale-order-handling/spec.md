@@ -87,6 +87,7 @@ When a prior order is still `pending` but the portfolio's recorded position chan
 - **FR-009**: The system MUST NOT propose `skipped` solely because time has passed with no matching change; absence of a fill leaves the order `pending`.
 - **FR-010**: When position changes are unknown for a week, no proposal MUST be made from that week.
 - **FR-011**: The first analysis after this feature ships MUST work with no prior orders or with prior orders lacking the information needed to age them, without error.
+- **FR-013**: A pending order for which later position changes show a matching fill (`executed` or `partial` proposal) MUST NOT be re-issued as a normal suggestion; it appears as a confirmation item for the owner to resolve.
 - **FR-012**: No real quantities, prices or holdings MUST be written to any tracked file, test fixture, log or commit as part of this feature; tests use placeholder data.
 
 ### Key Entities
