@@ -46,6 +46,7 @@ const {
   UpdateSetting,
   RefreshPrices,
   GenerateWeeklyAnalysis,
+  RerunWeeklyAnalysis,
   GetCalendarEvents,
   SetOrderExecutionStatus,
   GetSuggestionScorecard,
@@ -477,6 +478,17 @@ class Container {
       allocationTargetsRepository: this.getAllocationTargetsRepository(),
       // Feature 017: optional upcoming-events (maturities/dividends) block.
       getCalendarEvents: this.getGetCalendarEvents()
+    });
+  }
+
+  /**
+   * Get RerunWeeklyAnalysis use case — on-demand run for today, guarded.
+   * @returns {RerunWeeklyAnalysis}
+   */
+  getRerunWeeklyAnalysis() {
+    return new RerunWeeklyAnalysis({
+      analysisRepository: this.getAnalysisRepository(),
+      generateWeeklyAnalysis: this.getGenerateWeeklyAnalysis(),
     });
   }
 

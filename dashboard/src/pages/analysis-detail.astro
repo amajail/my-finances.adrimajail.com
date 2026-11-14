@@ -15,6 +15,12 @@ import Layout from '../layouts/Layout.astro';
     <div class="p-4">
       <h2 class="font-semibold mb-1 pos-negative">Run failed</h2>
       <p class="text-sm" id="failed-reason"></p>
+      <div class="flex flex-wrap items-center gap-3 mt-3">
+        <button id="rerun-btn" type="button" class="row-action-btn">Re-run now</button>
+        <span id="rerun-status" class="text-xs text-[var(--color-muted)]" role="status" aria-live="polite">
+          Runs a new analysis on today's positions and prices. Each run is billed.
+        </span>
+      </div>
     </div>
   </section>
 
@@ -286,6 +292,7 @@ import Layout from '../layouts/Layout.astro';
     renderMacroWow, renderDrift, renderCaps, renderWatchlist, renderWeekOverWeek, renderAmendments,
   } from '../lib/analysis-detail/drift.js';
   import { renderOrders, renderConfirmationItems } from '../lib/analysis-detail/orders.js';
+  import { wireRerun } from '../lib/analysis-detail/rerun.js';
 
   function show(el) { el.classList.remove('hidden'); }
 
@@ -356,6 +363,11 @@ import Layout from '../layouts/Layout.astro';
         if (detail.status === 'failed') {
           document.getElementById('failed-reason').textContent = detail.errorMessage || 'No reason recorded.';
           show(document.getElementById('failed-banner'));
+          wireRerun({
+            button: document.getElementById('rerun-btn'),
+            statusEl: document.getElementById('rerun-status'),
+            api,
+          });
           return;
         }
 

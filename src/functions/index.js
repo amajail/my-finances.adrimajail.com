@@ -13,6 +13,7 @@ require('./refreshPricesTimer');
 require('./weeklyAnalysisTimer');
 require('./getWeeklyAnalysisList');
 require('./getWeeklyAnalysis');
+require('./runWeeklyAnalysis');
 require('./setOrderExecutionStatus');
 require('./getSuggestionScorecard');
 require('./getMacroSeries');
