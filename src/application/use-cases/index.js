@@ -23,6 +23,7 @@ const { RefreshPrices } = require('./prices');
 
 // Analysis use cases
 const GenerateWeeklyAnalysis = require('./analysis/GenerateWeeklyAnalysis');
+const RerunWeeklyAnalysis = require('./analysis/RerunWeeklyAnalysis');
 const GetCalendarEvents = require('./calendar/GetCalendarEvents');
 const SetOrderExecutionStatus = require('./analysis/SetOrderExecutionStatus');
 const GetSuggestionScorecard = require('./analysis/GetSuggestionScorecard');
@@ -55,6 +56,7 @@ module.exports = {
   UpdateSetting,
   RefreshPrices,
   GenerateWeeklyAnalysis,
+  RerunWeeklyAnalysis,
   GetCalendarEvents,
   SetOrderExecutionStatus,
   GetSuggestionScorecard,

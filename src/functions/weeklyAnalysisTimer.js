@@ -10,9 +10,9 @@
  * instance executes at a time across the scale-out, which satisfies the
  * "no concurrent runs" requirement (spec FR-003) with no code-level lock.
  *
- * Manual recovery: invoke this function from the Azure Portal's
- * "Test / Run" affordance. There is no HTTP endpoint for triggering the
- * analysis; the read endpoints are the only HTTP surface for this feature.
+ * Manual recovery: POST /api/analysis/weekly/run (see runWeeklyAnalysis.js;
+ * the dashboard's failed-run banner calls it), or invoke this function from
+ * the Azure Portal's "Test / Run" affordance.
  */
 
 const { app } = require('@azure/functions');
