@@ -10,13 +10,13 @@
       "summary": {
         "type": "string",
         "minLength": 40,
-        "maxLength": 800,
-        "description": "One-paragraph executive summary of the week's recommended action. Plain prose, no markdown. Visible on the dashboard list page."
+        "maxLength": 1500,
+        "description": "One-paragraph executive summary. Plain prose, no markdown. Visible on the dashboard list page. Aim for 400 characters or fewer: the verdict, what changed since last week, and the action (or that none is needed). Do not enumerate triggers or caps that are OK. The hard limit is deliberately far above the target so a slightly long summary never fails the run."
       },
       "markdownBody": {
         "type": "string",
         "minLength": 200,
-        "description": "Full narrative report in markdown. Must include sections: Executive Summary, Market Context (with current riesgo país reading and its relation to the 600 bp trigger), Portfolio Assessment, Week-over-week Comparison (omitted on first run), Suggested Actions. Renders on the dashboard detail page."
+        "description": "Narrative report in markdown, containing exactly the output sections the instructions define, in the order they define them, and nothing else. Report by exception: interpret, do not restate figures the structured tables and fields already carry. Renders on the dashboard detail page."
       },
       "orders": {
         "type": "array",

@@ -67,7 +67,7 @@ Your `markdownBody` MUST contain these sections, in this order, with these headi
 
 You MUST call the `submit_analysis` tool with:
 
-- `summary` — one-paragraph executive summary (40-800 chars), identical or near-identical to the Executive Summary in the narrative.
+- `summary` — one-paragraph executive summary (aim for ≤400 chars; hard limit 1500), identical or near-identical to the Executive Summary in the narrative.
 - `markdownBody` — the full narrative (≥ 200 chars) with the sections above.
 - `orders` — array (may be empty) of `{ broker, symbol, side, quantity, rationale, conviction }`. Each `rationale` ≥ 20 chars and cites the basis (drift / directive / trigger / new context).
 
